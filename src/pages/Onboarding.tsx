@@ -9,7 +9,7 @@ import type { OnboardingStep } from '../lib/store';
 import { PAY_METHOD_LABELS, type DayHours, type PayMethod } from '../types';
 import { formatFCFA } from '../lib/format';
 import {
-  Alert, Badge, Card, Input, PageHeader, Progress, SectionTitle, Select, useSafeAction,
+  Alert, Badge, Breadcrumbs, Card, Input, PageHeader, Progress, SectionTitle, Select, useSafeAction,
 } from '../components/ui';
 
 const CATEGORY_SUGGESTIONS = ['Berline', '4×4 / SUV', 'Moto', 'Utilitaire', 'Minibus'];
@@ -363,6 +363,7 @@ export default function Onboarding() {
 
   return (
     <div>
+      <Breadcrumbs items={[{ label: 'Pilotage', to: '/app/tableau-de-bord' }, { label: 'Mise en route (13 étapes)' }]} />
       <PageHeader
         title="Mise en route"
         subtitle="Parcours d’ouverture en treize étapes. Chaque étape est constatée sur les données réellement enregistrées — aucun bouton ne déclare une étape « faite »."

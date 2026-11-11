@@ -3,7 +3,7 @@ import { FiDownload, FiLock, FiPieChart } from 'react-icons/fi';
 import { useStore } from '../lib/store';
 import { buildCommissions, periodRange, type Period } from '../lib/metrics';
 import { downloadCSV, formatDate, formatFCFA } from '../lib/format';
-import { Alert, Badge, Card, EmptyState, PageHeader, StatCard, Tabs } from '../components/ui';
+import { Alert, Badge, Breadcrumbs, Card, EmptyState, PageHeader, StatCard, Tabs } from '../components/ui';
 
 const PERIODS: { id: Period; label: string }[] = [
   { id: 'jour', label: 'Jour' }, { id: 'semaine', label: 'Semaine' }, { id: 'mois', label: 'Mois' },
@@ -22,6 +22,7 @@ export default function Commissions() {
   if (!allowed) {
     return (
       <div>
+        <Breadcrumbs items={[{ label: 'Ressources humaines', to: '/app/commissions' }, { label: 'Commissions laveurs' }]} />
         <PageHeader title="Commissions" subtitle="Réservé au propriétaire et au gérant." />
         <Card className="flex items-start gap-3 border-red-500/30">
           <FiLock className="mt-0.5 text-xl text-red-400" />
@@ -41,6 +42,7 @@ export default function Commissions() {
 
   return (
     <div>
+      <Breadcrumbs items={[{ label: 'Ressources humaines', to: '/app/commissions' }, { label: 'Commissions laveurs' }]} />
       <PageHeader title="Commissions" subtitle={`Ce que la station doit à chaque laveur sur les lavages terminés (${label}).`}
         actions={<button className="wg-btn wg-btn-primary" onClick={exportCSV}><FiDownload /> Export CSV pour la paie</button>} />
       <div className="mb-5"><Tabs value={period} onChange={setPeriod} options={PERIODS} /></div>

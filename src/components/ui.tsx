@@ -1,6 +1,7 @@
 import React from 'react';
 import {
-  FiAlertCircle, FiCheck, FiCheckCircle, FiInfo, FiLock, FiX,
+  FiAlertCircle, FiCheck, FiCheckCircle, FiChevronLeft, FiChevronRight,
+  FiInfo, FiLock, FiSearch, FiSliders, FiTrash2, FiX,
 } from 'react-icons/fi';
 import { useStore } from '../lib/store';
 import { Link } from 'react-router-dom';
@@ -90,16 +91,51 @@ export function Badge({ children, tone = 'neutral' }: { children: React.ReactNod
   return <span className={`wg-badge ${cls}`}>{children}</span>;
 }
 
-export function StatCard({ label, value, hint, icon, accent }: { label: string; value: string; hint?: string; icon?: React.ReactNode; accent?: string }) {
+export function StatCard({
+  label,
+  value,
+  hint,
+  icon,
+  accent,
+  trend,
+  className = '',
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  icon?: React.ReactNode;
+  accent?: string;
+  trend?: { direction: 'up' | 'down' | 'neutral'; text: string };
+  className?: string;
+}) {
   return (
-    <Card className="flex items-start justify-between gap-3">
-      <div className="min-w-0">
-        <p className="wg-muted text-xs font-semibold uppercase tracking-wide">{label}</p>
-        <p className="mt-2 truncate text-xl font-bold tracking-tight sm:text-2xl">{value}</p>
+    <Card className={`flex items-start justify-between gap-3 transition-all duration-200 hover:border-sky-500/30 ${className}`}>
+      <div className="min-w-0 flex-1">
+        <p className="wg-muted text-[11px] font-semibold uppercase tracking-wider">{label}</p>
+        <div className="mt-2 flex flex-wrap items-baseline gap-2">
+          <p className="truncate text-xl font-bold tracking-tight sm:text-2xl text-slate-100">{value}</p>
+          {trend && (
+            <span
+              className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                trend.direction === 'up'
+                  ? 'bg-emerald-500/15 text-emerald-400'
+                  : trend.direction === 'down'
+                  ? 'bg-rose-500/15 text-rose-400'
+                  : 'bg-slate-500/15 text-slate-400'
+              }`}
+            >
+              {trend.direction === 'up' ? '↗' : trend.direction === 'down' ? '↘' : '•'} {trend.text}
+            </span>
+          )}
+        </div>
         {hint && <p className="wg-muted mt-1 truncate text-xs">{hint}</p>}
       </div>
       {icon && (
-        <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl text-lg ${accent ?? 'bg-sky-500/10 text-sky-400'}`}>
+        <span
+          className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl text-lg ${
+            accent ?? 'bg-sky-500/10 text-sky-400'
+          }`}
+        >
           {icon}
         </span>
       )}
@@ -160,6 +196,299 @@ export function Tabs<T extends string>({ value, onChange, options }: { value: T;
           {o.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+export function Breadcrumbs({ items }: { items: { label: string; to?: string }[] }) {
+  return (
+    <nav className="mb-3 flex items-center gap-1.5 text-[11px] font-medium" aria-label="Fil d’Ariane">
+      {items.map((it, idx) => {
+        const isLast = idx === items.length - 1;
+        return (
+          <React.Fragment key={idx}>
+            {idx > 0 && <span className="wg-muted opacity-40">/</span>}
+            {it.to && !isLast ? (
+              <Link to={it.to} className="wg-muted hover:text-sky-400 transition">
+                {it.label}
+              </Link>
+            ) : (
+              <span className={isLast ? 'font-semibold text-sky-400' : 'wg-muted'}>{it.label}</span>
+            )}
+          </React.Fragment>
+        );
+      })}
+    </nav>
+  );
+}
+
+export function Drawer({
+  open,
+  onClose,
+  title,
+  subtitle,
+  children,
+  footer,
+  width = 'max-w-md',
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+  footer?: React.ReactNode;
+  width?: string;
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[85] overflow-hidden bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className={`fixed inset-y-0 right-0 flex w-full ${width} flex-col border-l shadow-2xl wg-slide-in-right`}
+        style={{ background: 'var(--wg-surface)', borderColor: 'var(--wg-border)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between border-b px-5 py-4" style={{ borderColor: 'var(--wg-border)' }}>
+          <div className="min-w-0 pr-3">
+            <h3 className="text-base font-bold tracking-tight">{title}</h3>
+            {subtitle && <p className="wg-muted mt-0.5 text-xs truncate">{subtitle}</p>}
+          </div>
+          <button className="wg-muted hover:text-sky-400 p-1.5 rounded-lg transition" onClick={onClose} aria-label="Fermer">
+            <FiX size={18} />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-5">{children}</div>
+        {footer && (
+          <div className="border-t p-4" style={{ borderColor: 'var(--wg-border)', background: 'var(--wg-surface-2)' }}>
+            {footer}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function ConfirmDialog({
+  open,
+  onClose,
+  onConfirm,
+  title,
+  message,
+  confirmLabel = 'Confirmer',
+  cancelLabel = 'Annuler',
+  tone = 'danger',
+}: {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title: string;
+  message: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  tone?: 'danger' | 'warn' | 'primary';
+}) {
+  if (!open) return null;
+  return (
+    <Modal open={open} onClose={onClose} title={title}>
+      <div className="space-y-4">
+        <p className="wg-muted text-sm leading-relaxed">{message}</p>
+        <div className="flex items-center justify-end gap-2 pt-3 border-t" style={{ borderColor: 'var(--wg-border)' }}>
+          <button type="button" className="wg-btn wg-btn-ghost text-xs" onClick={onClose}>
+            {cancelLabel}
+          </button>
+          <button
+            type="button"
+            className={`wg-btn text-xs ${tone === 'danger' ? 'wg-btn-danger' : tone === 'warn' ? 'bg-amber-500 text-white hover:bg-amber-600' : 'wg-btn-primary'}`}
+            onClick={() => {
+              onConfirm();
+              onClose();
+            }}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+export function MoneyInput({
+  label,
+  hint,
+  value,
+  onChange,
+  className = '',
+  placeholder = '0',
+  min = 0,
+  disabled = false,
+}: {
+  label?: string;
+  hint?: string;
+  value: number | string;
+  onChange: (val: number) => void;
+  className?: string;
+  placeholder?: string;
+  min?: number;
+  disabled?: boolean;
+}) {
+  return (
+    <div className={className}>
+      {label && <Label>{label}</Label>}
+      <div className="relative flex items-center">
+        <input
+          type="number"
+          min={min}
+          disabled={disabled}
+          className="wg-input pr-16 font-semibold"
+          placeholder={placeholder}
+          value={value === 0 || value === '0' ? '' : value}
+          onChange={(e) => {
+            const parsed = parseInt(e.target.value, 10);
+            onChange(isNaN(parsed) ? 0 : Math.max(min, parsed));
+          }}
+        />
+        <span className="absolute right-3 text-xs font-bold wg-muted pointer-events-none uppercase tracking-wide">
+          FCFA
+        </span>
+      </div>
+      {hint && <p className="wg-muted mt-1 text-xs">{hint}</p>}
+    </div>
+  );
+}
+
+export function Skeleton({ className = '' }: { className?: string }) {
+  return (
+    <div
+      className={`animate-pulse rounded-lg ${className}`}
+      style={{ background: 'var(--wg-surface-2)' }}
+    />
+  );
+}
+
+export interface DataTableColumn<T> {
+  key: string;
+  header: string;
+  render: (item: T) => React.ReactNode;
+  sortable?: boolean;
+  className?: string;
+}
+
+export function DataTable<T extends { id: string }>({
+  data,
+  columns,
+  searchPlaceholder = 'Rechercher...',
+  searchFilter,
+  pageSize = 10,
+  emptyTitle = 'Aucun élément trouvé',
+  emptyDescription = 'Aucune donnée disponible pour les filtres actuels.',
+  onRowClick,
+}: {
+  data: T[];
+  columns: DataTableColumn<T>[];
+  searchPlaceholder?: string;
+  searchFilter?: (item: T, query: string) => boolean;
+  pageSize?: number;
+  emptyTitle?: string;
+  emptyDescription?: string;
+  onRowClick?: (item: T) => void;
+}) {
+  const [query, setQuery] = React.useState('');
+  const [page, setPage] = React.useState(1);
+
+  const filtered = React.useMemo(() => {
+    if (!query.trim() || !searchFilter) return data;
+    return data.filter((item) => searchFilter(item, query.trim().toLowerCase()));
+  }, [data, query, searchFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const startIdx = (currentPage - 1) * pageSize;
+  const pageItems = filtered.slice(startIdx, startIdx + pageSize);
+
+  return (
+    <div className="space-y-3">
+      {searchFilter && (
+        <div className="relative max-w-sm">
+          <FiSearch className="wg-muted absolute left-3 top-1/2 -translate-y-1/2 text-sm" />
+          <input
+            type="text"
+            className="wg-input !pl-9 text-xs"
+            placeholder={searchPlaceholder}
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setPage(1);
+            }}
+          />
+        </div>
+      )}
+
+      {filtered.length === 0 ? (
+        <EmptyState title={emptyTitle} description={emptyDescription} />
+      ) : (
+        <div className="wg-card overflow-hidden">
+          <div className="wg-scroll-x">
+            <table>
+              <thead>
+                <tr>
+                  {columns.map((col) => (
+                    <th key={col.key} className={`wg-th ${col.className ?? ''}`}>
+                      {col.header}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {pageItems.map((item) => (
+                  <tr
+                    key={item.id}
+                    onClick={() => onRowClick && onRowClick(item)}
+                    className={`wg-tr-hover ${onRowClick ? 'cursor-pointer' : ''}`}
+                  >
+                    {columns.map((col) => (
+                      <td key={col.key} className={`wg-td ${col.className ?? ''}`}>
+                        {col.render(item)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between border-t px-4 py-2.5 text-xs text-slate-400" style={{ borderColor: 'var(--wg-border)' }}>
+              <span>
+                Affichage de <strong className="text-slate-200">{startIdx + 1}</strong> à{' '}
+                <strong className="text-slate-200">{Math.min(startIdx + pageSize, filtered.length)}</strong> sur{' '}
+                <strong className="text-slate-200">{filtered.length}</strong>
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  disabled={currentPage <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  className="wg-btn wg-btn-ghost !p-1.5"
+                  aria-label="Page précédente"
+                >
+                  <FiChevronLeft size={14} />
+                </button>
+                <span className="px-2 text-xs font-semibold">
+                  {currentPage} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  className="wg-btn wg-btn-ghost !p-1.5"
+                  aria-label="Page suivante"
+                >
+                  <FiChevronRight size={14} />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

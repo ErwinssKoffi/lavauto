@@ -4,7 +4,7 @@ import { useStore } from '../lib/store';
 import { formatDate, formatDateTime, formatFCFA } from '../lib/format';
 import { theoreticalCash } from '../lib/metrics';
 import { PAY_METHOD_LABELS } from '../types';
-import { Alert, Badge, Card, EmptyState, Input, LockedPanel, Modal, PageHeader, StatCard, useSafeAction } from '../components/ui';
+import { Alert, Badge, Breadcrumbs, Card, EmptyState, Input, LockedPanel, Modal, PageHeader, StatCard, useSafeAction } from '../components/ui';
 
 export default function Cash() {
   const { state, openCash, closeCash, reopenCash } = useStore();
@@ -15,12 +15,17 @@ export default function Cash() {
   const [counted, setCounted] = useState(0);
   const [reopenId, setReopenId] = useState<string | null>(null);
   const [reason, setReason] = useState('');
+  const currentStationId = state.station?.id;
   const activated = Boolean(state.station?.activated);
-  const open = state.cashSessions.find((c) => c.status === 'ouverte');
+  const stationSessions = state.cashSessions.filter(
+    (c) => !currentStationId || c.stationId === currentStationId
+  );
+  const open = stationSessions.find((c) => c.status === 'ouverte');
   const theoretical = open ? theoreticalCash(state, open.id) : 0;
 
   return (
     <div>
+      <Breadcrumbs items={[{ label: 'Gestion financière', to: '/app/caisse' }, { label: 'Caisse & Sessions' }]} />
       <PageHeader title="Caisse" subtitle="Ouverture avec fond de caisse, encaissements, dépenses, clôture avec comptage et écart théorique / compté."
         actions={open
           ? <button className="wg-btn wg-btn-danger" disabled={!activated} onClick={() => { setCounted(theoretical); setCloseMode(true); }}><FiLock /> Clôturer avec comptage</button>
@@ -47,12 +52,12 @@ export default function Cash() {
 
       <Card className="mt-5">
         <h2 className="mb-4 text-sm font-bold">Historique des caisses</h2>
-        {state.cashSessions.length === 0 ? <p className="wg-muted text-xs">Aucune caisse enregistrée.</p> : (
+        {stationSessions.length === 0 ? <p className="wg-muted text-xs">Aucune caisse enregistrée.</p> : (
           <div className="wg-scroll-x rounded-xl border" style={{ borderColor: 'var(--wg-border)' }}>
             <table>
               <thead><tr><th className="wg-th">Ouverture</th><th className="wg-th">Fond</th><th className="wg-th">Clôture</th><th className="wg-th">Théorique</th><th className="wg-th">Compté</th><th className="wg-th">Écart</th><th className="wg-th">État</th><th className="wg-th" /></tr></thead>
               <tbody>
-                {state.cashSessions.map((c) => {
+                {stationSessions.map((c) => {
                   const theo = theoreticalCash(state, c.id);
                   const ecart = c.countedAmount === null ? null : c.countedAmount - theo;
                   return (
@@ -79,11 +84,11 @@ export default function Cash() {
 
       <Card className="mt-5">
         <h2 className="mb-3 text-sm font-bold">Encaissements en espèces enregistrés</h2>
-        {state.washes.flatMap((w) => w.payments).filter((p) => p.method === 'especes').length === 0 ? (
+        {state.washes.filter(w => !currentStationId || w.stationId === currentStationId).flatMap((w) => w.payments).filter((p) => p.method === 'especes').length === 0 ? (
           <p className="wg-muted text-xs">Aucun encaissement en espèces.</p>
         ) : (
           <div className="space-y-1.5">
-            {state.washes.flatMap((w) => w.payments.filter((p) => p.method === 'especes').map((p) => ({ w, p }))).map(({ w, p }) => (
+            {state.washes.filter(w => !currentStationId || w.stationId === currentStationId).flatMap((w) => w.payments.filter((p) => p.method === 'especes').map((p) => ({ w, p }))).map(({ w, p }) => (
               <div key={p.id} className="wg-muted flex flex-wrap justify-between gap-2 rounded-lg px-3 py-2 text-xs" style={{ background: 'var(--wg-surface-2)' }}>
                 <span>{w.number} · {formatDateTime(p.at)} · {PAY_METHOD_LABELS[p.method]}</span><span className="font-bold">{formatFCFA(p.amount)}</span>
               </div>

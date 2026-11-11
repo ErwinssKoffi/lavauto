@@ -112,7 +112,24 @@ body {
 .wg-scroll-x { overflow-x: auto; }
 .wg-scroll-x table { min-width: 620px; width: 100%; border-collapse: collapse; }
 
-.wg-fade-in { animation: wgFade .32s ease both; }
-@keyframes wgFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.wg-fade-in { animation: wgFade .24s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes wgFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.wg-slide-in-right { animation: wgSlideRight .28s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes wgSlideRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
 
 .wg-gradient { background: linear-gradient(135deg, #0284c7 0%, #0ea5e9 45%, #22d3ee 100%); }
+
+.wg-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+tr.wg-tr-hover {
+  transition: background-color .15s ease;
+}
+tr.wg-tr-hover:hover {
+  background: var(--wg-surface-2);
+}

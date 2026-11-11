@@ -4,7 +4,7 @@ import { useStore } from '../lib/store';
 import { planById } from '../lib/plans';
 import { formatDate, formatFCFA } from '../lib/format';
 import { buildReport } from '../lib/metrics';
-import { Alert, Badge, Card, PageHeader, Progress } from '../components/ui';
+import { Alert, Badge, Breadcrumbs, Card, PageHeader, Progress } from '../components/ui';
 
 export default function Subscription() {
   const { state, plans, requestPlanChange } = useStore();
@@ -18,6 +18,7 @@ export default function Subscription() {
 
   return (
     <div>
+      <Breadcrumbs items={[{ label: 'Administration', to: '/app/abonnement' }, { label: 'Abonnement SaaS' }]} />
       <PageHeader title="Abonnement" subtitle="Formule en cours, consommation par rapport aux limites, comparaison des formules et demande de changement."
         actions={<Badge tone={sub?.status === 'essai' ? 'warn' : 'success'}>{sub?.status === 'essai' ? 'Essai en cours' : sub?.status === 'suspendue' ? 'Suspendu' : 'Formule active'}</Badge>} />
 

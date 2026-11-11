@@ -6,7 +6,7 @@ import { useStore } from '../lib/store';
 import { formatDate, formatDateTime, formatFCFA } from '../lib/format';
 import { PAY_METHOD_LABELS, WASH_STATUS_LABELS, type PayMethod, type WashStatus } from '../types';
 import {
-  Alert, Badge, Card, EmptyState, Input, LockedPanel, Modal, PageHeader,
+  Alert, Badge, Breadcrumbs, Card, Drawer, EmptyState, Input, LockedPanel, Modal, PageHeader,
   Select, useSafeAction,
 } from '../components/ui';
 
@@ -21,16 +21,20 @@ export default function Washes() {
   const methods: PayMethod[] = state.station?.paymentMethods.length
     ? state.station.paymentMethods : ['especes', 'mobile_money', 'carte', 'virement'];
 
+  const currentStationId = state.station?.id;
   const washes = useMemo(() => state.washes.filter((w) => {
+    if (currentStationId && w.stationId !== currentStationId) return false;
     const q = search.trim().toLowerCase();
     const matchQ = !q || w.number.toLowerCase().includes(q) || w.plate.toLowerCase().includes(q) || (w.clientName ?? '').toLowerCase().includes(q);
     return matchQ && (statusFilter === 'tous' || w.status === statusFilter);
-  }), [state.washes, search, statusFilter]);
+  }), [state.washes, currentStationId, search, statusFilter]);
 
   const detail = state.washes.find((w) => w.id === detailId) ?? null;
 
   return (
     <div>
+      <Breadcrumbs items={[{ label: 'Exploitation', to: '/app/lavages' }, { label: 'Lavages & File d’attente' }]} />
+
       <PageHeader
         title="Lavages"
         subtitle="Saisie rapide d’une fiche : prestations, véhicule, plaque facultative, employé, remise autorisée et client facultatif."
@@ -217,41 +221,109 @@ function WashDetail({ washId, methods, onClose, onStatus, onPay }: {
   const employee = state.users.find((u) => u.id === w.employeeId)?.name ?? '—';
 
   return (
-    <Modal open onClose={onClose} title={`Fiche ${w.number}`} wide>
-      <div className="flex flex-wrap items-center gap-2">
-        <Badge tone={w.status === 'termine' ? 'success' : w.status === 'annule' ? 'danger' : 'warn'}>{WASH_STATUS_LABELS[w.status]}</Badge>
-        <Badge>{formatDateTime(w.createdAt)}</Badge>
-        <Badge>{w.vehicleLabel}{w.plate ? ` · ${w.plate}` : ''}</Badge>
+    <Drawer
+      open
+      onClose={onClose}
+      title={`Fiche ${w.number}`}
+      subtitle={`${w.vehicleLabel}${w.plate ? ` · ${w.plate}` : ''} — ${formatDateTime(w.createdAt)}`}
+      width="max-w-xl"
+      footer={
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap gap-2">
+            {w.status === 'en_attente' && (
+              <button className="wg-btn wg-btn-ghost text-xs" onClick={() => onStatus('en_cours')}>
+                Passer en cours
+              </button>
+            )}
+            {w.status !== 'termine' && w.status !== 'annule' && (
+              <button className="wg-btn wg-btn-primary text-xs" onClick={() => onStatus('termine')}>
+                <FiCheckCircle size={14} /> Marquer terminé
+              </button>
+            )}
+            {w.status !== 'annule' && (
+              <button className="wg-btn wg-btn-danger text-xs" onClick={() => setCancelMode(true)}>
+                Annuler
+              </button>
+            )}
+          </div>
+          <button className="wg-btn wg-btn-ghost text-xs ml-auto" onClick={onClose}>
+            Fermer
+          </button>
+        </div>
+      }
+    >
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Badge tone={w.status === 'termine' ? 'success' : w.status === 'annule' ? 'danger' : 'warn'}>
+          {WASH_STATUS_LABELS[w.status]}
+        </Badge>
         <Badge>Employé : {employee}</Badge>
         {w.clientName && <Badge>Client : {w.clientName}</Badge>}
       </div>
 
-      <div className="mt-5 wg-scroll-x rounded-xl border" style={{ borderColor: 'var(--wg-border)' }}>
+      <div className="mt-4 wg-scroll-x rounded-xl border" style={{ borderColor: 'var(--wg-border)' }}>
         <table>
-          <thead><tr><th className="wg-th">Prestation</th><th className="wg-th">Prix unitaire (figé)</th><th className="wg-th">Qté</th><th className="wg-th">Montant</th></tr></thead>
+          <thead>
+            <tr>
+              <th className="wg-th">Prestation</th>
+              <th className="wg-th">Prix unitaire (figé)</th>
+              <th className="wg-th">Qté</th>
+              <th className="wg-th">Montant</th>
+            </tr>
+          </thead>
           <tbody>
             {w.items.map((it) => (
-              <tr key={it.serviceId}><td className="wg-td">{it.serviceName}</td><td className="wg-td">{formatFCFA(it.unitPrice)}</td><td className="wg-td">{it.qty}</td><td className="wg-td font-semibold">{formatFCFA(it.unitPrice * it.qty)}</td></tr>
+              <tr key={it.serviceId}>
+                <td className="wg-td">{it.serviceName}</td>
+                <td className="wg-td">{formatFCFA(it.unitPrice)}</td>
+                <td className="wg-td">{it.qty}</td>
+                <td className="wg-td font-semibold">{formatFCFA(it.unitPrice * it.qty)}</td>
+              </tr>
             ))}
-            {w.discount > 0 && <tr><td className="wg-td" colSpan={3}>Remise</td><td className="wg-td">− {formatFCFA(w.discount)}</td></tr>}
-            <tr><td className="wg-td font-bold" colSpan={3}>Total</td><td className="wg-td font-bold">{formatFCFA(w.total)}</td></tr>
+            {w.discount > 0 && (
+              <tr>
+                <td className="wg-td" colSpan={3}>Remise accordée</td>
+                <td className="wg-td text-amber-400 font-semibold">− {formatFCFA(w.discount)}</td>
+              </tr>
+            )}
+            <tr>
+              <td className="wg-td font-bold" colSpan={3}>Total net</td>
+              <td className="wg-td font-bold text-sky-400">{formatFCFA(w.total)}</td>
+            </tr>
           </tbody>
         </table>
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <Card className="!p-3"><p className="wg-muted text-[11px]">Total</p><p className="mt-1 font-bold">{formatFCFA(w.total)}</p></Card>
-        <Card className="!p-3"><p className="wg-muted text-[11px]">Encaissé</p><p className="mt-1 font-bold">{formatFCFA(w.paid)}</p></Card>
-        <Card className="!p-3"><p className="wg-muted text-[11px]">Reste à payer</p><p className="mt-1 font-bold">{formatFCFA(Math.max(0, w.total - w.paid))}</p></Card>
+      <div className="mt-4 grid gap-2 sm:grid-cols-3">
+        <Card className="!p-3">
+          <p className="wg-muted text-[10px] font-semibold uppercase tracking-wider">Total</p>
+          <p className="mt-1 font-bold text-sm text-slate-200">{formatFCFA(w.total)}</p>
+        </Card>
+        <Card className="!p-3">
+          <p className="wg-muted text-[10px] font-semibold uppercase tracking-wider">Encaissé</p>
+          <p className="mt-1 font-bold text-sm text-emerald-400">{formatFCFA(w.paid)}</p>
+        </Card>
+        <Card className="!p-3">
+          <p className="wg-muted text-[10px] font-semibold uppercase tracking-wider">Reste dû</p>
+          <p className="mt-1 font-bold text-sm text-amber-400">
+            {formatFCFA(Math.max(0, w.total - w.paid))}
+          </p>
+        </Card>
       </div>
 
       {w.payments.length > 0 && (
         <div className="mt-4">
-          <p className="mb-2 text-xs font-bold">Encaissements</p>
+          <p className="mb-2 text-xs font-bold text-slate-300">Historique des encaissements</p>
           <div className="space-y-1.5">
             {w.payments.map((p) => (
-              <div key={p.id} className="wg-muted flex justify-between rounded-lg px-3 py-2 text-xs" style={{ background: 'var(--wg-surface-2)' }}>
-                <span>{PAY_METHOD_LABELS[p.method]} · {formatDateTime(p.at)}</span><span className="font-bold">{formatFCFA(p.amount)}</span>
+              <div
+                key={p.id}
+                className="wg-muted flex justify-between rounded-lg px-3 py-2 text-xs border"
+                style={{ background: 'var(--wg-surface-2)', borderColor: 'var(--wg-border)' }}
+              >
+                <span>
+                  {PAY_METHOD_LABELS[p.method]} · {formatDateTime(p.at)}
+                </span>
+                <span className="font-bold text-slate-200">{formatFCFA(p.amount)}</span>
               </div>
             ))}
           </div>
@@ -259,34 +331,64 @@ function WashDetail({ washId, methods, onClose, onStatus, onPay }: {
       )}
 
       {w.total - w.paid > 0 && w.status !== 'annule' && (
-        <div className="mt-4 rounded-xl border p-4" style={{ borderColor: 'var(--wg-border)' }}>
-          <p className="mb-3 flex items-center gap-2 text-sm font-bold"><FiDollarSign /> Encaisser le reste</p>
+        <div className="mt-4 rounded-xl border p-4" style={{ borderColor: 'var(--wg-border)', background: 'var(--wg-surface-2)' }}>
+          <p className="mb-3 flex items-center gap-2 text-xs font-bold text-slate-200">
+            <FiDollarSign className="text-sky-400" /> Encaisser le solde restant
+          </p>
           <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-            <Input type="number" min="1" max={w.total - w.paid} value={amount} onChange={(e) => setAmount(Number(e.target.value))} />
-            <Select value={method} onChange={(e) => setMethod(e.target.value as PayMethod)}>{methods.map((m) => <option key={m} value={m}>{PAY_METHOD_LABELS[m]}</option>)}</Select>
-            <button className="wg-btn wg-btn-primary" onClick={() => onPay(amount, method)}>Encaisser</button>
+            <Input
+              type="number"
+              min="1"
+              max={w.total - w.paid}
+              value={amount}
+              onChange={(e) => setAmount(Number(e.target.value))}
+            />
+            <Select value={method} onChange={(e) => setMethod(e.target.value as PayMethod)}>
+              {methods.map((m) => (
+                <option key={m} value={m}>
+                  {PAY_METHOD_LABELS[m]}
+                </option>
+              ))}
+            </Select>
+            <button className="wg-btn wg-btn-primary !text-xs" onClick={() => onPay(amount, method)}>
+              Encaisser
+            </button>
           </div>
         </div>
       )}
 
       {cancelMode && (
-        <div className="mt-4 rounded-xl border border-red-500/30 p-4">
-          <p className="mb-2 text-sm font-bold">Annuler la fiche</p>
-          <Input label="Motif de l’annulation" value={reason} onChange={(e) => setReason(e.target.value)} />
+        <div className="mt-4 rounded-xl border border-red-500/40 p-4 bg-red-500/5">
+          <p className="mb-2 text-xs font-bold text-red-400">Annulation de la fiche</p>
+          <Input
+            label="Motif obligatoire de l’annulation"
+            placeholder="Ex : Erreur de saisie, client parti..."
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+          />
           <div className="mt-3 flex gap-2">
-            <button className="wg-btn wg-btn-ghost" onClick={() => setCancelMode(false)}>Revenir</button>
-            <button className="wg-btn wg-btn-danger" onClick={() => { onStatus('annule', reason.trim() || 'Annulé depuis la fiche'); setCancelMode(false); onClose(); }}>Confirmer l’annulation</button>
+            <button className="wg-btn wg-btn-ghost text-xs" onClick={() => setCancelMode(false)}>
+              Revenir
+            </button>
+            <button
+              className="wg-btn wg-btn-danger text-xs"
+              onClick={() => {
+                onStatus('annule', reason.trim() || 'Annulé depuis la fiche');
+                setCancelMode(false);
+                onClose();
+              }}
+            >
+              Confirmer l’annulation
+            </button>
           </div>
         </div>
       )}
 
-      <div className="mt-5 flex flex-wrap gap-2 border-t pt-4" style={{ borderColor: 'var(--wg-border)' }}>
-        {w.status === 'en_attente' && <button className="wg-btn wg-btn-ghost" onClick={() => onStatus('en_cours')}>Passer en cours</button>}
-        {w.status !== 'termine' && w.status !== 'annule' && <button className="wg-btn wg-btn-primary" onClick={() => onStatus('termine')}><FiCheckCircle /> Marquer terminé</button>}
-        {w.status !== 'annule' && <button className="wg-btn wg-btn-danger" onClick={() => setCancelMode(true)}>Annuler</button>}
-        <button className="wg-btn wg-btn-ghost ml-auto" onClick={onClose}>Fermer</button>
-      </div>
-      {w.cancelledReason && <p className="wg-muted mt-2 text-xs">Motif : {w.cancelledReason}</p>}
-    </Modal>
+      {w.cancelledReason && (
+        <p className="wg-muted mt-3 text-xs italic bg-red-500/10 p-2.5 rounded-lg border border-red-500/20 text-red-300">
+          Motif d'annulation : {w.cancelledReason}
+        </p>
+      )}
+    </Drawer>
   );
 }

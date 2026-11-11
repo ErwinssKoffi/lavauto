@@ -4,7 +4,7 @@ import { useStore } from '../lib/store';
 import { buildReport, periodRange, type Period } from '../lib/metrics';
 import { downloadCSV, formatDate, formatFCFA } from '../lib/format';
 import { PAY_METHOD_LABELS } from '../types';
-import { Badge, Card, EmptyState, PageHeader, StatCard, Tabs } from '../components/ui';
+import { Badge, Breadcrumbs, Card, EmptyState, PageHeader, StatCard, Tabs } from '../components/ui';
 
 const PERIODS: { id: Period; label: string }[] = [
   { id: 'jour', label: 'Jour' }, { id: 'semaine', label: 'Semaine' }, { id: 'mois', label: 'Mois' },
@@ -43,6 +43,7 @@ export default function Reports() {
 
   return (
     <div>
+      <Breadcrumbs items={[{ label: 'Gestion financière', to: '/app/rapports' }, { label: 'Rapports d’activité' }]} />
       <PageHeader title="Rapports" subtitle={`Jour / semaine / mois : chiffres calculés à partir des données enregistrées (${label}).`}
         actions={<button className="wg-btn wg-btn-primary" onClick={exportCSV}><FiDownload /> Exporter en CSV</button>} />
       <div className="mb-5"><Tabs value={period} onChange={setPeriod} options={PERIODS} /></div>

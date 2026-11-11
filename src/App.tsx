@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import AppShell from './components/AppShell';
+import RoleGuard from './components/RoleGuard';
 import { ToastHost } from './components/ui';
 import { fetchMeOnce, useStore } from './lib/store';
+import { getDefaultRedirectForRole } from './lib/rbac';
 
 import Landing from './pages/Landing';
 import SignIn from './pages/auth/SignIn';
@@ -44,6 +46,7 @@ function LandingRoute() {
   const { state } = useStore();
   if (state.session) {
     if (state.session.role === 'support') return <Navigate to="/app/plateforme" replace />;
+    if (state.session.role === 'laveur') return <Navigate to="/app/lavages" replace />;
     if (!state.station?.activated) return <Navigate to="/app/mise-en-route" replace />;
     return <Navigate to="/app/tableau-de-bord" replace />;
   }
@@ -52,7 +55,10 @@ function LandingRoute() {
 
 function AuthRoute({ children }: { children: React.ReactNode }) {
   const { state } = useStore();
-  if (state.session) return <Navigate to="/app/tableau-de-bord" replace />;
+  if (state.session) {
+    const dest = getDefaultRedirectForRole(state.session.role);
+    return <Navigate to={dest} replace />;
+  }
   return <>{children}</>;
 }
 
@@ -73,19 +79,111 @@ export default function App() {
         <Route path="/auth/*" element={<Navigate to="/connexion" replace />} />
         <Route path="/app" element={<AppRoute><AppShell /></AppRoute>}>
           <Route index element={<Navigate to="tableau-de-bord" replace />} />
-          <Route path="tableau-de-bord" element={<Dashboard />} />
-          <Route path="mise-en-route" element={<Onboarding />} />
-          <Route path="lavages" element={<Washes />} />
-          <Route path="prestations" element={<Services />} />
-          <Route path="clients" element={<Clients />} />
-          <Route path="employes" element={<Employees />} />
-          <Route path="caisse" element={<Cash />} />
-          <Route path="depenses" element={<Expenses />} />
-          <Route path="rapports" element={<Reports />} />
-          <Route path="commissions" element={<Commissions />} />
-          <Route path="parametres" element={<Settings />} />
-          <Route path="abonnement" element={<Subscription />} />
-          <Route path="plateforme" element={<Platform />} />
+          
+          <Route
+            path="tableau-de-bord"
+            element={
+              <RoleGuard allowedRoles={['proprietaire', 'gerant', 'caissier']}>
+                <Dashboard />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="mise-en-route"
+            element={
+              <RoleGuard allowedRoles={['proprietaire', 'gerant']}>
+                <Onboarding />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="lavages"
+            element={
+              <RoleGuard allowedRoles={['proprietaire', 'gerant', 'caissier', 'laveur']}>
+                <Washes />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="prestations"
+            element={
+              <RoleGuard allowedRoles={['proprietaire', 'gerant']}>
+                <Services />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="clients"
+            element={
+              <RoleGuard allowedRoles={['proprietaire', 'gerant', 'caissier']}>
+                <Clients />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="employes"
+            element={
+              <RoleGuard allowedRoles={['proprietaire', 'gerant']}>
+                <Employees />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="caisse"
+            element={
+              <RoleGuard allowedRoles={['proprietaire', 'gerant', 'caissier']}>
+                <Cash />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="depenses"
+            element={
+              <RoleGuard allowedRoles={['proprietaire', 'gerant', 'caissier']}>
+                <Expenses />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="rapports"
+            element={
+              <RoleGuard allowedRoles={['proprietaire', 'gerant']}>
+                <Reports />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="commissions"
+            element={
+              <RoleGuard allowedRoles={['proprietaire', 'gerant']}>
+                <Commissions />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="parametres"
+            element={
+              <RoleGuard allowedRoles={['proprietaire', 'gerant']}>
+                <Settings />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="abonnement"
+            element={
+              <RoleGuard allowedRoles={['proprietaire']}>
+                <Subscription />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="plateforme"
+            element={
+              <RoleGuard allowedRoles={['support']}>
+                <Platform />
+              </RoleGuard>
+            }
+          />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

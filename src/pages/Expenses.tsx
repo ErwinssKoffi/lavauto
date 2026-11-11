@@ -3,7 +3,7 @@ import { FiAlertCircle, FiPlus, FiX } from 'react-icons/fi';
 import { useStore } from '../lib/store';
 import { formatDate, formatFCFA, todayISO } from '../lib/format';
 import { PAY_METHOD_LABELS, type PayMethod } from '../types';
-import { Alert, Badge, Card, EmptyState, Input, LockedPanel, Modal, PageHeader, Select, useSafeAction } from '../components/ui';
+import { Alert, Badge, Breadcrumbs, Card, EmptyState, Input, LockedPanel, Modal, PageHeader, Select, useSafeAction } from '../components/ui';
 
 const CATEGORIES = ['Fournitures', 'Eau', 'Électricité', 'Carburant', 'Entretien', 'Salaires', 'Loyer', 'Autre'];
 
@@ -14,12 +14,15 @@ export default function Expenses() {
   const [cancelId, setCancelId] = useState<string | null>(null);
   const [reason, setReason] = useState('');
   const [f, setF] = useState({ amount: 0, category: CATEGORIES[0], reason: '', supplier: '', date: todayISO(), method: 'especes' as PayMethod });
+  const currentStationId = state.station?.id;
   const activated = Boolean(state.station?.activated);
   const methods: PayMethod[] = state.station?.paymentMethods.length ? state.station.paymentMethods : ['especes', 'mobile_money', 'carte', 'virement'];
-  const active = state.expenses.filter((e) => e.status === 'enregistree');
+  const stationExpenses = state.expenses.filter((e) => !currentStationId || e.stationId === currentStationId);
+  const active = stationExpenses.filter((e) => e.status === 'enregistree');
 
   return (
     <div>
+      <Breadcrumbs items={[{ label: 'Gestion financière', to: '/app/depenses' }, { label: 'Dépenses' }]} />
       <PageHeader title="Dépenses" subtitle="Montant, catégorie, motif, fournisseur, date et moyen de paiement. Rattachement automatique à la caisse ouverte."
         actions={<button className="wg-btn wg-btn-primary" disabled={!activated} onClick={() => setOpen(true)}><FiPlus /> Nouvelle dépense</button>} />
       {!activated && <div className="mb-5"><LockedPanel /></div>}
@@ -28,11 +31,11 @@ export default function Expenses() {
 
       <div className="mb-5 grid gap-4 sm:grid-cols-3">
         <Card><p className="wg-muted text-xs font-bold uppercase">Dépenses enregistrées</p><p className="mt-2 text-xl font-bold">{formatFCFA(active.reduce((s, e) => s + e.amount, 0))}</p><p className="wg-muted mt-1 text-xs">{active.length} opération(s)</p></Card>
-        <Card><p className="wg-muted text-xs font-bold uppercase">Annulées (tracées)</p><p className="mt-2 text-xl font-bold">{state.expenses.filter((e) => e.status === 'annulee').length}</p><p className="wg-muted mt-1 text-xs">Jamais supprimées</p></Card>
-        <Card><p className="wg-muted text-xs font-bold uppercase">Caisse ouverte</p><p className="mt-2 text-xl font-bold">{state.cashSessions.some((c) => c.status === 'ouverte') ? 'Oui' : 'Non'}</p><p className="wg-muted mt-1 text-xs">Rattachement automatique</p></Card>
+        <Card><p className="wg-muted text-xs font-bold uppercase">Annulées (tracées)</p><p className="mt-2 text-xl font-bold">{stationExpenses.filter((e) => e.status === 'annulee').length}</p><p className="wg-muted mt-1 text-xs">Jamais supprimées</p></Card>
+        <Card><p className="wg-muted text-xs font-bold uppercase">Caisse ouverte</p><p className="mt-2 text-xl font-bold">{state.cashSessions.some((c) => c.status === 'ouverte' && (!currentStationId || c.stationId === currentStationId)) ? 'Oui' : 'Non'}</p><p className="wg-muted mt-1 text-xs">Rattachement automatique</p></Card>
       </div>
 
-      {state.expenses.length === 0 ? (
+      {stationExpenses.length === 0 ? (
         <EmptyState icon={<FiAlertCircle />} title="Aucune dépense enregistrée" description="Les dépenses apparaîtront ici avec leur motif et leur moyen de paiement." />
       ) : (
         <Card className="!p-0 overflow-hidden">
@@ -40,7 +43,7 @@ export default function Expenses() {
             <table>
               <thead><tr><th className="wg-th">Date</th><th className="wg-th">Catégorie</th><th className="wg-th">Motif</th><th className="wg-th">Fournisseur</th><th className="wg-th">Paiement</th><th className="wg-th">Montant</th><th className="wg-th">État</th><th className="wg-th" /></tr></thead>
               <tbody>
-                {state.expenses.map((e) => (
+                {stationExpenses.map((e) => (
                   <tr key={e.id}>
                     <td className="wg-td">{formatDate(e.date)}</td>
                     <td className="wg-td"><Badge>{e.category}</Badge></td>

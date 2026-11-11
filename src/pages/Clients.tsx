@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { FiPlus, FiSearch, FiUsers, FiX } from 'react-icons/fi';
 import { useStore } from '../lib/store';
 import { formatDate, formatFCFA } from '../lib/format';
-import { Badge, Card, EmptyState, Input, Modal, PageHeader } from '../components/ui';
+import { Badge, Breadcrumbs, Card, Drawer, EmptyState, Input, Modal, PageHeader } from '../components/ui';
 
 export default function Clients() {
   const { state, addClient, updateClient } = useStore();
@@ -19,6 +19,7 @@ export default function Clients() {
 
   return (
     <div>
+      <Breadcrumbs items={[{ label: 'Commercial', to: '/app/clients' }, { label: 'Clients & Véhicules' }]} />
       <PageHeader title="Clients" subtitle="Fiche facultative : nom, téléphone, plaque et notes. Un lavage peut être encaissé sans créer de client."
         actions={<button className="wg-btn wg-btn-primary" onClick={() => setOpen(true)}><FiPlus /> Nouveau client</button>} />
 
@@ -69,7 +70,13 @@ export default function Clients() {
         </div>
       </Modal>
 
-      <Modal open={Boolean(detail)} onClose={() => setDetailId(null)} title={detail?.name ?? 'Client'} wide>
+      <Drawer
+        open={Boolean(detail)}
+        onClose={() => setDetailId(null)}
+        title={detail?.name ?? 'Client'}
+        subtitle={detail?.phone ? `Contact : ${detail.phone}` : 'Fiche client'}
+        width="max-w-xl"
+      >
         {detail && (
           <>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -78,8 +85,8 @@ export default function Clients() {
               <Input label="Plaque" value={detail.plate} onChange={(e) => updateClient(detail.id, { plate: e.target.value })} />
               <Input label="Notes" value={detail.notes} onChange={(e) => updateClient(detail.id, { notes: e.target.value })} />
             </div>
-            <p className="wg-muted mt-3 text-[11px]">Les modifications sont enregistrées immédiatement.</p>
-            <h3 className="mt-6 text-sm font-bold">Historique des lavages</h3>
+            <p className="wg-muted mt-2 text-[11px]">Les modifications sont enregistrées immédiatement.</p>
+            <h3 className="mt-6 text-sm font-bold text-slate-200">Historique des lavages</h3>
             {history.length === 0 ? <p className="wg-muted mt-2 text-xs">Aucun lavage rattaché à cette fiche.</p> : (
               <div className="wg-scroll-x mt-3 rounded-xl border" style={{ borderColor: 'var(--wg-border)' }}>
                 <table>
@@ -92,7 +99,7 @@ export default function Clients() {
             )}
           </>
         )}
-      </Modal>
+      </Drawer>
     </div>
   );
 }

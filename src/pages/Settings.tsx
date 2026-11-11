@@ -3,10 +3,10 @@ import { FiDatabase, FiLock, FiSave, FiShield, FiTrash2 } from 'react-icons/fi';
 import { useStore, DEFAULT_DAYS } from '../lib/store';
 import { isSupabaseConfigured as sbConfigured } from '../lib/supabase';
 import { formatDateTime } from '../lib/format';
-import { Alert, Badge, Card, Input, PageHeader, SectionTitle } from '../components/ui';
+import { Alert, Badge, Breadcrumbs, Card, Input, PageHeader, SectionTitle } from '../components/ui';
 
 export default function Settings() {
-  const { state, updateStation, updateCompany, setHours, resetAll, notify } = useStore();
+  const { state, updateStation, updateCompany, setHours, resetAll, updateMyPassword, notify } = useStore();
   const st = state.station;
   const co = state.company;
   const [stationDraft, setStationDraft] = useState({ name: st?.name ?? '', address: st?.address ?? '', city: st?.city ?? '', phone: st?.phone ?? '', logoUrl: st?.logoUrl ?? '' });
@@ -14,8 +14,36 @@ export default function Settings() {
   const [rules, setRules] = useState({ cashRequiresOpen: st?.cashRequiresOpen ?? true, maxCashierDiscount: st?.maxCashierDiscount ?? 0, commissionRate: st?.commissionRate ?? 0, monthlyTarget: st?.monthlyTarget ?? 0 });
   const [hours, setLocalHours] = useState(st?.hours?.length ? st.hours : DEFAULT_DAYS.map((h) => ({ ...h })));
 
+  const [passwordForm, setPasswordForm] = useState({ current: '', next: '', confirm: '' });
+  const [pwdLoading, setPwdLoading] = useState(false);
+
+  const handlePasswordChange = async () => {
+    if (!passwordForm.current || !passwordForm.next || !passwordForm.confirm) {
+      notify('error', 'Remplissez tous les champs du mot de passe.');
+      return;
+    }
+    if (passwordForm.next !== passwordForm.confirm) {
+      notify('error', 'Le nouveau mot de passe et sa confirmation ne correspondent pas.');
+      return;
+    }
+    if (passwordForm.next.length < 8) {
+      notify('error', 'Le mot de passe doit comporter au moins 8 caractères.');
+      return;
+    }
+    setPwdLoading(true);
+    try {
+      await updateMyPassword(passwordForm.current, passwordForm.next);
+      setPasswordForm({ current: '', next: '', confirm: '' });
+    } catch (err) {
+      notify('error', err instanceof Error ? err.message : 'Erreur lors de la modification');
+    } finally {
+      setPwdLoading(false);
+    }
+  };
+
   return (
     <div>
+      <Breadcrumbs items={[{ label: 'Administration', to: '/app/parametres' }, { label: 'Paramètres station' }]} />
       <PageHeader title="Paramètres" subtitle="Identité de la station, horaires, devise, logo, règles de caisse, barème, objectif, entreprise et journal des opérations sensibles."
         actions={<Badge tone="accent">Devise : FCFA</Badge>} />
 
@@ -82,6 +110,47 @@ export default function Settings() {
                 </div>
               ))}
             </div>
+          </div>
+        </Card>
+
+        {/* Sécurité et Mot de passe personnel */}
+        <Card className="lg:col-span-2">
+          <SectionTitle hint="Changement sécurisé du mot de passe de votre compte connecté.">Sécurité & Authentification personnelle</SectionTitle>
+          <div className="grid gap-4 sm:grid-cols-3 max-w-3xl">
+            <Input
+              label="Mot de passe actuel *"
+              type="password"
+              placeholder="••••••••"
+              value={passwordForm.current}
+              onChange={(e) => setPasswordForm({ ...passwordForm, current: e.target.value })}
+            />
+            <Input
+              label="Nouveau mot de passe *"
+              type="password"
+              placeholder="8 caractères min."
+              value={passwordForm.next}
+              onChange={(e) => setPasswordForm({ ...passwordForm, next: e.target.value })}
+            />
+            <Input
+              label="Confirmer le nouveau mot de passe *"
+              type="password"
+              placeholder="••••••••"
+              value={passwordForm.confirm}
+              onChange={(e) => setPasswordForm({ ...passwordForm, confirm: e.target.value })}
+            />
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              className="wg-btn wg-btn-primary"
+              onClick={handlePasswordChange}
+              disabled={pwdLoading}
+            >
+              <FiLock /> {pwdLoading ? 'Mise à jour…' : 'Mettre à jour mon mot de passe'}
+            </button>
+            <p className="wg-muted text-xs">
+              Connecté en tant que <strong>{state.session?.email}</strong> ({state.session?.name}).
+            </p>
           </div>
         </Card>
       </div>

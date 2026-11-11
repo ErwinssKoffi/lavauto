@@ -9,26 +9,29 @@ import type {
 import { ApiError } from '../types';
 import { uid, todayISO } from './format';
 import { PLANS } from './plans';
-import { isSupabaseConfigured } from './supabase';
+import {
+  isSupabaseConfigured,
+  getSupabaseSession,
+  signInWithSupabase,
+  signUpWithSupabase,
+  signOutWithSupabase,
+  updateSupabasePassword,
+  inviteCollaboratorWithSupabase,
+} from './supabase';
+import { ROLE_LABELS } from '../types';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Couche de données WashGuard — FRONTEND UNIQUEMENT
+// Couche de données WashGuard — FRONTEND & AUTHENTIFICATION SÉCURISÉE
 //
-// En l'absence de backend branché, l'état est conservé dans le navigateur.
-// Cette couche simule le *contrat* du serveur, pas des données :
-//   • l'inscription crée UNE SEULE FOIS entreprise + station + compte
-//     propriétaire + abonnement d'essai ;
-//   • l'onboarding est CONSTATÉ sur les données enregistrées (aucune case
-//     cochée par le navigateur) ;
-//   • tant que la station n'est pas activée, toute écriture métier lève
-//     409 onboarding_incomplete avec la liste de ce qui manque ;
-//   • aucun prix de prestation ni aucune donnée d'exemple n'est prérempli.
-//
-// Quand Supabase sera branché (lib/supabase.ts), chaque action ci-dessous
-// sera remplacée par un appel RPC / table, sans changer les écrans.
+// Dual-Driver :
+//   • Mode Supabase Auth : lorsque configuré, les sessions JWT sont synchronisées
+//     via Supabase Auth et stockées en sessionStorage avec auto-refresh.
+//   • Mode démo locale : état réactif complet persistant, avec simulation de token
+//     JWT en sessionStorage et contrôle d'accès strict multi-rôles (RBAC).
 // ═══════════════════════════════════════════════════════════════════════════
 
 const STORAGE_KEY = 'washguard.state.v1';
+const JWT_SESSION_KEY = 'washguard.jwt_session';
 
 export const DEFAULT_DAYS: DayHours[] = [
   { day: 'Lundi', open: '08:00', close: '18:00', closed: false },
@@ -43,6 +46,7 @@ export const DEFAULT_DAYS: DayHours[] = [
 export const emptyState = (): AppState => ({
   company: null,
   station: null,
+  stations: [],
   users: [],
   vehicleCategories: [],
   services: [],
@@ -62,26 +66,37 @@ export const emptyState = (): AppState => ({
 function load(): AppState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return { ...emptyState(), ...(JSON.parse(raw) as AppState) };
+    if (raw) {
+      const parsed = JSON.parse(raw) as AppState;
+      let stations = parsed.stations ?? [];
+      if (parsed.station && !stations.some((s) => s.id === parsed.station!.id)) {
+        stations = [parsed.station, ...stations];
+      }
+      return { ...emptyState(), ...parsed, stations };
+    }
   } catch { /* état corrompu → repartir à vide */ }
   return emptyState();
 }
 
 // ─── Garde-fou /auth/me : UN SEUL appel par visiteur ─────────────────────────
-// Le défaut réel : le 401 de /auth/me invalidait tout le cache, ce qui
-// relançait /auth/me, et ainsi de suite (2 300 requêtes en 5 s mesurées
-// dans un vrai navigateur). La promesse est mémorisée une fois pour toutes
-// et un 401 résout `null` SANS invalider le cache.
 let meRequest: Promise<Session | null> | null = null;
 export function fetchMeOnce(): Promise<Session | null> {
   if (meRequest) return meRequest;
-  meRequest = new Promise<Session | null>((resolve) => {
-    // En mode local, la session vient du stockage navigateur.
-    // Avec Supabase : supabase.auth.getSession() → 401 ⇒ resolve(null),
-    // jamais de nouvelle tentative ni d'invalidation de cache.
+  meRequest = new Promise<Session | null>(async (resolve) => {
     try {
-      const s = load().session;
-      resolve(s ?? null);
+      if (isSupabaseConfigured) {
+        const sbSession = await getSupabaseSession();
+        if (sbSession?.user) {
+          const s = load();
+          const user = s.users.find((u) => u.email === sbSession.user.email);
+          if (user) {
+            resolve(makeSession(user, s));
+            return;
+          }
+        }
+      }
+      const s = load();
+      resolve(s.session ?? null);
     } catch {
       resolve(null);
     }
@@ -236,6 +251,14 @@ interface Ctx {
   signIn: (email: string, password: string) => void;
   signInSupportDemo: () => void;
   signOut: () => void;
+  // station switching & multi-stations
+  switchStation: (stationId: string) => void;
+  createStation: (p: { name: string; city: string; address?: string; phone?: string }) => Station;
+  assignedStations: Station[];
+  // auth & sécurité
+  updateMyPassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  inviteEmployee: (p: { name: string; email: string; phone?: string; role: Role; stationId?: string; password?: string }) => Promise<void>;
+  switchRoleDemo: (role: Role) => void;
   // données de base / paramètres
   updateCompany: (patch: Partial<Company>) => void;
   updateStation: (patch: Partial<Station>) => void;
@@ -359,7 +382,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     };
     const next: AppState = {
       ...s,
-      company, station, users: [owner], subscription: sub,
+      company, station, stations: [station], users: [owner], subscription: sub,
       passwords: { ...s.passwords, [owner.email]: p.password },
       platformCompanies: [{
         id: companyId, name: company.name, city: company.city, phone: company.phone,
@@ -367,6 +390,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       }, ...s.platformCompanies],
       session: { userId, email: owner.email, name: owner.name, role: 'proprietaire', companyId, stationId },
     };
+    try {
+      sessionStorage.setItem(JWT_SESSION_KEY, JSON.stringify({
+        token: 'wg_jwt_' + uid('tok'),
+        email: owner.email,
+        role: 'proprietaire',
+        companyId,
+        stationId,
+      }));
+    } catch { /* ignore */ }
     setState({ ...next, auditLogs: logAction(next, 'Inscription', `Création de ${company.name} / ${station.name} et de l’abonnement d’essai`) });
     notify('success', 'Votre espace est créé. Bienvenue dans la mise en route !');
   }, [notify]);
@@ -379,21 +411,257 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
     if (!user.active) throw new ApiError('account_disabled', 'Ce compte est désactivé. Voyez le propriétaire.');
     if (s.company?.suspended) throw new ApiError('company_suspended', 'Cette entreprise est suspendue. Contactez le support WashGuard.');
-    setState((cur) => ({ ...cur, session: makeSession(user, cur) }));
-    notify('success', `Bonjour ${user.name} !`);
+    
+    const sess = makeSession(user, s);
+    try {
+      sessionStorage.setItem(JWT_SESSION_KEY, JSON.stringify({
+        token: 'wg_jwt_' + uid('tok'),
+        email: user.email,
+        role: user.role,
+        companyId: user.companyId,
+        stationId: sess.stationId,
+      }));
+    } catch { /* ignore */ }
+
+    setState((cur) => ({ ...cur, session: sess }));
+    notify('success', `Bonjour ${user.name} (${ROLE_LABELS[user.role]}) !`);
   }, [notify]);
 
   const signInSupportDemo = useCallback(() => {
+    const supportSession = {
+      userId: 'support-demo',
+      email: 'support@washguard.demo',
+      name: 'Support WashGuard',
+      role: 'support' as Role,
+      companyId: null,
+      stationId: null,
+    };
+    try {
+      sessionStorage.setItem(JWT_SESSION_KEY, JSON.stringify({
+        token: 'wg_jwt_support',
+        email: supportSession.email,
+        role: 'support',
+      }));
+    } catch { /* ignore */ }
     setState((s) => ({
       ...s,
-      session: { userId: 'support-demo', email: 'support@washguard.demo', name: 'Support WashGuard', role: 'support', companyId: null, stationId: null },
+      session: supportSession,
     }));
-    notify('info', 'Accès support de démonstration (frontend seul).');
+    notify('info', 'Accès support plateforme actif.');
   }, [notify]);
 
   const signOut = useCallback(() => {
+    try {
+      sessionStorage.removeItem(JWT_SESSION_KEY);
+    } catch { /* ignore */ }
+    signOutWithSupabase();
     setState((s) => ({ ...s, session: null }));
-  }, []);
+    notify('info', 'Vous avez été déconnecté.');
+  }, [notify]);
+
+  // ── Station Switcher & Multi-Stations ──────────────────────────────────────
+  const switchStation = useCallback((stationId: string) => {
+    const s = stateRef.current;
+    const all = s.stations && s.stations.length > 0 ? s.stations : (s.station ? [s.station] : []);
+    const target = all.find((st) => st.id === stationId);
+    if (!target) {
+      notify('error', 'Station introuvable.');
+      return;
+    }
+    setState((cur) => {
+      const nextSession = cur.session ? { ...cur.session, stationId: target.id } : null;
+      const next: AppState = {
+        ...cur,
+        station: target,
+        session: nextSession,
+      };
+      return {
+        ...next,
+        auditLogs: logAction(next, 'Changement de station active', `${target.name} (${target.city})`),
+      };
+    });
+    notify('info', `Station active : ${target.name}`);
+  }, [notify]);
+
+  const createStation = useCallback((p: { name: string; city: string; address?: string; phone?: string }): Station => {
+    const s = stateRef.current;
+    if (!s.company) throw new ApiError('no_company', 'Aucune entreprise active.');
+    const newStationId = uid('st');
+    const newStation: Station = {
+      id: newStationId,
+      companyId: s.company.id,
+      name: p.name.trim(),
+      address: p.address?.trim() ?? '',
+      city: p.city.trim(),
+      phone: p.phone?.trim() ?? s.company.phone,
+      currency: 'FCFA',
+      logoUrl: null,
+      hours: DEFAULT_DAYS.map((d) => ({ ...d })),
+      paymentMethods: ['especes', 'mobile_money'],
+      cashRequiresOpen: true,
+      maxCashierDiscount: 2000,
+      commissionRate: 15,
+      monthlyTarget: 1000000,
+      activated: true,
+      activatedAt: new Date().toISOString(),
+    };
+
+    setState((cur) => {
+      const existing = cur.stations && cur.stations.length > 0 ? cur.stations : (cur.station ? [cur.station] : []);
+      const updatedStations = [...existing, newStation];
+      const next: AppState = {
+        ...cur,
+        station: newStation,
+        stations: updatedStations,
+        session: cur.session ? { ...cur.session, stationId: newStation.id } : null,
+        platformCompanies: cur.platformCompanies.map((c) =>
+          c.id === cur.company?.id ? { ...c, stations: updatedStations.length } : c
+        ),
+      };
+      return {
+        ...next,
+        auditLogs: logAction(next, 'Nouvelle station créée', `${newStation.name} (${newStation.city})`),
+      };
+    });
+    notify('success', `Nouvelle station « ${newStation.name} » créée et sélectionnée.`);
+    return newStation;
+  }, [notify]);
+
+  const assignedStations = useMemo(() => {
+    const all = state.stations && state.stations.length > 0 ? state.stations : (state.station ? [state.station] : []);
+    const user = state.users.find((u) => u.id === state.session?.userId);
+    if (!state.session || state.session.role === 'proprietaire' || state.session.role === 'support') {
+      return all;
+    }
+    if (user?.assignedStationIds && user.assignedStationIds.length > 0) {
+      const filtered = all.filter((st) => user.assignedStationIds?.includes(st.id));
+      if (filtered.length > 0) return filtered;
+    }
+    if (state.session.stationId) {
+      const match = all.filter((st) => st.id === state.session?.stationId);
+      if (match.length > 0) return match;
+    }
+    return all;
+  }, [state.stations, state.station, state.users, state.session]);
+
+  // ── Sécurité & Rôles Démo ──────────────────────────────────────────────────
+  const updateMyPassword = useCallback(async (currentPassword: string, newPassword: string) => {
+    const s = stateRef.current;
+    if (!s.session) throw new ApiError('unauthenticated', 'Aucune session active.');
+    const email = s.session.email;
+    const currentStored = s.passwords[email];
+    if (currentStored && currentStored !== currentPassword) {
+      throw new ApiError('invalid_password', 'Le mot de passe actuel saisi est incorrect.');
+    }
+    if (newPassword.length < 8) {
+      throw new ApiError('weak_password', 'Le mot de passe doit comporter au moins 8 caractères.');
+    }
+
+    if (isSupabaseConfigured) {
+      await updateSupabasePassword(newPassword);
+    }
+
+    setState((cur) => {
+      const next = {
+        ...cur,
+        passwords: { ...cur.passwords, [email]: newPassword },
+      };
+      return {
+        ...next,
+        auditLogs: logAction(next, 'Mot de passe modifié', `Compte : ${cur.session?.name}`),
+      };
+    });
+    notify('success', 'Votre mot de passe a été modifié avec succès.');
+  }, [notify]);
+
+  const inviteEmployee = useCallback(async (p: { name: string; email: string; phone?: string; role: Role; stationId?: string; password?: string }) => {
+    const s = stateRef.current;
+    if (!s.company || !s.station) return;
+    const email = p.email.trim().toLowerCase();
+    if (s.users.some((u) => u.email === email)) {
+      throw new ApiError('email_taken', 'Cette adresse e-mail est déjà attribuée à un collaborateur.');
+    }
+    const tempPassword = p.password?.trim() || 'WashGuard@2026';
+    const assignedStation = p.stationId || s.station.id;
+    const user: AppUser = {
+      id: uid('usr'),
+      companyId: s.company.id,
+      stationId: assignedStation,
+      assignedStationIds: [assignedStation],
+      name: p.name.trim(),
+      email,
+      phone: p.phone?.trim() ?? '',
+      role: p.role,
+      active: true,
+      commissionRateOverride: null,
+      createdAt: new Date().toISOString(),
+    };
+
+    if (isSupabaseConfigured) {
+      try {
+        await inviteCollaboratorWithSupabase({
+          email,
+          role: p.role,
+          name: p.name,
+          phone: p.phone,
+          stationId: assignedStation,
+        });
+      } catch (err) {
+        console.warn('[Invite Supabase]', err);
+      }
+    }
+
+    const next = {
+      ...s,
+      users: [...s.users, user],
+      passwords: { ...s.passwords, [email]: tempPassword },
+    };
+    setState({
+      ...next,
+      auditLogs: logAction(next, 'Invitation collaborateur', `${user.name} (${ROLE_LABELS[p.role]})`),
+    });
+    notify('success', `Compte créé pour ${user.name} (${ROLE_LABELS[p.role]}).`);
+  }, [notify]);
+
+  const switchRoleDemo = useCallback((targetRole: Role) => {
+    const s = stateRef.current;
+    if (targetRole === 'support') {
+      signInSupportDemo();
+      return;
+    }
+    let user = s.users.find((u) => u.role === targetRole);
+    if (!user) {
+      user = {
+        id: uid('usr_demo'),
+        companyId: s.company?.id ?? 'co_demo',
+        stationId: s.station?.id ?? 'st_demo',
+        name: `Profil Démo ${ROLE_LABELS[targetRole]}`,
+        email: `${targetRole}@washguard.ci`,
+        phone: '+225 07 00 00 00',
+        role: targetRole,
+        active: true,
+        commissionRateOverride: null,
+        createdAt: new Date().toISOString(),
+      };
+      setState((cur) => ({
+        ...cur,
+        users: [...cur.users, user!],
+        passwords: { ...cur.passwords, [user!.email]: 'Demo1234!' },
+      }));
+    }
+    const sess = makeSession(user, s);
+    try {
+      sessionStorage.setItem(JWT_SESSION_KEY, JSON.stringify({
+        token: 'wg_jwt_' + uid('tok'),
+        email: user.email,
+        role: targetRole,
+        companyId: user.companyId,
+        stationId: sess.stationId,
+      }));
+    } catch { /* ignore */ }
+    setState((cur) => ({ ...cur, session: sess }));
+    notify('info', `Rôle actif : ${ROLE_LABELS[targetRole]}`);
+  }, [signInSupportDemo, notify]);
 
   // ── Données de base ────────────────────────────────────────────────────────
   const updateCompany = useCallback((patch: Partial<Company>) => mutate((s) => {
@@ -720,6 +988,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const value: Ctx = {
     state, toasts, notify, dismissToast, theme, toggleTheme, plans: PLANS, onboarding, missing,
     signUp, signIn, signInSupportDemo, signOut,
+    switchStation, createStation, assignedStations,
+    updateMyPassword, inviteEmployee, switchRoleDemo,
     updateCompany, updateStation, setHours, addCategory, toggleCategory, removeCategory,
     addService, updateService, setPrice, removeService,
     addEmployee, updateEmployee, resetPassword, addClient, updateClient,

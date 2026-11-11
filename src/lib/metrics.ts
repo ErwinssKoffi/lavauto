@@ -29,7 +29,10 @@ export function inRange(iso: string, start: Date, end: Date): boolean {
 }
 
 export function activeWashes(state: AppState): Wash[] {
-  return state.washes.filter((w) => w.status !== 'annule');
+  const currentStationId = state.station?.id;
+  return state.washes.filter(
+    (w) => w.status !== 'annule' && (!currentStationId || w.stationId === currentStationId)
+  );
 }
 
 export interface Report {
@@ -46,6 +49,7 @@ export interface Report {
 }
 
 export function buildReport(state: AppState, period: Period): Report {
+  const currentStationId = state.station?.id;
   const { start, end } = periodRange(period);
   const washes = activeWashes(state).filter((w) => inRange(w.createdAt, start, end));
   const revenue = washes.reduce((s, w) => s + w.total, 0);
@@ -53,7 +57,10 @@ export function buildReport(state: AppState, period: Period): Report {
   const payments = washes.flatMap((w) => w.payments).filter((p) => inRange(p.at, start, end));
   const collected = payments.reduce((s, p) => s + p.amount, 0);
   const exps = state.expenses.filter(
-    (e) => e.status === 'enregistree' && inRange(e.date + 'T00:00:00', start, end)
+    (e) =>
+      e.status === 'enregistree' &&
+      (!currentStationId || e.stationId === currentStationId) &&
+      inRange(e.date + 'T00:00:00', start, end)
   );
   const expenses = exps.reduce((s, e) => s + e.amount, 0);
 
@@ -160,4 +167,30 @@ export function theoreticalCash(state: AppState, sessionId: string): number {
     .filter((e) => e.status === 'enregistree' && e.method === 'especes' && e.cashSessionId === s.id)
     .reduce((sum, e) => sum + e.amount, 0);
   return s.openingFloat + cashPayments - cashExpenses;
+}
+
+export function previous7DaysMetrics(state: AppState, now = new Date()): {
+  totalRevenue: number;
+  dailyAverage: number;
+  washesCount: number;
+} {
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+
+  const startOf7DaysAgo = new Date(startOfToday);
+  startOf7DaysAgo.setDate(startOf7DaysAgo.getDate() - 7);
+
+  const pastWashes = activeWashes(state).filter((w) => {
+    const t = new Date(w.createdAt).getTime();
+    return t >= startOf7DaysAgo.getTime() && t < startOfToday.getTime();
+  });
+
+  const totalRevenue = pastWashes.reduce((sum, w) => sum + w.total, 0);
+  const dailyAverage = Math.round(totalRevenue / 7);
+
+  return {
+    totalRevenue,
+    dailyAverage,
+    washesCount: pastWashes.length,
+  };
 }

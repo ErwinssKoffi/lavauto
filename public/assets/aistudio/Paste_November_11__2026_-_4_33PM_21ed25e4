@@ -1,0 +1,1373 @@
+Parfait. Passons à la transformation de Lavauto en un véritable ERP SaaS professionnel de gestion de stations de lavage automobile, en conservant les fonctionnalités déjà développées dans le repository.
+
+Je vais préparer un AI Development Playbook composé de 10 prompts indépendants et progressifs, prêts à être utilisés dans Claude Code ou Cursor.
+
+L'objectif n'est pas de demander à l'IA de tout réécrire. Chaque prompt devra lui faire analyser l'existant, identifier ce qui est déjà fonctionnel, compléter ce qui manque, puis intégrer les évolutions sans casser les fonctionnalités validées.
+
+# LAVAUTO — AI Development Playbook
+
+10 prompts
+
+Évolution du repository existant
+
+SaaS multi-entreprises
+
+Méthode d'utilisation : ouvre le repository `ErwinssKoffi/lavauto` dans Claude Code ou Cursor. Exécute les prompts dans l'ordre, un par un. À la fin de chaque étape, l'agent doit vérifier son travail avant de passer à la suivante.
+
+Les prompts sont conçus pour éviter trois erreurs fréquentes :
+
+- Réécrire des fonctionnalités qui existent déjà.
+- Développer une interface sans véritable logique métier derrière.
+- Construire un ERP qui affiche du chiffre d'affaires sans permettre de calculer la rentabilité réelle d'une station.
+
+# LAVAUTO — AI DEVELOPMENT PLAYBOOK
+
+## ERP SaaS professionnel de gestion de stations de lavage automobile
+
+**Repository de départ :** `https://github.com/ErwinssKoffi/lavauto`
+
+**Objectif :** faire évoluer le projet existant en une solution SaaS complète de gestion opérationnelle, commerciale, financière et administrative des stations de lavage automobile, adaptée au marché ivoirien et extensible à plusieurs pays africains.
+
+---
+
+# RÈGLES GÉNÉRALES À RESPECTER PAR L'AGENT IA
+
+Tu interviens sur un projet existant. Tu n'as pas le droit de considérer que le repository est vide.
+
+Avant chaque intervention :
+
+1. Inspecte les fichiers et l'architecture existante.
+2. Identifie les fonctionnalités déjà implémentées.
+3. Identifie les fonctionnalités partiellement implémentées.
+4. Identifie les fonctionnalités absentes.
+5. Propose un plan d'intervention avant toute modification importante.
+6. Réutilise les composants, services et règles métier existants lorsqu'ils sont pertinents.
+7. Ne supprime aucune fonctionnalité existante sans justification et validation.
+8. Ne remplace pas toute l'architecture pour une préférence personnelle.
+9. Vérifie les dépendances et leur compatibilité avant installation.
+10. Exécute les tests, le lint et le build après les modifications.
+
+## Stack technique de référence
+
+Conserve la stack existante lorsque cela est pertinent :
+
+- React 19
+- TypeScript
+- Vite
+- Tailwind CSS
+- React Router
+- React Icons
+- Supabase JS
+- Supabase Auth
+- PostgreSQL
+- Supabase Storage
+- Row Level Security (RLS)
+
+Technologies complémentaires à introduire uniquement si elles apportent une réelle valeur :
+
+- TanStack Query : gestion des données serveur.
+- Zod : validation des données.
+- React Hook Form : formulaires complexes.
+- Recharts : graphiques et indicateurs.
+- Framer Motion : animations.
+- date-fns : gestion des dates.
+- Vitest : tests unitaires.
+- Playwright : tests end-to-end.
+
+## Exigences générales
+
+- Architecture modulaire et maintenable.
+- TypeScript strict.
+- Séparation des composants, services, hooks et règles métier.
+- Respect des principes SOLID.
+- Gestion des erreurs.
+- Gestion des états de chargement et des états vides.
+- Sécurité multi-entreprises.
+- Journalisation des opérations sensibles.
+- Monnaie configurable, avec XOF comme devise initiale.
+- Interface entièrement en français.
+- Dates, montants et nombres formatés selon les conventions locales.
+- Responsive desktop, tablette et mobile.
+
+---
+
+# PROMPT 01 — FOUNDATION & AUDIT TECHNIQUE
+
+## Objectif
+
+Réaliser un audit complet du repository et préparer les fondations techniques de l'évolution de Lavauto.
+
+## Instructions
+
+Tu es un architecte logiciel senior spécialisé dans les ERP SaaS.
+
+Commence par analyser intégralement le repository.
+
+Examine notamment :
+
+- `package.json`
+- `src/App.tsx`
+- `src/types.ts`
+- `src/lib/store.tsx`
+- `src/lib/metrics.ts`
+- `src/lib/plans.ts`
+- `src/lib/supabase.ts`
+- Les composants et pages.
+- Les routes.
+- Les formulaires.
+- Les mécanismes de stockage local.
+- Les interfaces et tableaux de bord.
+
+### Travail à réaliser
+
+1. Produire une cartographie de l'architecture actuelle.
+2. Identifier les fonctionnalités opérationnelles.
+3. Identifier les fonctionnalités simulées ou utilisant localStorage.
+4. Identifier les fonctionnalités incomplètes.
+5. Identifier les dépendances inutilisées ou manquantes.
+6. Identifier les problèmes de sécurité.
+7. Définir l'architecture cible.
+8. Définir une stratégie de migration progressive vers Supabase.
+9. Proposer une organisation des dossiers cohérente.
+
+### Architecture cible indicative
+
+```
+src/
+├── app/
+│   ├── router/
+│   ├── providers/
+│   └── layouts/
+├── components/
+│   ├── ui/
+│   ├── forms/
+│   ├── tables/
+│   └── charts/
+├── modules/
+│   ├── dashboard/
+│   ├── stations/
+│   ├── washes/
+│   ├── services/
+│   ├── customers/
+│   ├── employees/
+│   ├── cash/
+│   ├── expenses/
+│   ├── commissions/
+│   ├── inventory/
+│   ├── suppliers/
+│   ├── purchases/
+│   ├── finance/
+│   ├── reports/
+│   └── settings/
+├── services/
+├── hooks/
+├── lib/
+├── types/
+├── schemas/
+└── utils/
+```
+
+Cette structure est une cible indicative : adapte-la à l'architecture existante sans multiplier inutilement les dossiers.
+
+### Livrables
+
+Créer :
+
+- `docs/architecture-audit.md`
+- `docs/architecture-target.md`
+- `docs/technical-debt.md`
+- `docs/migration-roadmap.md`
+
+### Critères de validation
+
+- Le projet compile.
+- Aucune fonctionnalité existante n'est supprimée.
+- L'architecture cible est documentée.
+- La stratégie de migration est progressive.
+- Les risques techniques sont clairement identifiés.
+
+---
+
+# PROMPT 02 — DESIGN SYSTEM & UX PROFESSIONNELLE
+
+## Objectif
+
+Faire évoluer l'interface vers un ERP SaaS moderne, premium et professionnel.
+
+## Direction artistique
+
+Créer une expérience inspirée des meilleurs logiciels SaaS modernes :
+
+- Linear
+- Vercel
+- Stripe
+- Notion
+- Apple
+
+Le design doit être élégant, professionnel, fluide et facile à utiliser par le personnel d'une station de lavage.
+
+### Identité visuelle
+
+Privilégier :
+
+- Fond général gris très clair ou blanc cassé.
+- Surfaces blanches.
+- Texte principal sombre.
+- Couleur primaire bleue ou bleu profond.
+- Couleurs sémantiques cohérentes.
+- Bordures discrètes.
+- Ombres légères.
+- Angles légèrement arrondis.
+- Typographie moderne et lisible.
+
+Éviter les interfaces surchargées, les dégradés excessifs et les animations inutiles.
+
+### Composants à standardiser
+
+Créer ou améliorer :
+
+- Sidebar.
+- Topbar.
+- Breadcrumbs.
+- Cards statistiques.
+- Data tables.
+- Dialogs.
+- Drawers.
+- Formulaires.
+- Selects.
+- Date pickers.
+- Filtres.
+- Badges de statut.
+- Notifications toast.
+- Empty states.
+- Skeleton loaders.
+- Pagination.
+- Confirmations d'actions sensibles.
+
+### Navigation principale
+
+Organiser les modules selon cette structure :
+
+**Pilotage**
+
+- Dashboard.
+- Activité en temps réel.
+
+**Exploitation**
+
+- Nouveau lavage.
+- Lavages en cours.
+- File d'attente.
+- Historique des lavages.
+- Postes de lavage.
+
+**Commercial**
+
+- Prestations.
+- Catégories de véhicules.
+- Clients.
+- Fidélisation.
+
+**Ressources humaines**
+
+- Employés.
+- Équipes.
+- Commissions.
+- Présences.
+
+**Gestion financière**
+
+- Caisse.
+- Paiements.
+- Dépenses.
+- Rapports financiers.
+
+**Stock et achats**
+
+- Produits.
+- Fournisseurs.
+- Approvisionnements.
+- Inventaires.
+
+**Analyse**
+
+- Statistiques.
+- Rentabilité.
+- Performance du personnel.
+
+**Administration**
+
+- Stations.
+- Utilisateurs.
+- Rôles et permissions.
+- Paramètres.
+- Abonnement.
+
+### Exigences UX
+
+- Sidebar repliable.
+- Navigation responsive.
+- Recherche globale.
+- Actions rapides.
+- Filtres persistants lorsque pertinent.
+- Confirmation avant les opérations irréversibles.
+- États de chargement cohérents.
+- Accessibilité clavier.
+- Feedback immédiat après les actions.
+
+### Livrables
+
+- Design system documenté.
+- Composants UI réutilisables.
+- Navigation harmonisée.
+- Interfaces existantes améliorées.
+- Démonstration fonctionnelle des principaux parcours.
+
+Ne construis pas uniquement des maquettes : tous les composants interactifs doivent avoir un comportement réel.
+
+---
+
+# PROMPT 03 — DATABASE & DOMAIN ARCHITECTURE
+
+## Objectif
+
+Construire une architecture de données robuste pour un ERP SaaS multi-entreprises et multi-stations.
+
+## Principe fondamental
+
+Une entreprise peut posséder plusieurs stations. Chaque station possède ses propres opérations, employés, caisses, stocks et résultats financiers.
+
+Les données doivent être isolées entre les entreprises.
+
+### Entités principales
+
+Créer ou adapter les tables suivantes :
+
+**Organisation**
+
+- companies
+- stations
+- user_profiles
+- roles
+- permissions
+- user_station_assignments
+
+**Exploitation**
+
+- vehicle_categories
+- services
+- service_prices
+- customers
+- vehicles
+- washes
+- wash_items
+- wash_assignments
+- wash_status_history
+- wash_quality_checks
+
+**Finance**
+
+- payments
+- payment_methods
+- cash_sessions
+- cash_movements
+- expenses
+- expense_categories
+
+**Personnel**
+
+- employees
+- employee_commissions
+- commission_periods
+- commission_payouts
+- attendance_records
+
+**Stock**
+
+- products
+- product_categories
+- suppliers
+- purchase_orders
+- purchase_order_items
+- stock_movements
+- inventory_sessions
+- inventory_items
+
+**SaaS**
+
+- plans
+- subscriptions
+- subscription_usage
+- audit_logs
+
+### Champs fondamentaux
+
+Lorsque cela est pertinent, chaque table métier doit contenir :
+
+- `id`
+- `company_id`
+- `station_id`
+- `created_at`
+- `updated_at`
+- `created_by`
+
+Ne rends pas `station_id` obligatoire pour les données qui appartiennent au niveau entreprise.
+
+### Exigences SQL
+
+- Utiliser UUID.
+- Définir les clés étrangères.
+- Ajouter les index nécessaires.
+- Définir les contraintes d'intégrité.
+- Prévoir les suppressions logiques lorsque nécessaire.
+- Utiliser des migrations versionnées.
+- Utiliser des transactions pour les opérations financières.
+- Éviter les doublons.
+- Définir les règles de conservation des historiques.
+
+### Sécurité
+
+Mettre en place les politiques RLS sur toutes les tables accessibles aux utilisateurs.
+
+Un utilisateur d'une entreprise ne doit jamais pouvoir consulter les données d'une autre entreprise.
+
+Ne jamais faire confiance à un `company_id` transmis librement par le frontend.
+
+Les opérations sensibles doivent être exécutées côté serveur avec vérification des droits.
+
+### Règles métier importantes
+
+1. Le tarif d'une prestation doit être figé dans la ligne du lavage au moment de sa création.
+2. Un paiement doit conserver son historique.
+3. Une clôture de caisse ne doit pas pouvoir être modifiée silencieusement.
+4. Un mouvement de stock ne doit pas disparaître de l'historique.
+5. Une commission calculée sur une période validée doit conserver son montant de référence.
+6. Les opérations annulées doivent rester traçables.
+
+### Livrables
+
+- Migrations SQL.
+- Schéma relationnel.
+- Documentation des tables.
+- Politiques RLS.
+- Fonctions SQL nécessaires.
+- Données de démonstration.
+- Tests des contraintes et de l'isolation multi-entreprises.
+
+---
+
+# PROMPT 04 — AUTHENTICATION, MULTI-TENANCY & ACCESS CONTROL
+
+## Objectif
+
+Transformer la gestion locale des utilisateurs en un véritable système d'authentification et d'autorisation sécurisé.
+
+### Authentification
+
+Implémenter Supabase Auth :
+
+- Inscription.
+- Connexion.
+- Déconnexion.
+- Mot de passe oublié.
+- Réinitialisation.
+- Gestion de session.
+- Protection des routes.
+- Gestion des utilisateurs désactivés.
+
+### Organisation des comptes
+
+Un propriétaire crée son entreprise.
+
+Il peut ensuite :
+
+- Créer plusieurs stations.
+- Inviter des collaborateurs.
+- Affecter les collaborateurs à une ou plusieurs stations.
+- Définir leurs rôles.
+- Révoquer leurs accès.
+
+### Rôles
+
+Créer au minimum :
+
+**Propriétaire**
+
+- Accès complet à son entreprise.
+- Gestion des stations.
+- Gestion des utilisateurs.
+- Consultation des finances consolidées.
+- Gestion de l'abonnement.
+
+**Gérant**
+
+- Gestion opérationnelle de sa station.
+- Gestion des employés autorisés.
+- Consultation des rapports.
+- Gestion des prestations et des clients.
+
+**Caissier**
+
+- Enregistrement des paiements.
+- Ouverture et clôture de caisse.
+- Consultation des opérations autorisées.
+
+**Laveur**
+
+- Consultation des lavages affectés.
+- Mise à jour des étapes autorisées.
+- Consultation de son activité.
+
+**Super administrateur SaaS**
+
+- Gestion des entreprises.
+- Gestion des abonnements.
+- Suspension et réactivation.
+- Supervision technique.
+
+### Permissions
+
+Construire un système RBAC avec permissions granulaires.
+
+Exemples :
+
+- `washes.create`
+- `washes.update_status`
+- `payments.create`
+- `cash.open`
+- `cash.close`
+- `expenses.create`
+- `employees.manage`
+- `reports.view`
+- `inventory.manage`
+- `settings.manage`
+
+Les permissions doivent être contrôlées côté serveur et dans les politiques RLS. Masquer un bouton dans le frontend ne constitue pas une protection.
+
+### Audit
+
+Journaliser :
+
+- Connexions.
+- Modifications des rôles.
+- Créations et suppressions logiques.
+- Annulations de paiements.
+- Clôtures de caisse.
+- Modifications sensibles des paramètres.
+
+### Livrables
+
+- Authentification fonctionnelle.
+- Protection des routes.
+- Gestion des rôles.
+- Gestion des permissions.
+- Invitations collaborateurs.
+- Isolation multi-entreprises.
+- Tests de sécurité.
+
+---
+
+# PROMPT 05 — CORE BUSINESS : GESTION DES LAVAGES
+
+## Objectif
+
+Construire le cœur opérationnel de Lavauto.
+
+Ce module doit permettre de suivre chaque véhicule depuis son arrivée jusqu'à sa restitution.
+
+### A. Gestion des véhicules
+
+Enregistrer :
+
+- Immatriculation.
+- Marque.
+- Modèle.
+- Catégorie.
+- Couleur facultative.
+- Client associé.
+- Historique des passages.
+
+Catégories configurables :
+
+- Moto.
+- Petite voiture.
+- Berline.
+- SUV.
+- 4x4.
+- Pick-up.
+- Minibus.
+- Camionnette.
+- Autres catégories personnalisées.
+
+### B. Catalogue des prestations
+
+Permettre de créer :
+
+- Lavage extérieur.
+- Lavage intérieur.
+- Lavage complet.
+- Nettoyage moteur.
+- Nettoyage sièges.
+- Nettoyage tapis.
+- Polissage.
+- Lustrage.
+- Désinfection.
+- Autres prestations personnalisées.
+
+Chaque prestation possède :
+
+- Nom.
+- Description.
+- Durée estimée.
+- Catégories de véhicules concernées.
+- Tarifs par catégorie.
+- Consommation théorique de produits.
+- Statut actif/inactif.
+
+### C. Création d'un lavage
+
+Workflow :
+
+1. Enregistrer le véhicule.
+2. Identifier ou créer le client.
+3. Sélectionner la catégorie du véhicule.
+4. Sélectionner les prestations.
+5. Calculer automatiquement le montant.
+6. Appliquer une remise autorisée.
+7. Affecter un ou plusieurs employés.
+8. Générer un numéro de lavage.
+9. Enregistrer l'opération.
+10. Envoyer le véhicule dans la file d'attente.
+
+### D. Cycle de vie
+
+Prévoir les statuts :
+
+- `pending`
+- `assigned`
+- `in_progress`
+- `quality_check`
+- `ready`
+- `delivered`
+- `cancelled`
+
+Chaque changement doit être historisé avec utilisateur et date.
+
+Ne considère pas automatiquement un lavage comme livré lorsqu'il est simplement terminé.
+
+### E. Gestion des postes
+
+Créer des postes configurables :
+
+- Poste extérieur.
+- Poste intérieur.
+- Poste detailing.
+- Poste moteur.
+- Poste finition.
+
+Permettre de connaître les postes occupés et disponibles.
+
+### F. Tableau opérationnel
+
+Afficher :
+
+- Véhicules en attente.
+- Véhicules en cours.
+- Véhicules en contrôle qualité.
+- Véhicules prêts.
+- Véhicules livrés.
+- Temps moyen de traitement.
+- Employés affectés.
+
+### G. Contrôle qualité
+
+Avant restitution, prévoir une vérification :
+
+- Extérieur propre.
+- Intérieur propre.
+- Vitres propres.
+- Jantes propres.
+- Tapis propres.
+- Prestations conformes.
+- Observations.
+- Validation par responsable.
+
+### Livrables
+
+- Module de gestion des lavages.
+- File d'attente.
+- Affectation des employés.
+- Gestion des postes.
+- Suivi des statuts.
+- Contrôle qualité.
+- Historique des véhicules.
+- Interface opérationnelle en temps réel.
+
+---
+
+# PROMPT 06 — CAISSE, PAIEMENTS & GESTION FINANCIÈRE
+
+## Objectif
+
+Mettre en place une gestion financière fiable et traçable.
+
+### A. Moyens de paiement
+
+Prévoir :
+
+- Espèces.
+- Orange Money.
+- MTN MoMo.
+- Wave.
+- Carte bancaire.
+- Virement.
+- Autres moyens configurables.
+
+Chaque paiement doit conserver :
+
+- Montant.
+- Moyen de paiement.
+- Référence de transaction si disponible.
+- Date.
+- Utilisateur.
+- Lavage associé.
+- Statut.
+
+Gérer les paiements partiels, les soldes restants et les remboursements autorisés.
+
+### B. Gestion de caisse
+
+Cycle :
+
+1. Ouverture.
+2. Saisie du fond initial.
+3. Enregistrement des encaissements espèces.
+4. Enregistrement des sorties espèces.
+5. Comptage physique.
+6. Calcul de l'écart.
+7. Clôture.
+8. Consultation de l'historique.
+
+Formule :
+
+`Solde théorique = Fond initial + Encaissements espèces - Décaissements espèces`
+
+Ne pas mélanger les paiements Mobile Money avec les espèces présentes physiquement dans la caisse.
+
+Prévoir des rapprochements distincts pour chaque canal.
+
+### C. Dépenses
+
+Catégories :
+
+- Eau.
+- Électricité.
+- Carburant.
+- Produits de lavage.
+- Maintenance.
+- Réparation.
+- Transport.
+- Salaires.
+- Loyer.
+- Communication.
+- Divers.
+
+Chaque dépense comprend :
+
+- Libellé.
+- Catégorie.
+- Montant.
+- Date.
+- Moyen de paiement.
+- Fournisseur facultatif.
+- Justificatif facultatif.
+- Utilisateur responsable.
+- Station concernée.
+
+### D. Commissions
+
+Configurer :
+
+- Taux global.
+- Taux individuel.
+- Commission fixe éventuelle.
+- Règles de calcul.
+- Période de calcul.
+
+Calculer les commissions sur la base des prestations éligibles et des règles définies.
+
+Créer un relevé périodique figé, puis un processus de validation et de paiement.
+
+### E. Rentabilité
+
+Distinguer clairement :
+
+- Chiffre d'affaires.
+- Montants encaissés.
+- Créances clients.
+- Dépenses.
+- Achats.
+- Consommations de produits.
+- Commissions.
+- Charges fixes.
+- Marge brute.
+- Résultat d'exploitation.
+- Résultat net estimé.
+
+Ne jamais présenter le total des encaissements moins les dépenses enregistrées comme un bénéfice net comptable si tous les coûts ne sont pas intégrés.
+
+### Livrables
+
+- Module caisse.
+- Paiements.
+- Dépenses.
+- Commissions.
+- Rapprochements.
+- Rapports financiers.
+- Journal des opérations.
+- Tests de cohérence financière.
+
+---
+
+# PROMPT 07 — STOCK, FOURNISSEURS & APPROVISIONNEMENTS
+
+## Objectif
+
+Créer un véritable système de gestion des consommables utilisés dans les stations de lavage.
+
+### A. Catalogue des produits
+
+Exemples :
+
+- Shampoing automobile.
+- Détergent.
+- Dégraissant.
+- Cire.
+- Polish.
+- Produit pour pneus.
+- Nettoyant vitres.
+- Désinfectant.
+- Microfibres.
+- Éponges.
+- Brosses.
+- Gants.
+- Sacs.
+- Autres consommables.
+
+Chaque produit possède :
+
+- Référence.
+- Nom.
+- Catégorie.
+- Unité.
+- Coût d'achat.
+- Prix éventuel.
+- Stock disponible.
+- Seuil d'alerte.
+- Fournisseur principal.
+- Station ou dépôt.
+
+### B. Fournisseurs
+
+Gestion :
+
+- Nom commercial.
+- Contact.
+- Téléphone.
+- Adresse.
+- Email.
+- Produits fournis.
+- Historique des achats.
+- Conditions commerciales.
+- Solde fournisseur éventuel.
+
+### C. Approvisionnements
+
+Workflow :
+
+1. Création d'une commande.
+2. Sélection du fournisseur.
+3. Ajout des produits.
+4. Saisie des quantités.
+5. Calcul du montant.
+6. Validation.
+7. Réception totale ou partielle.
+8. Mise à jour du stock.
+9. Enregistrement du règlement.
+
+Ne pas augmenter le stock au moment de la simple création d'une commande. Le stock doit évoluer selon les quantités réellement réceptionnées.
+
+### D. Consommation automatique
+
+Relier les prestations aux consommations théoriques.
+
+Exemple :
+
+Une prestation de lavage complet peut consommer :
+
+- 50 ml de shampoing.
+- 20 ml de dégraissant.
+- 10 ml de finition.
+- Une quantité définie de consommables.
+
+À la validation d'un lavage, générer les mouvements de stock correspondant aux règles configurées.
+
+Prévoir les ajustements et consommations réelles lorsque les quantités diffèrent des standards.
+
+### E. Inventaires
+
+Permettre :
+
+- Création d'un inventaire.
+- Saisie des quantités physiques.
+- Comparaison avec les quantités théoriques.
+- Identification des écarts.
+- Validation des corrections.
+- Historique des inventaires.
+
+### F. Alertes
+
+- Stock faible.
+- Rupture.
+- Produit proche de sa date limite si pertinent.
+- Commandes en attente de réception.
+
+### Livrables
+
+- Gestion des produits.
+- Gestion des fournisseurs.
+- Achats et réceptions.
+- Mouvements de stock.
+- Consommation automatique.
+- Inventaires.
+- Alertes.
+- Valorisation du stock.
+
+---
+
+# PROMPT 08 — CRM, FIDÉLISATION & EXPÉRIENCE CLIENT
+
+## Objectif
+
+Transformer Lavauto en un outil de fidélisation et de développement commercial.
+
+### A. CRM clients
+
+Créer une fiche client comprenant :
+
+- Nom.
+- Téléphone.
+- Email facultatif.
+- Véhicules.
+- Immatriculations.
+- Historique des lavages.
+- Dépenses cumulées.
+- Dernière visite.
+- Notes.
+- Préférences.
+
+### B. Fidélisation
+
+Prévoir plusieurs systèmes configurables :
+
+**Points**
+
+- Points par montant dépensé.
+- Conversion des points en avantages.
+- Historique des points.
+
+**Carte de fidélité**
+
+- Exemple : 10 lavages réalisés, 1 avantage offert.
+- Paramétrage du nombre de passages.
+
+**Forfaits**
+
+- Pack mensuel.
+- Pack de plusieurs lavages.
+- Offre VIP.
+- Offre entreprise.
+
+Les conditions d'utilisation et les dates de validité doivent être contrôlées.
+
+### C. Promotions
+
+Créer :
+
+- Remises ponctuelles.
+- Offres de bienvenue.
+- Promotions par prestation.
+- Promotions par catégorie de véhicule.
+- Offres pour clients réguliers.
+
+### D. Flottes automobiles
+
+Prévoir une gestion spécifique des clients professionnels :
+
+- Entreprises.
+- Plusieurs véhicules.
+- Contrats.
+- Tarifs négociés.
+- Facturation périodique.
+- Suivi des passages.
+- Créances.
+
+### E. Communication
+
+Préparer l'intégration future de :
+
+- WhatsApp Business.
+- SMS.
+- Email.
+
+Cas d'utilisation :
+
+- Confirmation de réception.
+- Notification véhicule prêt.
+- Rappel de rendez-vous.
+- Relance client.
+- Promotion.
+- Reçu de paiement.
+
+Ne pas simuler l'envoi d'un message si aucun fournisseur de communication n'est configuré.
+
+### Livrables
+
+- CRM.
+- Historique client.
+- Programme de fidélité.
+- Gestion des forfaits.
+- Promotions.
+- Gestion des flottes.
+- Architecture de notifications.
+
+---
+
+# PROMPT 09 — DASHBOARD, ANALYTICS & ADMINISTRATION SAAS
+
+## Objectif
+
+Construire le système de pilotage permettant aux dirigeants de prendre des décisions à partir des données réelles.
+
+### A. Dashboard station
+
+Indicateurs :
+
+- Chiffre d'affaires du jour.
+- Chiffre d'affaires du mois.
+- Nombre de lavages.
+- Panier moyen.
+- Nombre de clients.
+- Paiements par canal.
+- Dépenses.
+- Marge estimée.
+- Stock critique.
+- Performance des employés.
+
+### B. Analyses
+
+Créer des graphiques :
+
+- Évolution du chiffre d'affaires.
+- Lavages par jour.
+- Répartition des prestations.
+- Répartition des moyens de paiement.
+- Dépenses par catégorie.
+- Performance des employés.
+- Rentabilité par prestation.
+- Évolution de la consommation des produits.
+
+### C. Comparaison des périodes
+
+Permettre de comparer :
+
+- Aujourd'hui et hier.
+- Cette semaine et la semaine précédente.
+- Ce mois et le mois précédent.
+- Une période personnalisée.
+- Plusieurs stations.
+
+Les calculs doivent utiliser les mêmes définitions métier pour toutes les périodes.
+
+### D. Dashboard multi-stations
+
+Pour un propriétaire possédant plusieurs stations :
+
+- Vue consolidée.
+- CA par station.
+- Dépenses par station.
+- Résultat estimé par station.
+- Volume de lavages.
+- Comparaison des performances.
+- Classement des stations.
+
+### E. Administration SaaS
+
+Créer un espace super administrateur permettant :
+
+- Consulter les entreprises.
+- Consulter les stations.
+- Gérer les abonnements.
+- Suspendre ou réactiver un compte.
+- Consulter les limites d'utilisation.
+- Consulter les journaux d'audit.
+- Suivre les paiements d'abonnement.
+
+### F. Abonnements
+
+Préparer les formules :
+
+**Essai gratuit**
+
+- 14 jours.
+- 1 station.
+- 3 employés.
+- 100 lavages.
+
+**Standard**
+
+- 15 000 FCFA/mois.
+- 1 station.
+- 10 employés.
+- 1 000 lavages.
+
+**Premium**
+
+- 35 000 FCFA/mois.
+- 5 stations.
+- 50 employés.
+- Lavages illimités.
+
+Ces tarifs sont des hypothèses commerciales initiales à tester auprès des stations ivoiriennes. Ils doivent être administrables depuis le back-office.
+
+### G. Limites SaaS
+
+Contrôler :
+
+- Nombre de stations.
+- Nombre d'employés.
+- Nombre de lavages.
+- Fonctionnalités disponibles.
+- Date d'expiration.
+- Statut de l'abonnement.
+
+### Livrables
+
+- Dashboard opérationnel.
+- Dashboard financier.
+- Analytics.
+- Comparaison multi-stations.
+- Administration SaaS.
+- Gestion des abonnements.
+- Contrôle des quotas.
+
+---
+
+# PROMPT 10 — QA, SECURITY, PERFORMANCE & DEPLOYMENT
+
+## Objectif
+
+Finaliser Lavauto en une application SaaS fiable, sécurisée et prête à être déployée.
+
+### A. Tests fonctionnels
+
+Tester les parcours complets :
+
+1. Création d'entreprise.
+2. Création de station.
+3. Configuration des prestations.
+4. Création d'un client.
+5. Enregistrement d'un véhicule.
+6. Création d'un lavage.
+7. Affectation d'un employé.
+8. Changement de statut.
+9. Paiement.
+10. Clôture de caisse.
+11. Enregistrement d'une dépense.
+12. Consommation de stock.
+13. Réception d'un approvisionnement.
+14. Validation des commissions.
+15. Consultation des rapports.
+
+### B. Tests de sécurité
+
+Tester notamment :
+
+- Accès non autorisé.
+- Isolation entre entreprises.
+- Permissions des utilisateurs.
+- Protection des routes.
+- Accès aux fichiers.
+- Accès aux opérations financières.
+- Tentatives de modification de données sensibles.
+- Contrôle des sessions.
+
+### C. Tests de cohérence
+
+Vérifier :
+
+- Aucun paiement dupliqué.
+- Aucun stock négatif non autorisé.
+- Aucun lavage comptabilisé deux fois.
+- Aucune clôture modifiée sans trace.
+- Aucun montant financier incohérent.
+- Aucune commission calculée deux fois.
+- Aucun accès interentreprises.
+
+### D. Performance
+
+- Pagination côté serveur.
+- Index SQL.
+- Requêtes optimisées.
+- Chargement différé.
+- Cache maîtrisé.
+- Optimisation des images.
+- Gestion des grandes tables.
+- Optimisation des dashboards.
+
+### E. Fiabilité
+
+- Gestion des erreurs réseau.
+- Transactions SQL.
+- Idempotence des opérations financières.
+- Sauvegardes.
+- Journalisation.
+- Gestion des interruptions de service.
+- Gestion des migrations.
+
+### F. Déploiement
+
+Préparer :
+
+- Frontend sur Vercel.
+- Supabase pour Auth et PostgreSQL.
+- Supabase Storage pour les documents.
+- Variables d'environnement.
+- Configuration des domaines.
+- Configuration CORS.
+- Environnements développement et production.
+- Pipeline CI/CD.
+- Documentation de déploiement.
+
+### G. Documentation finale
+
+Créer :
+
+- `README.md`
+- `docs/installation.md`
+- `docs/architecture.md`
+- `docs/database.md`
+- `docs/security.md`
+- `docs/user-guide.md`
+- `docs/deployment.md`
+- `docs/testing.md`
+
+### Critères de validation finale
+
+- Build production réussi.
+- Tests essentiels réussis.
+- Aucune erreur TypeScript critique.
+- Isolation multi-entreprises vérifiée.
+- Parcours métier fonctionnels.
+- Sécurité des opérations financières vérifiée.
+- Documentation à jour.
+- Aucune fonctionnalité importante laissée sous forme de simulation sans indication explicite.
+
+---
+
+# DIRECTIVE FINALE À L'AGENT IA
+
+Tu dois travailler comme une équipe complète composée de :
+
+- Architecte logiciel.
+- Développeur frontend senior.
+- Développeur backend senior.
+- Expert PostgreSQL et Supabase.
+- UX/UI designer SaaS.
+- Expert ERP.
+- Ingénieur QA.
+- Expert sécurité applicative.
+
+Ne cherche pas à terminer artificiellement une étape en créant uniquement des pages visuelles.
+
+Chaque module doit comporter :
+
+- Une interface.
+- Des règles métier.
+- Des validations.
+- Une couche de service.
+- Une persistance réelle.
+- Une gestion des erreurs.
+- Des permissions.
+- Des tests adaptés.
+
+Lorsque tu termines une étape, présente un rapport indiquant :
+
+1. Ce qui existait avant.
+2. Ce qui a été réutilisé.
+3. Ce qui a été créé.
+4. Ce qui a été modifié.
+5. Les fichiers concernés.
+6. Les migrations nécessaires.
+7. Les tests exécutés et leurs résultats.
+8. Les éventuels problèmes restants.
+9. Les instructions pour la prochaine étape.
+
+**Ne passe pas automatiquement au prompt suivant. Attends ma validation.**
+
+Le résultat final doit être un véritable ERP SaaS de gestion de stations de lavage, et non une simple interface de démonstration.
+
+## Ordre d'exécution et résultat attendu
+
+## Les 10 étapes du projet
+
+1. 01 — Foundation & Audit
+
+   Comprendre et sécuriser les fondations existantes.
+2. 02 — Design System
+
+   Uniformiser les interfaces et améliorer l'expérience utilisateur.
+3. 03 — Database
+
+   Construire le modèle de données et les migrations.
+4. 04 — Authentication
+
+   Sécuriser les comptes, les rôles et les entreprises.
+5. 05 — Core Business
+
+   Gérer les véhicules, les lavages et les opérations.
+6. 06 — Finance
+
+   Gérer les paiements, la caisse, les dépenses et les commissions.
+7. 07 — Stock & Achats
+
+   Contrôler les consommables, fournisseurs et approvisionnements.
+8. 08 — CRM
+
+   Fidéliser les clients et gérer les flottes automobiles.
+9. 09 — Analytics & SaaS
+
+   Piloter les stations et administrer les abonnements.
+10. 10 — QA & Deployment
+
+    Tester, sécuriser et mettre en production.
+
+## Mes recommandations avant de commencer
+
+1\. Ne commence pas par le design. Lance d'abord le Prompt 01. Il faut savoir précisément ce qui fonctionne dans le repository avant de toucher à l'architecture.
+
+2\. Ne connecte pas Supabase à la hâte. Le modèle de données et les politiques RLS doivent être réfléchis avant de migrer les fonctionnalités.
+
+3\. Priorise le cycle de lavage et la caisse. Ce sont les deux processus qui produisent les données opérationnelles et financières essentielles.
+
+4\. Ne confonds pas chiffre d'affaires et bénéfice. Le stock consommé, les commissions et les charges doivent être intégrés pour mesurer correctement la rentabilité.
+
+5\. Valide chaque étape avant la suivante. C'est particulièrement important lorsque tu travailles avec Claude Code ou Cursor.
+
+### La prochaine action
+
+Commence par ouvrir le repository dans Claude Code ou Cursor et exécute uniquement le Prompt 01 — Foundation & Audit. Il doit produire un diagnostic réel avant de modifier le code.
+
+Souhaites-tu que je te rappelle demain de reprendre le développement à partir du rapport d'audit ?
+
+🛠️Me rappeler de reprendre Lavauto demainAppuyez pour configurer
