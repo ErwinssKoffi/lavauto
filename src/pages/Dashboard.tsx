@@ -1,0 +1,135 @@
+import React from 'react';
+import { Link } from 'react-router-dom';
+import {
+  FiActivity, FiAlertTriangle, FiArrowRight, FiCreditCard, FiDollarSign,
+  FiDroplet, FiTrendingUp, FiTruck,
+} from 'react-icons/fi';
+import { useStore } from '../lib/store';
+import { buildReport } from '../lib/metrics';
+import { formatDate, formatFCFA } from '../lib/format';
+import { Badge, Card, EmptyState, LockedPanel, PageHeader, Progress, StatCard } from '../components/ui';
+import { WASH_STATUS_LABELS, PAY_METHOD_LABELS } from '../types';
+
+export default function Dashboard() {
+  const { state } = useStore();
+  const day = buildReport(state, 'jour');
+  const month = buildReport(state, 'mois');
+  const openCash = state.cashSessions.find((c) => c.status === 'ouverte');
+  const unpaid = state.washes.filter((w) => w.status !== 'annule' && w.total > w.paid);
+  const target = state.station?.monthlyTarget ?? 0;
+  const recent = [...state.washes].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 6);
+
+  const alerts: { tone: 'warn' | 'danger' | 'accent'; text: string }[] = [];
+  if (!state.station?.activated) alerts.push({ tone: 'warn', text: 'Station non activée : les écritures de métier sont bloquées (409 onboarding_incomplete).' });
+  if (!openCash && state.station?.cashRequiresOpen) alerts.push({ tone: 'warn', text: 'Aucune caisse ouverte : les encaissements en espèces sont refusés.' });
+  if (unpaid.length > 0) alerts.push({ tone: 'accent', text: `${unpaid.length} fiche(s) avec un reste à payer.` });
+  if (state.expenses.some((e) => e.status === 'annulee')) alerts.push({ tone: 'accent', text: 'Des dépenses annulées sont conservées dans le journal.' });
+  if (state.subscription?.pendingPlanId) alerts.push({ tone: 'accent', text: 'Une demande de changement de formule est en attente.' });
+
+  return (
+    <div>
+      <PageHeader
+        title="Tableau de bord"
+        subtitle={`Chiffres du ${formatDate(new Date().toISOString())} — calculés par le serveur à partir des données enregistrées.`}
+        actions={<Badge tone={state.station?.activated ? 'success' : 'warn'}>{state.station?.activated ? 'Station active' : 'Exploitation fermée'}</Badge>}
+      />
+
+      {!state.station?.activated && <div className="mb-6"><LockedPanel /></div>}
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Chiffre d’affaires du jour" value={formatFCFA(day.revenue)} hint={`${day.washes.length} lavage(s) enregistré(s)`} icon={<FiTrendingUp />} />
+        <StatCard label="Lavages du jour" value={String(day.washes.length)} hint={`${day.washes.filter((w) => w.status === 'termine').length} terminé(s)`} icon={<FiDroplet />} accent="bg-emerald-500/10 text-emerald-400" />
+        <StatCard label="Encaissements du jour" value={formatFCFA(day.collected)} hint={`${day.byMethod.reduce((n, m) => n + m.count, 0)} paiement(s)`} icon={<FiCreditCard />} accent="bg-sky-500/10 text-sky-400" />
+        <StatCard label="Dépenses du jour" value={formatFCFA(day.expenses)} hint={`Résultat simplifié : ${formatFCFA(day.result)}`} icon={<FiCreditCard />} accent="bg-amber-500/10 text-amber-400" />
+      </div>
+
+      <div className="mt-5 grid gap-5 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-sm font-bold">Dernières opérations</h2>
+            <Link to="/app/lavages" className="wg-link text-xs">Voir les lavages <FiArrowRight className="inline" /></Link>
+          </div>
+          {recent.length === 0 ? (
+            <EmptyState icon={<FiTruck />} title="Aucune opération enregistrée" description="Les fiches de lavage apparaîtront ici dès l’ouverture de l’exploitation. Aucune donnée d’exemple n’est ajoutée." />
+          ) : (
+            <div className="wg-scroll-x">
+              <table>
+                <thead><tr><th className="wg-th">Fiche</th><th className="wg-th">Véhicule</th><th className="wg-th">Client</th><th className="wg-th">Total</th><th className="wg-th">Payé</th><th className="wg-th">Statut</th></tr></thead>
+                <tbody>
+                  {recent.map((w) => (
+                    <tr key={w.id}>
+                      <td className="wg-td font-bold">{w.number}</td>
+                      <td className="wg-td">{w.vehicleLabel}{w.plate && <span className="wg-muted ml-1 text-xs">· {w.plate}</span>}</td>
+                      <td className="wg-td">{w.clientName ?? <span className="wg-muted">Sans client</span>}</td>
+                      <td className="wg-td font-semibold">{formatFCFA(w.total)}</td>
+                      <td className="wg-td">{formatFCFA(w.paid)}</td>
+                      <td className="wg-td"><Badge tone={w.status === 'termine' ? 'success' : w.status === 'annule' ? 'danger' : 'warn'}>{WASH_STATUS_LABELS[w.status]}</Badge></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+
+        <div className="space-y-5">
+          <Card>
+            <h2 className="mb-3 text-sm font-bold">État de la caisse</h2>
+            {openCash ? (
+              <>
+                <Badge tone="success">Caisse ouverte</Badge>
+                <p className="wg-muted mt-3 text-xs">Ouverte le {formatDate(openCash.openedAt)} par {openCash.openedBy}</p>
+                <p className="mt-2 text-lg font-bold">{formatFCFA(openCash.openingFloat)}</p>
+                <p className="wg-muted text-[11px]">Fond de caisse</p>
+                <Link to="/app/caisse" className="wg-btn wg-btn-ghost mt-4 w-full">Gérer la caisse</Link>
+              </>
+            ) : (
+              <>
+                <Badge tone="warn">Aucune caisse ouverte</Badge>
+                <p className="wg-muted mt-3 text-xs leading-relaxed">Un encaissement en espèces exige une caisse ouverte{!state.station?.cashRequiresOpen ? ' (règle désactivée pour cette station).' : '.'} Le Mobile Money peut être enregistré à tout moment.</p>
+                <Link to="/app/caisse" className="wg-btn wg-btn-ghost mt-4 w-full">Ouvrir la caisse</Link>
+              </>
+            )}
+          </Card>
+
+          <Card>
+            <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-bold">Objectif du mois</h2><FiActivity className="text-sky-400" /></div>
+            <p className="text-xl font-bold">{formatFCFA(month.revenue)}</p>
+            <p className="wg-muted text-xs">sur {target > 0 ? formatFCFA(target) : 'aucun objectif fixé'}</p>
+            <div className="mt-3"><Progress value={month.revenue} max={target || 1} tone={target && month.revenue >= target ? 'success' : 'accent'} /></div>
+            {target === 0 && <p className="wg-muted mt-2 text-[11px]">Fixez un objectif dans Paramètres ou pendant la mise en route.</p>}
+          </Card>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-5 lg:grid-cols-2">
+        <Card>
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-bold"><FiAlertTriangle className="text-amber-400" /> Alertes</h2>
+          {alerts.length === 0 ? <p className="wg-muted text-xs">Aucune alerte pour le moment.</p> : (
+            <div className="space-y-2">
+              {alerts.map((a, i) => <div key={i}><Badge tone={a.tone}>{a.text}</Badge></div>)}
+            </div>
+          )}
+        </Card>
+        <Card>
+          <h2 className="mb-3 text-sm font-bold">Répartition des encaissements du jour</h2>
+          {day.byMethod.length === 0 ? <p className="wg-muted text-xs">Aucun encaissement aujourd’hui.</p> : (
+            <div className="space-y-3">
+              {day.byMethod.map((m) => (
+                <div key={m.method}>
+                  <div className="mb-1 flex justify-between text-xs"><span className="font-medium">{PAY_METHOD_LABELS[m.method]}</span><span className="wg-muted">{formatFCFA(m.amount)} · {m.count} paiement(s)</span></div>
+                  <Progress value={m.amount} max={day.collected || 1} />
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
+
+      <div className="mt-5 flex flex-wrap gap-3">
+        <Link to="/app/rapports" className="wg-btn wg-btn-ghost"><FiDollarSign /> Rapports et export CSV</Link>
+        <Link to="/app/commissions" className="wg-btn wg-btn-ghost"><FiTruck /> Commissions de la période</Link>
+      </div>
+    </div>
+  );
+}

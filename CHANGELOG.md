@@ -1,23 +1,12 @@
 # Changelog
 
-## [2.0.0] 2025-13-01
+## 1.0.0 — Frontend WashGuard
 
-### Upgraded to React 19 ⚡️
-
-## [1.1.0] 2024-07-26
-
-🚀 New features:
-
-- React tables updated to Tanstack V8
-
-## [1.0.1] 2023-03-07
-
-🐛 Bugs solved:
-
-- Bug with charts being uneven fixed
-
-## [1.0.0] 2023-02-27
-
-### Original Release
-
-- Added Tailwind CSS as base framework
+- Remplacement du template Horizon UI (CRA/JS) par une application **Vite + React 19 + TypeScript + Tailwind CSS**, avec le client Supabase prêt mais non branché.
+- Vitrine `/` : aperçus issus du rendu de l'application, formules et tarifs lus depuis la table `plans`, questions fréquentes, **aucun témoignage inventé**.
+- Connexion / inscription avec `AuthLayout` : formulaire clair et centré, panneau photo `public/images/lav-auto.jpeg` avec dégradé sombre, masqué sur téléphone.
+- Mise en route : 13 étapes (8 obligatoires) constatées sur les données enregistrées, refus `409 onboarding_incomplete` avec liste des manques, aucun prix ni donnée d'exemple prérempli.
+- Modules : tableau de bord, lavages, prestations, clients, employés, caisse, dépenses, rapports (CSV), commissions (CSV), paramètres, abonnement, espace plateforme.
+- Montants en FCFA, dates jj/mm/aaaa, thème sombre par défaut et thème clair.
+- Garde-fou `/auth/me` : une seule requête par visiteur, un 401 n'invalide plus le cache.
+- Documentation : `README.md`, `docs/onboarding.md`, `.env.example`, `Makefile`.
