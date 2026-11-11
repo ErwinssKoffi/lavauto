@@ -1,78 +1,168 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  FiArrowRight, FiBarChart2, FiCheck, FiCheckCircle, FiChevronDown,
-  FiCreditCard, FiDollarSign, FiFileText, FiGrid, FiList, FiLock, FiMoon,
-  FiPieChart, FiSettings, FiShield, FiSun, FiTruck, FiUsers, FiX,
+  FiArrowDownRight,
+  FiArrowRight,
+  FiBarChart2,
+  FiCheck,
+  FiCheckCircle,
+  FiChevronDown,
+  FiCreditCard,
+  FiDollarSign,
+  FiFileText,
+  FiGrid,
+  FiLock,
+  FiMoon,
+  FiPieChart,
+  FiSettings,
+  FiShield,
+  FiSun,
+  FiTruck,
+  FiUsers,
+  FiX,
 } from 'react-icons/fi';
 import { useStore } from '../lib/store';
 import { formatFCFA } from '../lib/format';
 import { Badge, Logo, Progress } from '../components/ui';
 
 const MODULES = [
-  { icon: <FiList />, title: 'Mise en route', text: 'Treize étapes constatées sur vos données. Aucun prix inventé : la station ouvre quand vous avez choisi vos tarifs.' },
-  { icon: <FiGrid />, title: 'Tableau de bord', text: 'Chiffre d’affaires, lavages, encaissements, dépenses, caisse et alertes, calculés par le serveur.' },
-  { icon: <FiTruck />, title: 'Lavages', text: 'Fiche rapide, statuts, remise autorisée, encaissement total ou partiel et reste à payer.' },
-  { icon: <FiSettings />, title: 'Prestations', text: 'Catalogue propre à chaque station. Modifier un tarif ne change jamais les lavages déjà enregistrés.' },
-  { icon: <FiUsers />, title: 'Clients & employés', text: 'Fiches facultatives, historique, rôles, activation et réinitialisation du mot de passe.' },
-  { icon: <FiDollarSign />, title: 'Caisse', text: 'Fond de caisse, comptage à la clôture, écart théorique/compté et réouverture motivée.' },
-  { icon: <FiCreditCard />, title: 'Dépenses', text: 'Montant, catégorie, motif, fournisseur et annulation tracée — jamais de suppression.' },
-  { icon: <FiBarChart2 />, title: 'Rapports', text: 'Jour, semaine, mois : meilleures prestations, employés, moyens de paiement, export CSV.' },
-  { icon: <FiPieChart />, title: 'Commissions', text: 'Lavages terminés, barème ou exception par compte, montant dû et export CSV pour la paie.' },
-  { icon: <FiFileText />, title: 'Abonnement', text: 'Formule en cours, consommation par rapport aux limites, comparaison et demande de changement.' },
+  { icon: <FiTruck />, number: '01', title: 'Suivez chaque lavage', text: 'Statuts clairs, remise autorisée, encaissement total ou partiel et reste à payer.' },
+  { icon: <FiDollarSign />, number: '02', title: 'Gardez une caisse juste', text: 'Fond de caisse, comptage à la clôture, écarts expliqués et réouverture motivée.' },
+  { icon: <FiUsers />, number: '03', title: 'Coordonnez votre équipe', text: 'Rôles adaptés, comptes activés au bon moment et commissions calculées sur les lavages terminés.' },
+  { icon: <FiCreditCard />, number: '04', title: 'Tracez chaque dépense', text: 'Catégorie, motif, fournisseur et annulation suivie. Les opérations ne disparaissent pas.' },
+  { icon: <FiBarChart2 />, number: '05', title: 'Lisez vos résultats', text: 'Rapports par jour, semaine ou mois, moyens de paiement et export CSV.' },
+  { icon: <FiSettings />, number: '06', title: 'Gardez la main sur vos tarifs', text: 'Votre catalogue appartient à votre station. Les lavages enregistrés gardent leur prix d’origine.' },
 ];
 
 const FAQ = [
   { q: 'Les prix affichés sont-ils les vrais ?', r: 'Oui. Les formules et leurs tarifs sont lus dans la base, comme la facturation. La vitrine ne peut donc pas afficher un prix différent de celui qui sera appliqué.' },
-  { q: 'Pourquoi n’y a-t-il pas de témoignages ?', r: 'Parce qu’aucune station n’en a encore donné. Des avis inventés seraient pires que pas d’avis du tout : ils seront ajoutés quand de vraies stations en fourniront.' },
-  { q: 'Que se passe-t-il après l’inscription ?', r: 'Le serveur crée une seule fois votre entreprise, sa station, votre compte propriétaire et l’abonnement d’essai. Vous arrivez sur la Mise en route.' },
-  { q: 'Puis-je encaisser avant d’avoir fixé mes tarifs ?', r: 'Non. Tant que la station n’est pas activée, les fiches, encaissements, la caisse et les dépenses répondent 409 onboarding_incomplete avec la liste de ce qui manque.' },
-  { q: 'Puis-je modifier un tarif plus tard ?', r: 'Oui, mais les lavages déjà enregistrés conservent le prix en vigueur au moment de leur création. L’historique et les rapports restent justes.' },
-  { q: 'Comment réinitialiser un mot de passe oublié ?', r: 'WashGuard n’envoie aucun e-mail. Le propriétaire réinitialise le mot de passe depuis le module Employés — c’est la seule voie réelle.' },
+  { q: 'Que se passe-t-il après l’inscription ?', r: 'Le serveur crée une seule fois votre entreprise, sa station, votre compte propriétaire et l’abonnement d’essai. Vous arrivez ensuite sur la Mise en route.' },
+  { q: 'Puis-je encaisser avant d’avoir fixé mes tarifs ?', r: 'Non. Tant que la station n’est pas activée, les fiches, encaissements, la caisse et les dépenses restent verrouillés. La mise en route vous indique ce qu’il reste à compléter.' },
+  { q: 'Puis-je modifier un tarif plus tard ?', r: 'Oui. Les lavages déjà enregistrés conservent toutefois le tarif en vigueur au moment de leur création, afin de préserver un historique juste.' },
+  { q: 'Y a-t-il déjà des avis de clients ?', r: 'Pas encore. Nous préférons attendre les retours de vraies stations plutôt que d’afficher des témoignages inventés.' },
 ];
 
-/** Aperçu issu du rendu réel de l'application (pas d'image retouchée). */
-function AppPreview() {
+function DashboardPreview() {
+  const stats = [
+    { label: 'Chiffre d’affaires', value: '0 FCFA', icon: <FiDollarSign /> },
+    { label: 'Lavages du jour', value: '0', icon: <FiTruck /> },
+    { label: 'Encaissements', value: '0 FCFA', icon: <FiCreditCard /> },
+    { label: 'Dépenses', value: '0 FCFA', icon: <FiPieChart /> },
+  ];
+
   return (
-    <div className="wg-card overflow-hidden !p-0 shadow-2xl">
-      <div className="flex items-center gap-1.5 border-b px-4 py-3" style={{ borderColor: 'var(--wg-border)' }}>
-        <span className="h-2.5 w-2.5 rounded-full bg-red-400/70" /><span className="h-2.5 w-2.5 rounded-full bg-amber-400/70" /><span className="h-2.5 w-2.5 rounded-full bg-emerald-400/70" />
-        <span className="wg-muted ml-3 rounded-md px-2 py-1 text-[10px]" style={{ background: 'var(--wg-surface-2)' }}>washguard.app/app/tableau-de-bord</span>
+    <div className="landing-dashboard" role="img" aria-label="Aperçu visuel du tableau de bord WashGuard">
+      <div className="landing-dashboard-topbar">
+        <div className="landing-window-dots" aria-hidden="true"><i /><i /><i /></div>
+        <span className="landing-address">washguard.app / tableau-de-bord</span>
+        <span className="landing-live"><span /> Votre espace</span>
       </div>
-      <div className="flex" style={{ background: 'var(--wg-bg)' }}>
-        <div className="hidden w-32 shrink-0 border-r p-3 sm:block" style={{ borderColor: 'var(--wg-border)', background: 'var(--wg-surface)' }}>
-          <div className="mb-4 flex items-center gap-1.5"><span className="wg-gradient h-5 w-5 rounded-md" /><span className="text-[10px] font-bold">WashGuard</span></div>
-          {['Tableau de bord', 'Mise en route', 'Lavages', 'Prestations', 'Clients', 'Caisse', 'Rapports', 'Paramètres'].map((n, i) => (
-            <div key={n} className={`mb-1 rounded-md px-2 py-1.5 text-[9px] ${i === 0 ? 'wg-btn-primary' : 'wg-muted'}`} style={i === 0 ? {} : { background: 'transparent' }}>{n}</div>
+      <div className="landing-dashboard-body">
+        <aside className="landing-sidebar" aria-label="Navigation de l’aperçu">
+          <div className="landing-sidebar-brand"><Logo compact /><span>WashGuard</span></div>
+          {[
+            ['Tableau de bord', <FiGrid />],
+            ['Lavages', <FiTruck />],
+            ['Prestations', <FiSettings />],
+            ['Clients', <FiUsers />],
+            ['Caisse', <FiDollarSign />],
+            ['Rapports', <FiBarChart2 />],
+          ].map(([label, icon], index) => (
+            <div key={label as string} className={`landing-sidebar-link ${index === 0 ? 'is-active' : ''}`}>
+              {icon as React.ReactNode}<span>{label as string}</span>
+            </div>
           ))}
-        </div>
-        <div className="min-w-0 flex-1 p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <div><div className="text-[11px] font-bold">Tableau de bord</div><div className="wg-muted text-[9px]">Chiffres du jour calculés par le serveur</div></div>
-            <span className="wg-gradient h-6 w-6 rounded-full" />
+        </aside>
+        <div className="landing-dashboard-content">
+          <div className="landing-dashboard-heading">
+            <div>
+              <p className="landing-eyebrow">VUE D’ENSEMBLE</p>
+              <h3>Tableau de bord</h3>
+              <p>Les chiffres de votre station, en un seul endroit.</p>
+            </div>
+            <span className="landing-avatar" aria-hidden="true"><FiUsers /></span>
           </div>
-          <div className="mb-3 grid grid-cols-2 gap-2 xl:grid-cols-4">
-            {['Chiffre d’affaires', 'Lavages', 'Encaissements', 'Dépenses'].map((l) => (
-              <div key={l} className="rounded-lg border p-2.5" style={{ borderColor: 'var(--wg-border)', background: 'var(--wg-surface)' }}>
-                <div className="wg-muted text-[8px] font-bold uppercase">{l}</div>
-                <div className="mt-1.5 text-[13px] font-bold">0 FCFA</div>
-                <div className="mt-2 h-1 w-2/3 rounded-full bg-sky-500/20" />
+          <div className="landing-stat-grid">
+            {stats.map((stat) => (
+              <div className="landing-stat" key={stat.label}>
+                <span className="landing-stat-icon">{stat.icon}</span>
+                <p>{stat.label}</p>
+                <strong>{stat.value}</strong>
+                <span className="landing-stat-rule" />
               </div>
             ))}
           </div>
-          <div className="rounded-lg border p-3" style={{ borderColor: 'var(--wg-border)', background: 'var(--wg-surface)' }}>
-            <div className="mb-2 flex items-center justify-between text-[9px] font-bold"><span>Dernières opérations</span><span className="wg-muted">Aujourd’hui</span></div>
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="flex items-center gap-2 border-t py-2" style={{ borderColor: 'var(--wg-border)' }}>
-                <span className="wg-gradient h-5 w-5 rounded-md opacity-70" />
-                <span className="h-1.5 flex-1 rounded-full" style={{ background: 'var(--wg-surface-2)' }} />
-                <span className="wg-muted text-[8px]">—</span>
-              </div>
-            ))}
-            <div className="wg-muted mt-1 text-center text-[9px]">Aucune opération : la station n’est pas encore activée.</div>
+          <div className="landing-activity">
+            <div className="landing-activity-header"><div><h4>Activité récente</h4><p>Suivez les opérations de votre équipe.</p></div><span>Aujourd’hui</span></div>
+            <div className="landing-activity-empty">
+              <span className="landing-empty-icon"><FiTruck /></span>
+              <strong>Votre activité apparaîtra ici</strong>
+              <p>Aucune opération de démonstration n’est ajoutée.</p>
+            </div>
           </div>
+          <div className="landing-preview-note"><FiLock /><span>Vos données restent les vôtres. Les montants sont calculés à partir de vos opérations.</span></div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ActivityFlowPreview() {
+  const stages = [
+    { icon: <FiTruck />, title: 'Lavage enregistré', detail: 'Prestation · catégorie · tarif en vigueur' },
+    { icon: <FiCreditCard />, title: 'Encaissement suivi', detail: 'Paiement · montant reçu · reste à payer' },
+    { icon: <FiBarChart2 />, title: 'Rapport actualisé', detail: 'Activité · caisse · résultats regroupés' },
+  ];
+
+  return (
+    <div className="landing-flow-card" role="img" aria-label="Schéma du suivi d’une opération, du lavage au rapport">
+      <div className="landing-flow-header">
+        <div><span className="landing-setup-kicker">DU TERRAIN AU RAPPORT</span><h3>Chaque opération laisse une trace.</h3></div>
+        <span className="landing-flow-shield"><FiShield /></span>
+      </div>
+      <p className="landing-flow-intro">Un suivi cohérent, de la fiche de lavage aux résultats de la station.</p>
+      <div className="landing-flow-stages">
+        {stages.map((stage, index) => (
+          <div className="landing-flow-stage" key={stage.title}>
+            <span className="landing-flow-icon">{stage.icon}</span>
+            <div><strong>{stage.title}</strong><span>{stage.detail}</span></div>
+            <span className="landing-flow-number">0{index + 1}</span>
+          </div>
+        ))}
+      </div>
+      <div className="landing-flow-footer"><FiLock /><span>Les rapports regroupent les données saisies par vos équipes, jamais des exemples préremplis.</span></div>
+    </div>
+  );
+}
+
+function SetupPreview() {
+  const steps = [
+    'Identité de l’entreprise',
+    'Horaires et catégories de véhicules',
+    'Prestations et grille tarifaire',
+    'Moyens de paiement',
+    'Activation de la station',
+  ];
+
+  return (
+    <div className="landing-setup-card">
+      <div className="landing-setup-heading">
+        <div><span className="landing-setup-kicker">APERÇU DE LA MISE EN ROUTE</span><h3>Une station configurée à votre façon</h3></div>
+        <span className="landing-setup-count">0 <small>/ 13</small></span>
+      </div>
+      <div role="progressbar" aria-label="Avancement du parcours de mise en route" aria-valuenow={0} aria-valuemin={0} aria-valuemax={13}>
+        <Progress value={0} max={13} />
+      </div>
+      <ul className="landing-setup-list">
+        {steps.map((step, index) => (
+          <li key={step}>
+            <span className="landing-step-number">0{index + 1}</span>
+            <span>{step}</span>
+            <FiArrowDownRight aria-hidden="true" />
+          </li>
+        ))}
+      </ul>
+      <p className="landing-setup-footnote"><FiShield /> Parcours de 13 étapes. Pas de tarifs prédéfinis : vous décidez avant l’ouverture.</p>
     </div>
   );
 }
@@ -82,221 +172,187 @@ export default function Landing() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [menu, setMenu] = useState(false);
 
+  const closeMenu = () => setMenu(false);
+  const navigation = [
+    ['#fonctionnalites', 'Fonctionnalités'],
+    ['#apercu', 'Aperçu'],
+    ['#tarifs', 'Tarifs'],
+    ['#faq', 'FAQ'],
+  ];
+
   return (
-    <div className="min-h-screen">
-      {/* En-tête */}
-      <header className="sticky top-0 z-50 border-b backdrop-blur-xl" style={{ borderColor: 'var(--wg-border)', background: 'color-mix(in srgb, var(--wg-bg) 85%, transparent)' }}>
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5">
-          <Link to="/"><Logo /></Link>
-          <nav className="hidden items-center gap-7 text-[13px] font-medium md:flex">
-            <a href="#modules" className="wg-muted hover:text-sky-400">Fonctionnalités</a>
-            <a href="#apercu" className="wg-muted hover:text-sky-400">Aperçu</a>
-            <a href="#tarifs" className="wg-muted hover:text-sky-400">Tarifs</a>
-            <a href="#faq" className="wg-muted hover:text-sky-400">Questions fréquentes</a>
+    <div className="landing-page">
+      <header className="landing-header">
+        <div className="landing-header-inner">
+          <Link to="/" aria-label="WashGuard, accueil" onClick={closeMenu}><Logo /></Link>
+          <nav className="landing-desktop-nav" aria-label="Navigation principale">
+            {navigation.map(([href, label]) => <a href={href} key={href}>{label}</a>)}
           </nav>
-          <div className="flex items-center gap-2">
-            <button onClick={toggleTheme} className="wg-btn wg-btn-ghost !px-2.5" aria-label="Changer de thème">{theme === 'dark' ? <FiSun size={16} /> : <FiMoon size={16} />}</button>
-            <Link to="/connexion" className="wg-btn wg-btn-ghost hidden sm:inline-flex">Se connecter</Link>
-            <Link to="/inscription" className="wg-btn wg-btn-primary hidden sm:inline-flex">Créer mon espace <FiArrowRight /></Link>
-            <button className="wg-btn wg-btn-ghost !px-2.5 md:hidden" onClick={() => setMenu((v) => !v)} aria-label="Menu">{menu ? <FiX /> : <FiList />}</button>
+          <div className="landing-header-actions">
+            <button onClick={toggleTheme} className="landing-theme-toggle" aria-label={theme === 'dark' ? 'Activer le thème clair' : 'Activer le thème sombre'}>
+              {theme === 'dark' ? <FiSun /> : <FiMoon />}
+            </button>
+            <Link to="/connexion" className="landing-login">Se connecter</Link>
+            <Link to="/inscription" className="landing-button landing-button-primary landing-header-cta">Créer mon espace <FiArrowRight /></Link>
+            <button
+              className="landing-menu-toggle"
+              onClick={() => setMenu((current) => !current)}
+              aria-label={menu ? 'Fermer le menu' : 'Ouvrir le menu'}
+              aria-expanded={menu}
+              aria-controls="landing-mobile-menu"
+            >
+              {menu ? <FiX /> : <span className="landing-menu-icon"><i /><i /></span>}
+            </button>
           </div>
         </div>
         {menu && (
-          <div className="wg-card mx-4 mb-3 flex flex-col gap-1 p-3 md:hidden">
-            {[['#modules', 'Fonctionnalités'], ['#apercu', 'Aperçu'], ['#tarifs', 'Tarifs'], ['#faq', 'Questions fréquentes']].map(([h, l]) => (
-              <a key={h} href={h} onClick={() => setMenu(false)} className="wg-btn wg-btn-ghost !justify-start">{l}</a>
-            ))}
-            <Link to="/connexion" className="wg-btn wg-btn-ghost !justify-start">Se connecter</Link>
-            <Link to="/inscription" className="wg-btn wg-btn-primary !justify-start">Créer mon espace</Link>
-          </div>
+          <nav id="landing-mobile-menu" className="landing-mobile-nav" aria-label="Navigation mobile">
+            {navigation.map(([href, label]) => <a href={href} key={href} onClick={closeMenu}>{label}</a>)}
+            <Link to="/connexion" onClick={closeMenu}>Se connecter</Link>
+            <Link to="/inscription" className="landing-mobile-cta" onClick={closeMenu}>Créer mon espace <FiArrowRight /></Link>
+          </nav>
         )}
       </header>
 
-      {/* Héros */}
-      <section className="relative overflow-hidden">
-        <div className="pointer-events-none absolute -top-40 left-1/2 h-[500px] w-[900px] -translate-x-1/2 rounded-full bg-sky-500/10 blur-3xl" />
-        <div className="mx-auto grid max-w-7xl items-center gap-10 px-5 py-14 lg:grid-cols-2 lg:py-20">
-          <div className="wg-fade-in">
-            <Badge tone="accent"><span className="h-1.5 w-1.5 rounded-full bg-sky-400" /> Logiciel de gestion pour stations de lavage</Badge>
-            <h1 className="mt-5 text-4xl font-extrabold leading-[1.1] tracking-tight sm:text-5xl lg:text-[56px]">
-              Votre station,<br /><span className="wg-gradient bg-clip-text text-transparent">du lavage à la paie.</span>
-            </h1>
-            <p className="wg-muted mt-5 max-w-xl text-base leading-relaxed">
-              WashGuard suit chaque fiche, chaque encaissement, chaque dépense et chaque commission.
-              Les chiffres sont calculés sur vos données réelles — pas sur des exemples.
-            </p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <Link to="/inscription" className="wg-btn wg-btn-primary !px-5 !py-3">Créer mon espace <FiArrowRight /></Link>
-              <Link to="/connexion" className="wg-btn wg-btn-ghost !px-5 !py-3">J’ai déjà un compte</Link>
+      <main>
+        <section className="landing-hero">
+          <div className="landing-hero-copy">
+            <Badge tone="accent"><span className="landing-badge-dot" /> Gestion de station · en français · FCFA</Badge>
+            <h1>Le quotidien de votre station, <span>enfin bien maîtrisé.</span></h1>
+            <p className="landing-hero-description">Lavages, caisse, équipe et résultats : WashGuard rassemble vos opérations pour vous aider à piloter votre station avec clarté.</p>
+            <div className="landing-hero-actions">
+              <Link to="/inscription" className="landing-button landing-button-primary">Découvrir WashGuard <FiArrowRight /></Link>
+              <a href="#apercu" className="landing-button landing-button-secondary">Voir l’interface <FiArrowDownRight /></a>
             </div>
-            <div className="mt-7 flex flex-wrap gap-x-6 gap-y-2 text-xs">
-              {['Montants en FCFA', 'Interface en français', 'Thème sombre / clair', 'Session de 30 jours'].map((t) => (
-                <span key={t} className="wg-muted flex items-center gap-1.5"><FiCheckCircle className="text-sky-400" /> {t}</span>
-              ))}
+            <div className="landing-hero-reassurance">
+              <span><FiCheckCircle /> Essai de 14 jours</span>
+              <span><FiCheckCircle /> Vos tarifs, votre choix</span>
+              <span><FiCheckCircle /> Aucun avis inventé</span>
             </div>
           </div>
-          <div className="wg-fade-in relative">
-            <div className="absolute -inset-4 rounded-3xl bg-sky-500/10 blur-2xl" />
-            <div className="relative"><AppPreview /></div>
-            <p className="wg-muted mt-3 text-center text-[11px]">Aperçu du rendu de l’application, sans donnée d’exemple.</p>
+          <div className="landing-hero-visual">
+            <div className="landing-visual-glow" />
+            <DashboardPreview />
+            <div className="landing-float-card"><span className="landing-float-icon"><FiShield /></span><span><strong>Conçu pour le terrain</strong><small>Des opérations suivies, pas devinées.</small></span></div>
           </div>
-        </div>
-      </section>
+          <div className="landing-hero-index" aria-hidden="true"><span>01</span><i /></div>
+        </section>
 
-      {/* Ce qui est réel */}
-      <section className="mx-auto max-w-7xl px-5 pb-8">
-        <div className="grid gap-3 sm:grid-cols-3">
-          {[
-            { icon: <FiGrid />, t: 'Aperçus réels', d: 'Les écrans présentés viennent du rendu de l’application, pas de maquettes retouchées.' },
-            { icon: <FiLock />, t: 'Tarifs depuis la base', d: 'Les formules affichées sont lues là où la facturation les lit : jamais désynchronisées.' },
-            { icon: <FiShield />, t: 'Aucun avis inventé', d: 'Pas de témoignages pour l’instant. Ils viendront de vraies stations, ou pas du tout.' },
-          ].map((c) => (
-            <div key={c.t} className="wg-card flex items-start gap-3 p-4">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-sky-500/10 text-sky-400">{c.icon}</span>
-              <div><p className="text-sm font-bold">{c.t}</p><p className="wg-muted mt-1 text-xs leading-relaxed">{c.d}</p></div>
-            </div>
-          ))}
-        </div>
-      </section>
+        <section className="landing-trust-strip" aria-label="Les engagements WashGuard">
+          <div><FiLock /><span>Tarifs lus depuis la même base que la facturation</span></div>
+          <div><FiFileText /><span>Historique conservé pour chaque opération</span></div>
+          <div><FiShield /><span>Pas de témoignages ni de chiffres inventés</span></div>
+        </section>
 
-      {/* Aperçu grand écran */}
-      <section id="apercu" className="mx-auto max-w-7xl scroll-mt-20 px-5 py-14">
-        <div className="mb-8 text-center">
-          <Badge tone="accent">Aperçu</Badge>
-          <h2 className="mt-3 text-3xl font-extrabold tracking-tight">Toute l’exploitation, au même endroit</h2>
-          <p className="wg-muted mx-auto mt-2 max-w-2xl text-sm">Un espace unique pour la station, du premier tarif choisi au rapport du mois.</p>
-        </div>
-        <div className="mx-auto max-w-5xl"><AppPreview /></div>
-      </section>
-
-      {/* Modules */}
-      <section id="modules" className="scroll-mt-20 border-y py-14" style={{ borderColor: 'var(--wg-border)', background: 'var(--wg-surface)' }}>
-        <div className="mx-auto max-w-7xl px-5">
-          <div className="mb-8 max-w-2xl">
-            <Badge tone="accent">Fonctionnalités</Badge>
-            <h2 className="mt-3 text-3xl font-extrabold tracking-tight">Ce que fait WashGuard</h2>
-            <p className="wg-muted mt-2 text-sm">Chaque module correspond à un écran réel de l’application.</p>
+        <section className="landing-section landing-features" id="fonctionnalites">
+          <div className="landing-section-heading">
+            <div><span className="landing-section-kicker">TOUT EST À SA PLACE</span><h2>Moins de flou.<br /><span>Plus de maîtrise.</span></h2></div>
+            <p>Chaque module répond à un besoin concret de la station. Ils travaillent ensemble pour vous donner une vue cohérente de l’activité.</p>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {MODULES.map((m) => (
-              <div key={m.title} className="wg-card p-5 transition hover:-translate-y-0.5 hover:border-sky-500/40">
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-sky-500/10 text-lg text-sky-400">{m.icon}</span>
-                <h3 className="mt-4 text-sm font-bold">{m.title}</h3>
-                <p className="wg-muted mt-1.5 text-xs leading-relaxed">{m.text}</p>
-              </div>
+          <div className="landing-feature-grid">
+            {MODULES.map((module) => (
+              <article className="landing-feature-card" key={module.number}>
+                <div className="landing-feature-card-top"><span className="landing-feature-icon">{module.icon}</span><span className="landing-feature-number">{module.number}</span></div>
+                <h3>{module.title}</h3>
+                <p>{module.text}</p>
+                <span className="landing-feature-line" />
+              </article>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Mise en route */}
-      <section className="mx-auto max-w-7xl px-5 py-16">
-        <div className="wg-card grid gap-8 p-6 lg:grid-cols-2 lg:p-10">
-          <div>
-            <Badge tone="warn">Mise en route</Badge>
-            <h2 className="mt-3 text-2xl font-extrabold tracking-tight sm:text-3xl">La station ouvre quand vous avez choisi vos tarifs</h2>
-            <p className="wg-muted mt-3 text-sm leading-relaxed">
-              Ce n’est pas un formulaire de bienvenue : c’est un parcours de treize étapes dont l’état est constaté par le serveur sur les données réellement enregistrées. Huit sont obligatoires — identité, horaires, catégories de véhicules, catalogue, grille tarifaire, moyens de paiement.
-            </p>
-            <p className="wg-muted mt-3 text-sm leading-relaxed">
-              Aucun prix n’est inventé et aucune donnée d’exemple n’est ajoutée. Tant que l’activation n’a pas eu lieu, les écritures de métier répondent <code className="rounded bg-amber-500/15 px-1 py-0.5 text-amber-400">409 onboarding_incomplete</code> avec la liste de ce qui manque.
-            </p>
-            <Link to="/inscription" className="wg-btn wg-btn-primary mt-6">Démarrer la mise en route <FiArrowRight /></Link>
+        <section className="landing-showcase" id="apercu">
+          <div className="landing-showcase-copy">
+            <span className="landing-section-kicker">VOTRE STATION, EN UN COUP D’ŒIL</span>
+            <h2>Une vue claire sur ce qui se passe.</h2>
+            <p>Le tableau de bord rassemble les chiffres utiles : chiffre d’affaires, lavages, encaissements et dépenses. Les données présentées dans l’application proviennent de vos opérations, pas d’exemples préremplis.</p>
+            <ul className="landing-check-list">
+              <li><FiCheck /> Chiffres calculés à partir de vos données</li>
+              <li><FiCheck /> Les opérations récentes restent traçables</li>
+              <li><FiCheck /> Une interface adaptée aux écrans du quotidien</li>
+            </ul>
+            <Link to="/inscription" className="landing-text-link">Créer mon espace <FiArrowRight /></Link>
           </div>
-          <div className="rounded-2xl border p-5" style={{ borderColor: 'var(--wg-border)', background: 'var(--wg-surface-2)' }}>
-            <div className="flex items-center justify-between text-xs font-bold"><span>Progression constatée</span><span>0 / 8 obligatoires</span></div>
-            <div className="mt-3"><Progress value={0} max={8} /></div>
-            <div className="mt-5 space-y-2">
-              {['Identité de l’entreprise', 'Identité de la station', 'Horaires d’ouverture', 'Catégories de véhicules', 'Catalogue des prestations', 'Grille tarifaire', 'Moyens de paiement', 'Activation de la station'].map((s, i) => (
-                <div key={s} className="flex items-center gap-3 rounded-lg border px-3 py-2.5 text-xs" style={{ borderColor: 'var(--wg-border)', background: 'var(--wg-surface)' }}>
-                  <span className="wg-muted grid h-6 w-6 shrink-0 place-items-center rounded-full text-[10px] font-bold" style={{ background: 'var(--wg-surface-2)' }}>{i + 1}</span>
-                  <span className="flex-1 font-medium">{s}</span>
-                  <Badge tone="warn">À faire</Badge>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
+          <div className="landing-showcase-visual"><ActivityFlowPreview /></div>
+        </section>
 
-      {/* Tarifs */}
-      <section id="tarifs" className="scroll-mt-20 border-y py-16" style={{ borderColor: 'var(--wg-border)', background: 'var(--wg-surface)' }}>
-        <div className="mx-auto max-w-7xl px-5">
-          <div className="mb-8 text-center">
-            <Badge tone="accent">Formules et tarifs</Badge>
-            <h2 className="mt-3 text-3xl font-extrabold tracking-tight">Les prix de la base, affichés tels quels</h2>
-            <p className="wg-muted mx-auto mt-2 max-w-2xl text-sm">Ces montants sont lus depuis la table des formules : la vitrine et la facturation partagent la même source.</p>
+        <section className="landing-setup-section">
+          <div className="landing-setup-copy">
+            <span className="landing-section-kicker">VOUS GARDEZ LA MAIN</span>
+            <h2>Prêt quand <span>vous l’êtes.</span></h2>
+            <p>Configurez l’identité de la station, ses prestations, ses tarifs et ses moyens de paiement. L’activation attend que les éléments obligatoires soient réellement renseignés.</p>
+            <div className="landing-setup-note"><FiShield /><span>Aucun tarif n’est imposé. Les écritures de gestion restent verrouillées tant que la station n’est pas activée.</span></div>
+            <Link to="/inscription" className="landing-button landing-button-secondary">Commencer la mise en route <FiArrowRight /></Link>
           </div>
-          <div className="grid gap-5 lg:grid-cols-3">
+          <SetupPreview />
+        </section>
+
+        <section className="landing-pricing-section" id="tarifs">
+          <div className="landing-section-heading landing-pricing-heading">
+            <div><span className="landing-section-kicker">DES FORMULES CLAIRES</span><h2>Choisissez votre rythme.</h2></div>
+            <p>Les formules et les montants ci-dessous sont ceux utilisés par l’application et la facturation.</p>
+          </div>
+          <div className="landing-pricing-grid">
             {plans.map((plan) => {
               const featured = plan.id === 'standard';
               return (
-                <div key={plan.id} className={`wg-card relative flex flex-col p-6 ${featured ? 'border-sky-500 shadow-xl shadow-sky-500/10' : ''}`}>
-                  {featured && <span className="absolute -top-3 left-6"><Badge tone="accent">Le plus choisi</Badge></span>}
-                  <h3 className="text-lg font-extrabold">{plan.name}</h3>
-                  <p className="wg-muted mt-1 text-xs">{plan.trial ? 'Pour ouvrir votre station' : 'Facturé chaque mois, en FCFA'}</p>
-                  <p className="mt-5 text-3xl font-extrabold tracking-tight">{formatFCFA(plan.priceMonthly)}<span className="wg-muted text-sm font-medium"> / mois</span></p>
-                  <div className="my-5 border-t" style={{ borderColor: 'var(--wg-border)' }} />
-                  <ul className="flex-1 space-y-2.5 text-xs">
-                    {plan.features.map((f) => <li key={f} className="flex items-start gap-2"><FiCheck className="mt-0.5 shrink-0 text-sky-400" /><span>{f}</span></li>)}
-                    <li className="flex items-start gap-2"><FiCheck className="mt-0.5 shrink-0 text-sky-400" /><span>{plan.limits.stations} station(s) · {plan.limits.employees} comptes · {plan.limits.washesPerMonth.toLocaleString('fr-FR')} lavages/mois</span></li>
+                <article key={plan.id} className={`landing-price-card ${featured ? 'is-featured' : ''}`}>
+                  {plan.trial && <span className="landing-plan-tag">14 JOURS D’ESSAI</span>}
+                  <div className="landing-plan-header"><h3>{plan.name}</h3><span>{plan.trial ? 'Pour démarrer' : 'Sans surprise'}</span></div>
+                  <p className="landing-plan-description">{plan.trial ? 'Prenez le temps de configurer votre station.' : 'La gestion complète de votre activité, chaque mois.'}</p>
+                  <p className="landing-price">{formatFCFA(plan.priceMonthly)}<span>{plan.trial ? ' / 14 jours' : ' / mois'}</span></p>
+                  <div className="landing-plan-divider" />
+                  <ul>
+                    {plan.features.map((feature) =>                     <li key={feature}><FiCheck /><span>{feature}</span></li>)}
                   </ul>
-                  <Link to="/inscription" className={`wg-btn mt-6 ${featured ? 'wg-btn-primary' : 'wg-btn-ghost'}`}>
-                    {plan.trial ? 'Commencer l’essai' : `Choisir ${plan.name}`}
+                  <Link to="/inscription" className={`landing-button ${featured ? 'landing-button-primary' : 'landing-button-secondary'}`}>
+                    {plan.trial ? 'Commencer l’essai' : `Choisir ${plan.name}`} <FiArrowRight />
                   </Link>
-                </div>
+                </article>
               );
             })}
           </div>
-          <p className="wg-muted mt-5 text-center text-xs">Aucun prix de prestation n’est prédéfini : vos tarifs de lavage sont choisis par vous pendant la mise en route.</p>
-        </div>
-      </section>
+          <p className="landing-pricing-footnote">Les tarifs de lavage sont définis par chaque station pendant la mise en route.</p>
+        </section>
 
-      {/* Pas de témoignages */}
-      <section className="mx-auto max-w-7xl px-5 py-14">
-        <div className="wg-card flex flex-col items-center justify-center border-dashed py-10 text-center">
-          <FiShield className="text-3xl text-sky-400 opacity-70" />
-          <h3 className="mt-3 text-lg font-bold">Pas de témoignages — pour l’instant</h3>
-          <p className="wg-muted mt-2 max-w-xl text-sm leading-relaxed">Des avis inventés seraient pires que pas d’avis du tout. Cette section accueillera les retours de vraies stations quand elles en donneront.</p>
-        </div>
-      </section>
+        <section className="landing-honesty">
+          <div className="landing-honesty-icon"><FiShield /></div>
+          <div><span className="landing-section-kicker">LA CONFIANCE SE MÉRITE</span><h2>Pas de témoignages inventés.</h2><p>Les avis viendront de vraies stations, quand elles auront quelque chose à raconter. En attendant, nous préférons vous montrer ce que le produit fait réellement.</p></div>
+          <a href="#apercu" className="landing-text-link">Voir le produit <FiArrowRight /></a>
+        </section>
 
-      {/* FAQ */}
-      <section id="faq" className="scroll-mt-20 border-t py-16" style={{ borderColor: 'var(--wg-border)', background: 'var(--wg-surface)' }}>
-        <div className="mx-auto max-w-3xl px-5">
-          <div className="mb-8 text-center">
-            <Badge tone="accent">Questions fréquentes</Badge>
-            <h2 className="mt-3 text-3xl font-extrabold tracking-tight">Les réponses, sans détour</h2>
-          </div>
-          <div className="space-y-2">
-            {FAQ.map((f, i) => (
-              <div key={f.q} className="wg-card overflow-hidden !p-0">
-                <button className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left text-sm font-semibold" onClick={() => setOpenFaq(openFaq === i ? null : i)}>
-                  {f.q}<FiChevronDown className={`wg-muted shrink-0 transition ${openFaq === i ? 'rotate-180' : ''}`} />
-                </button>
-                {openFaq === i && <p className="wg-muted border-t px-5 py-4 text-xs leading-relaxed" style={{ borderColor: 'var(--wg-border)' }}>{f.r}</p>}
-              </div>
+        <section className="landing-faq-section" id="faq">
+          <div className="landing-faq-intro"><span className="landing-section-kicker">BESOIN DE SAVOIR</span><h2>Questions fréquentes.</h2><p>Des réponses directes sur l’utilisation de WashGuard.</p></div>
+          <div className="landing-faq-list">
+            {FAQ.map((item, index) => (
+              <article className={`landing-faq-item ${openFaq === index ? 'is-open' : ''}`} key={item.q}>
+                <h3>
+                  <button aria-expanded={openFaq === index} aria-controls={`landing-faq-answer-${index}`} onClick={() => setOpenFaq(openFaq === index ? null : index)}>
+                    <span>{item.q}</span><FiChevronDown aria-hidden="true" />
+                  </button>
+                </h3>
+                {openFaq === index && <p id={`landing-faq-answer-${index}`} className="landing-faq-answer">{item.r}</p>}
+              </article>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* CTA final */}
-      <section className="mx-auto max-w-7xl px-5 py-16">
-        <div className="wg-gradient relative overflow-hidden rounded-3xl px-6 py-12 text-center text-white sm:px-12">
-          <div className="absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10 blur-2xl" />
-          <h2 className="relative text-2xl font-extrabold sm:text-3xl">Prêt à ouvrir votre station ?</h2>
-          <p className="relative mx-auto mt-2 max-w-xl text-sm text-white/85">Inscription en deux temps, puis mise en route guidée. Aucune donnée d’exemple, aucun tarif imposé.</p>
-          <Link to="/inscription" className="wg-btn relative mt-6 !bg-white !px-6 !py-3 !text-sky-700">Créer mon espace <FiArrowRight /></Link>
-        </div>
-      </section>
+        <section className="landing-final-cta">
+          <div className="landing-cta-glow" />
+          <div className="landing-final-cta-content">
+            <span className="landing-section-kicker">ON Y VA ?</span>
+            <h2>La prochaine étape,<br /><span>c’est votre station.</span></h2>
+            <p>Créez votre espace, renseignez vos tarifs et avancez à votre rythme.</p>
+            <Link to="/inscription" className="landing-button landing-button-light">Créer mon espace <FiArrowRight /></Link>
+          </div>
+          <div className="landing-cta-mark" aria-hidden="true"><Logo compact /></div>
+        </section>
+      </main>
 
-      <footer className="border-t py-8" style={{ borderColor: 'var(--wg-border)' }}>
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5">
-          <Logo />
-          <p className="wg-muted text-xs">© {new Date().getFullYear()} WashGuard · Interface en français · Montants en FCFA · Dates jj/mm/aaaa</p>
-          <div className="flex gap-4 text-xs"><a href="#modules" className="wg-link">Fonctionnalités</a><a href="#tarifs" className="wg-link">Tarifs</a><Link to="/connexion" className="wg-link">Connexion</Link></div>
-        </div>
+      <footer className="landing-footer">
+        <Link to="/" aria-label="WashGuard, accueil"><Logo /></Link>
+        <p>© {new Date().getFullYear()} WashGuard <span>·</span> Interface en français <span>·</span> Montants en FCFA</p>
+        <nav aria-label="Liens de pied de page"><a href="#fonctionnalites">Fonctionnalités</a><a href="#tarifs">Tarifs</a><Link to="/connexion">Connexion</Link></nav>
       </footer>
     </div>
   );
