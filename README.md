@@ -1,103 +1,86 @@
-# [Horizon UI TailwindCSS React ⚡️](https://horizon-ui.com/horizon-tailwind-react) [![Tweet](https://img.shields.io/twitter/url/http/shields.io.svg?style=social&logo=twitter)](https://twitter.com/intent/tweet?text=Check%20Horizon%20UI,%20the%20trendiest%20open-source%20admin%20template%20for%20%23tailwindcss%20and%20%23react!%0A%0Ahorizon-ui.com%20)
+# WashGuard — frontend
 
-![version](https://img.shields.io/badge/version-2.0.0-brightgreen.svg)
-![license](https://img.shields.io/badge/license-MIT-blue.svg)
-[![GitHub issues open](https://img.shields.io/github/issues/horizon-ui/horizon-tailwind-react.svg?maxAge=2592000)](https://github.com/horizon-ui/horizon-tailwind-react/issues?q=is%3Aopen+is%3Aissue)
+Application de gestion de station de lavage. **Ce dépôt ne contient, pour l'heure, que le frontend** : React, TypeScript, Tailwind CSS, avec Supabase prêt à être branché.
 
-<p>&nbsp;</p>
+Toute l'interface est en **français**, les montants en **FCFA** (`12 500 FCFA`), les dates au format **jj/mm/aaaa**. Thème **sombre par défaut**, thème clair disponible (bouton soleil / lune dans l'en-tête).
 
-[<img alt="Horizon UI - Tailwind CSS React Admin dashboard template" src="https://i.ibb.co/1zhBQ2J/horizon-ui-tailwind-2.png" />](https://github.com/horizon-ui/horizon-tailwind-react)
-
-<p>&nbsp;</p>
-
-Get started and build your dream web app with Horizon UI, the trendiest & innovative Open Source Admin Template for Tailwind CSS & React!
-
----
-
-### Introduction
-
-Designed for those who like modern UI elements and beautiful websites. Made of hundred of elements, designed blocks and fully coded pages, Horizon UI is ready to help you create stunning websites and webapps.
-
-Save hundreds of hours trying to create and develop a dashboard from scratch.
-The fastest, most responsive & trendiest dashboard for Tailwind CSS is here. Seriously.
-
-With Horizon UI you will find many examples for pages like NFTs Pages,
-Authentication Pages, Profile and so on. Just choose between a Basic Design or a cover and you are good to go!
-
-### 🎉 [NEW] Horizon UI Components
-
-All the main components from both versions, this will help you to see and interact with all & the latest added components of Horizon (also, new components are on the way, stay tuned)! ⚡️
-<a href="https://horizon-ui.com/components/?ref=readme-horizon-tailwind-react" target="_blank">See all components</a>
-
-### Documentation
-
-Each element is well presented in a very complex documentation. You can read more about the <a href="https://horizon-ui.com/docs-tailwind/docs/react/installation?ref=readme-horizon-tailwind-react" target="_blank">documentation here.</a>
-
-### Quick Start
-
-Install Horizon UI by running either of the following:
-
-- Install NodeJS LTS from [NodeJs Official Page](https://nodejs.org/en/?ref=horizon-documentation) (NOTE: Product only works with LTS version).
-
-Clone the repository with the following command:
-
-```bash
-git clone https://github.com/horizon-ui/horizon-tailwind-react.git
-```
-
-Run in terminal this command:
+## Démarrer
 
 ```bash
 npm install
+npm run dev        # ou : make web
+npm run build      # ou : make build — vérifie les types puis produit dist/
+npm run preview    # sert dist/ sur le port 5173
 ```
 
-Then run this command to start your local server
+Le serveur de développement écoute sur `0.0.0.0:5173`. En production, servez `dist/` derrière un serveur qui renvoie `index.html` pour toutes les routes (SPA).
 
-```bash
-npm start
+L'aperçu de la vitrine est un **composant React rendu en direct** (`AppPreview` dans `src/pages/Landing.tsx`) et non une image retouchée : il ne peut pas se désynchroniser de l'application. La génération automatisée de captures (`make rendu`) n'est pas encore en place — elle viendra avec le branchement backend.
+
+## Ce qui est implémenté
+
+| Écran | Contenu |
+| --- | --- |
+| `/` — Vitrine | Présentation, aperçus **issus du rendu de l'application**, formules et tarifs lus dans `src/lib/plans.ts` (la table `plans` en attendant Supabase), questions fréquentes. **Aucun témoignage** : des avis inventés seraient pires que pas d'avis du tout. Une personne déjà identifiée est conduite directement à son espace. |
+| `/connexion`, `/inscription` | Même mise en page `AuthLayout` : formulaire sur surface claire et centrée, panneau photo à droite (`public/images/lav-auto.jpeg`) avec dégradé sombre, masqué sur téléphone. Inscription groupée en deux temps : *votre entreprise et sa station* (nom de l'entreprise, nom de la station, téléphone, ville), puis *votre compte de propriétaire*. |
+| Mise en route | 13 étapes, **8 obligatoires**, dont l'état est **constaté sur les données enregistrées** : aucune case n'est cochée par le navigateur. Voir [docs/onboarding.md](docs/onboarding.md). |
+| Tableau de bord | CA du jour, lavages, encaissements, dépenses, état de la caisse, alertes, dernières opérations, objectif du mois. |
+| Lavages | Fiche rapide (prestations, véhicule, plaque facultative, employé, remise autorisée, client facultatif), statuts, encaissement total ou partiel, reste à payer, annulation motivée. |
+| Prestations | Catalogue propre à la station et grille tarifaire par catégorie de véhicules. **Modifier un tarif ne change jamais les lavages déjà enregistrés.** |
+| Clients | Fiche facultative, historique, recherche. Un lavage peut être encaissé sans client. |
+| Employés | Comptes, rôles, activation, réinitialisation de mot de passe, exception de barème de commission, activité. |
+| Caisse | Ouverture avec fond, clôture avec **comptage** et écart théorique / compté, réouverture motivée, historique. Règle : les espèces exigent une caisse ouverte (désactivable dans Paramètres) ; Mobile Money à tout moment. |
+| Dépenses | Montant, catégorie, motif, fournisseur, date, moyen de paiement, rattachement à la caisse ouverte, annulation motivée (**jamais de suppression**). |
+| Rapports | Jour / semaine / mois, meilleures prestations, activité par employé, répartition par moyen de paiement, historique de caisse, meilleurs clients, **export CSV**. |
+| Commissions | Lavages **terminés** de la période, barème de la station ou exception par compte, montant dû, **export CSV pour la paie**. Réservé au propriétaire et au gérant. |
+| Paramètres | Station, horaires, devise FCFA, logo, règles de caisse, remise maximale du caissier, barème, objectif, entreprise, journal des opérations sensibles. |
+| Abonnement | Formule en cours, consommation / limites, comparaison, demande de changement. |
+| Espace plateforme | Réservé au support : entreprises clientes, formules, suspension, journal. |
+
+### Règles respectées
+
+- **Aucun prix de prestation n'est prédéfini, aucune donnée d'exemple n'est ajoutée.** Les libellés proposés pendant la mise en route (Berline, Lavage extérieur…) ne sont que des raccourcis de saisie : rien n'est inséré sans une action de l'utilisateur.
+- Tant que la station n'est pas activée, les écritures de métier lèvent `409 onboarding_incomplete` avec la liste de ce qui manque (`src/lib/store.tsx`, `assertActivated`). Les écrans concernés affichent le panneau de blocage.
+- **Garde-fou de session** : un visiteur sans cookie ne déclenche qu'**un seul** appel à `/auth/me`. La promesse est mémorisée une fois (`fetchMeOnce`), et un 401 résout `null` sans invalider le cache — c'était le défaut réel qui produisait 2 300 requêtes en cinq secondes.
+- Absents volontairement, faute de les tenir : « Continuer avec Google / Facebook », « Mot de passe oublié » par e-mail (le texte renvoie vers *Employés*), « Se souvenir de moi » (session de 30 jours, l'option n'aurait aucun effet).
+
+## Changer la photo des écrans d'authentification
+
+Remplacez le seul fichier `public/images/lav-auto.jpeg` (même nom). En développement (`npm run dev`), le changement est immédiat ; après un `npm run build`, rechargez la page. Le dégradé sombre posé sur la photo garde le badge « Espace station », l'accroche et les trois repères lisibles, même sur une photo très claire. Sur téléphone, le panneau disparaît et le formulaire reste plein largeur.
+
+## Supabase
+
+Le client est prêt dans `src/lib/supabase.ts` et n'est activé que si `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY` sont renseignées (voir `.env.example`). Sans ces variables, l'application tourne en **mode démonstration local** : l'état est conservé dans le `localStorage` du navigateur (`washguard.state.v1`).
+
+`src/lib/store.tsx` est la seule couche de données. Elle simule le *contrat* du serveur (inscription idempotente, onboarding constaté, 409, caisse, commissions) et non des données. Quand Supabase sera branché, ses actions seront remplacées par des appels aux tables `companies`, `stations`, `users`, `services`, `vehicle_categories`, `clients`, `washes`, `wash_items`, `payments`, `cash_sessions`, `expenses`, `plans`, `subscriptions`, `audit_logs`, **sans modifier les écrans**.
+
+Les mots de passe de la démonstration sont stockés localement uniquement pour rendre la connexion testable ; l'authentification réelle sera Supabase Auth, aucun mot de passe ne doit transiter par le frontend.
+
+Pour repartir à vide : *Paramètres → Réinitialiser la démonstration*.
+
+## Structure
+
+```
+index.html              point d'entrée Vite
+src/
+  main.tsx              thème initial + providers
+  App.tsx               routes et garde de session
+  types.ts              types métier (reflet des tables Supabase)
+  index.css             thème sombre / clair (variables CSS) + composants Tailwind
+  lib/
+    format.ts           FCFA, jj/mm/aaaa, export CSV
+    metrics.ts          rapports, commissions, théorique de caisse
+    plans.ts            table `plans` (source unique des tarifs)
+    supabase.ts         client prêt, non branché
+    store.tsx           couche de données + règles métier
+  components/
+    ui.tsx              briques d'interface
+    AppShell.tsx        sidebar, topbar, navigation par rôle
+  pages/                vitrine, auth, 13 modules
+docs/onboarding.md      parcours, prérequis, refus et vérifications
+public/images/          photo de lavage
 ```
 
-### Example Pages
+## Licence
 
-If you want to get inspiration or just show something directly to your clients, you can jump start your development with our pre-built example pages. You will be able to quickly set up the basic structure for your web project.
-
-View <a href="https://horizon-ui.com/horizon-tailwind-react/?ref=readme-horizon-tailwind-react" target="_blank">example pages here.</a>
-
-### Versions
-
-| Free Version                                                                                                                                          | PRO Version                                                                                                                                                    |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [![Horizon UI Tailwind CSS React](https://i.ibb.co/1zhBQ2J/horizon-ui-tailwind-2.png)](https://www.horizon-ui.com/?ref=readme-horizon-tailwind-react) | [![Horizon UI Tailwind CSS React PRO](https://i.ibb.co/d0cVzKB/horizon-ui-pro-tailwind.png)](https://www.horizon-ui.com/pro?ref=readme-horizon-tailwind-react) |
-
-### Figma Version
-
-Horizon UI is available in Figma format as well! Check it out on Figma
-Community! 🎨
-[See the Horizon UI Figma design files](https://bit.ly/horizon-figma)
-
-### Reporting Issues
-
-We use GitHub Issues as the official bug tracker for the Horizon UI. Here are
-some advices for our users that want to report an issue:
-
-1. Make sure that you are using the latest version of the Horizon UI Dashbaord.
-   Check the CHANGELOG from your dashboard on our
-   [CHANGE LOG File](https://github.com/horizon-ui/horizon-tailwind-react/blob/main/CHANGELOG.md?ref=readme-horizon-tailwind-react).
-2. Providing us reproducible steps for the issue will shorten the time it takes
-   for it to be fixed.
-3. Some issues may be browser specific, so specifying in what browser you
-   encountered the issue might help.
-
----
-
-### Community
-
-Connect with the community! Feel free to ask questions, report issues, and meet new people that already use Horizon UI!
-
-💬 [Join the #HorizonUI Discord Community!](https://discord.gg/f6tEKFBd4m)
-
-### Copyright and license
-
-⭐️ [Copyright 2023 Horizon UI ](https://www.horizon-ui.com/?ref=readme-horizon-tailwind-react)
-
-📄 [Horizon UI License](https://www.simmmple.com/licenses?ref=readme-horizon-tailwind-react)
+Voir [LICENSE.md](LICENSE.md) (template Horizon UI d'origine, remplacé par cette application).
