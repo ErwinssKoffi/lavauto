@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from 'recharts';
 import {
   FiActivity, FiAlertTriangle, FiArrowRight, FiCreditCard, FiDollarSign,
   FiDroplet, FiTrendingUp, FiTruck,
@@ -7,15 +8,16 @@ import {
 import { useStore } from '../lib/store';
 import { buildReport } from '../lib/metrics';
 import { formatDate, formatFCFA } from '../lib/format';
-import { Badge, Card, EmptyState, LockedPanel, PageHeader, Progress, StatCard } from '../components/ui';
+import { Alert, Badge, Card, EmptyState, LockedPanel, PageHeader, Progress, StatCard } from '../components/ui';
 import { WASH_STATUS_LABELS, PAY_METHOD_LABELS } from '../types';
+import { washStatusTone, finishedWashes } from '../lib/washLifecycle';
 
 export default function Dashboard() {
-  const { state } = useStore();
+  const { state, analyticsBoard } = useStore();
   const day = buildReport(state, 'jour');
   const month = buildReport(state, 'mois');
   const openCash = state.cashSessions.find((c) => c.status === 'ouverte');
-  const unpaid = state.washes.filter((w) => w.status !== 'annule' && w.total > w.paid);
+  const unpaid = state.washes.filter((w) => w.status !== 'cancelled' && w.total > w.paid);
   const target = state.station?.monthlyTarget ?? 0;
   const recent = [...state.washes].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 6);
 
@@ -35,12 +37,15 @@ export default function Dashboard() {
       />
 
       {!state.station?.activated && <div className="mb-6"><LockedPanel /></div>}
+      <div className="mb-5"><Alert kind="warn">
+        Finance P06 : <strong>coûts manquants</strong>. Le « solde partiel » (encaissé − dépenses) n’est <strong>pas un bénéfice net</strong> ; la marge brute et le résultat seront calculables après les achats/consommations du Prompt 07.
+      </Alert></div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Chiffre d’affaires du jour" value={formatFCFA(day.revenue)} hint={`${day.washes.length} lavage(s) enregistré(s)`} icon={<FiTrendingUp />} />
-        <StatCard label="Lavages du jour" value={String(day.washes.length)} hint={`${day.washes.filter((w) => w.status === 'termine').length} terminé(s)`} icon={<FiDroplet />} accent="bg-emerald-500/10 text-emerald-400" />
+        <StatCard label="Lavages du jour" value={String(day.washes.length)} hint={`${finishedWashes(day.washes).length} terminé(s)`} icon={<FiDroplet />} accent="bg-emerald-500/10 text-emerald-400" />
         <StatCard label="Encaissements du jour" value={formatFCFA(day.collected)} hint={`${day.byMethod.reduce((n, m) => n + m.count, 0)} paiement(s)`} icon={<FiCreditCard />} accent="bg-sky-500/10 text-sky-400" />
-        <StatCard label="Dépenses du jour" value={formatFCFA(day.expenses)} hint={`Résultat simplifié : ${formatFCFA(day.result)}`} icon={<FiCreditCard />} accent="bg-amber-500/10 text-amber-400" />
+        <StatCard label="Dépenses du jour" value={formatFCFA(day.expenses)} hint={`Solde partiel : ${formatFCFA(day.partialBalance)} · PAS un bénéfice`} icon={<FiCreditCard />} accent="bg-amber-500/10 text-amber-400" />
       </div>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-3">
@@ -63,7 +68,7 @@ export default function Dashboard() {
                       <td className="wg-td">{w.clientName ?? <span className="wg-muted">Sans client</span>}</td>
                       <td className="wg-td font-semibold">{formatFCFA(w.total)}</td>
                       <td className="wg-td">{formatFCFA(w.paid)}</td>
-                      <td className="wg-td"><Badge tone={w.status === 'termine' ? 'success' : w.status === 'annule' ? 'danger' : 'warn'}>{WASH_STATUS_LABELS[w.status]}</Badge></td>
+                      <td className="wg-td"><Badge tone={washStatusTone(w.status)}>{WASH_STATUS_LABELS[w.status]}</Badge></td>
                     </tr>
                   ))}
                 </tbody>
@@ -125,6 +130,28 @@ export default function Dashboard() {
           )}
         </Card>
       </div>
+
+      <Card className="mt-5">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-bold">Tendance du mois — dashboard station</h2>
+          <Link to="/app/consolidation" className="wg-link text-xs"><FiTrendingUp className="inline" /> Consolidation multi-stations</Link>
+        </div>
+        {analyticsBoard.trend.length === 0 ? (
+          <EmptyState icon={<FiActivity />} title="Aucune tendance enregistrée" description="Les lavages réels alimenteront ce graphique Recharts, sans donnée d’exemple." />
+        ) : (
+          <div className="wg-scroll-x">
+            <BarChart width={720} height={220} data={analyticsBoard.trend} margin={{ top: 8, right: 12, bottom: 8, left: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+              <XAxis dataKey="date" stroke="#94a3b8" fontSize={10} tickFormatter={(v) => String(v).slice(8, 10)} />
+              <YAxis stroke="#94a3b8" fontSize={10} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
+              <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid #334155', color: '#e2e8f0', borderRadius: '10px', fontSize: '12px' }} />
+              <Bar dataKey="revenue" name="Chiffre d’affaires" fill="#38bdf8" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+              <Bar dataKey="collected" name="Encaissé" fill="#34d399" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+            </BarChart>
+          </div>
+        )}
+        <p className="wg-muted mt-2 text-xs">Source : {analyticsBoard.periodStart} → {analyticsBoard.periodEnd} · {analyticsBoard.rules.netResult}.</p>
+      </Card>
 
       <div className="mt-5 flex flex-wrap gap-3">
         <Link to="/app/rapports" className="wg-btn wg-btn-ghost"><FiDollarSign /> Rapports et export CSV</Link>

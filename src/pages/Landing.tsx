@@ -1,303 +1,399 @@
-import React, { useState } from 'react';
+import React, { type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  FiArrowRight, FiBarChart2, FiCheck, FiCheckCircle, FiChevronDown,
-  FiCreditCard, FiDollarSign, FiFileText, FiGrid, FiList, FiLock, FiMoon,
-  FiPieChart, FiSettings, FiShield, FiSun, FiTruck, FiUsers, FiX,
-} from 'react-icons/fi';
-import { useStore } from '../lib/store';
 import { formatFCFA } from '../lib/format';
-import { Badge, Logo, Progress } from '../components/ui';
+import { useStore } from '../lib/store';
 
-const MODULES = [
-  { icon: <FiList />, title: 'Mise en route', text: 'Treize étapes constatées sur vos données. Aucun prix inventé : la station ouvre quand vous avez choisi vos tarifs.' },
-  { icon: <FiGrid />, title: 'Tableau de bord', text: 'Chiffre d’affaires, lavages, encaissements, dépenses, caisse et alertes, calculés par le serveur.' },
-  { icon: <FiTruck />, title: 'Lavages', text: 'Fiche rapide, statuts, remise autorisée, encaissement total ou partiel et reste à payer.' },
-  { icon: <FiSettings />, title: 'Prestations', text: 'Catalogue propre à chaque station. Modifier un tarif ne change jamais les lavages déjà enregistrés.' },
-  { icon: <FiUsers />, title: 'Clients & employés', text: 'Fiches facultatives, historique, rôles, activation et réinitialisation du mot de passe.' },
-  { icon: <FiDollarSign />, title: 'Caisse', text: 'Fond de caisse, comptage à la clôture, écart théorique/compté et réouverture motivée.' },
-  { icon: <FiCreditCard />, title: 'Dépenses', text: 'Montant, catégorie, motif, fournisseur et annulation tracée — jamais de suppression.' },
-  { icon: <FiBarChart2 />, title: 'Rapports', text: 'Jour, semaine, mois : meilleures prestations, employés, moyens de paiement, export CSV.' },
-  { icon: <FiPieChart />, title: 'Commissions', text: 'Lavages terminés, barème ou exception par compte, montant dû et export CSV pour la paie.' },
-  { icon: <FiFileText />, title: 'Abonnement', text: 'Formule en cours, consommation par rapport aux limites, comparaison et demande de changement.' },
+/* ─── Vitrine `/` reprise du modèle public ixartz/Next-js-Boilerplate ───────
+   Source : https://github.com/ixartz/Next-js-Boilerplate (branche `main`).
+   Licence MIT — Copyright (c) 2026 Remi W. — voir
+   `public/assets/images/LICENSE.txt` et `docs/landing.md`.
+   Les textes, sections, illustrations et la navigation sont repris fidèlement ;
+   seules les actions internes sont branchées aux routes WashGuard existantes.
+   Aucune nouvelle fonctionnalité, dépendance, table ou clé n'est ajoutée.      */
+
+type Sponsor = {
+  label: string;
+  href: string;
+  src: string;
+  alt: string;
+};
+
+const SPONSORS: Sponsor[] = [
+  {
+    label: 'Visit Clerk',
+    href: 'https://clerk.com?utm_source=github&utm_medium=sponsorship&utm_campaign=nextjs-boilerplate',
+    src: '/assets/images/clerk-logo-dark.png',
+    alt: 'Clerk – Authentication & User Management for Next.js',
+  },
+  {
+    label: 'Visit CodeRabbit',
+    href: 'https://www.coderabbit.ai?utm_source=next_js_starter&utm_medium=github&utm_campaign=next_js_starter_oss_2025',
+    src: '/assets/images/coderabbit-logo-light.svg',
+    alt: 'CodeRabbit',
+  },
+  {
+    label: 'Visit Sentry',
+    href: 'https://sentry.io/for/nextjs/?utm_source=github&utm_medium=paid-community&utm_campaign=general-fy25q1-nextjs&utm_content=github-banner-nextjsboilerplate-logo',
+    src: '/assets/images/sentry-dark.png',
+    alt: 'Sentry',
+  },
+  {
+    label: 'Visit Arcjet',
+    href: 'https://launch.arcjet.com/Q6eLbRE',
+    src: '/assets/images/arcjet-light.svg',
+    alt: 'Arcjet',
+  },
+  {
+    label: 'Visit Crowdin',
+    href: 'https://l.crowdin.com/next-js',
+    src: '/assets/images/crowdin-dark.png',
+    alt: 'Crowdin',
+  },
+  {
+    label: 'Visit Better Stack',
+    href: 'https://betterstack.com/?utm_source=github&utm_medium=sponsorship&utm_campaign=next-js-boilerplate',
+    src: '/assets/images/better-stack-dark.png',
+    alt: 'Better Stack',
+  },
+  {
+    label: 'Visit PostHog',
+    href: 'https://posthog.com/?utm_source=github&utm_medium=sponsorship&utm_campaign=next-js-boilerplate',
+    src: '/assets/images/posthog-logo.svg',
+    alt: 'PostHog',
+  },
+  {
+    label: 'Visit Checkly',
+    href: 'https://www.checklyhq.com/?utm_source=github&utm_medium=sponsorship&utm_campaign=next-js-boilerplate',
+    src: '/assets/images/checkly-logo-light.png',
+    alt: 'Checkly',
+  },
+  {
+    label: 'Visit Next.js SaaS Boilerplate',
+    href: 'https://nextjs-boilerplate.com/pro-saas-starter-kit',
+    src: '/assets/images/nextjs-boilerplate-saas.png',
+    alt: 'Next.js SaaS Boilerplate',
+  },
 ];
 
-const FAQ = [
-  { q: 'Les prix affichés sont-ils les vrais ?', r: 'Oui. Les formules et leurs tarifs sont lus dans la base, comme la facturation. La vitrine ne peut donc pas afficher un prix différent de celui qui sera appliqué.' },
-  { q: 'Pourquoi n’y a-t-il pas de témoignages ?', r: 'Parce qu’aucune station n’en a encore donné. Des avis inventés seraient pires que pas d’avis du tout : ils seront ajoutés quand de vraies stations en fourniront.' },
-  { q: 'Que se passe-t-il après l’inscription ?', r: 'Le serveur crée une seule fois votre entreprise, sa station, votre compte propriétaire et l’abonnement d’essai. Vous arrivez sur la Mise en route.' },
-  { q: 'Puis-je encaisser avant d’avoir fixé mes tarifs ?', r: 'Non. Tant que la station n’est pas activée, les fiches, encaissements, la caisse et les dépenses répondent 409 onboarding_incomplete avec la liste de ce qui manque.' },
-  { q: 'Puis-je modifier un tarif plus tard ?', r: 'Oui, mais les lavages déjà enregistrés conservent le prix en vigueur au moment de leur création. L’historique et les rapports restent justes.' },
-  { q: 'Comment réinitialiser un mot de passe oublié ?', r: 'WashGuard n’envoie aucun e-mail. Le propriétaire réinitialise le mot de passe depuis le module Employés — c’est la seule voie réelle.' },
-];
-
-/** Aperçu issu du rendu réel de l'application (pas d'image retouchée). */
-function AppPreview() {
+function DemoBanner() {
   return (
-    <div className="wg-card overflow-hidden !p-0 shadow-2xl">
-      <div className="flex items-center gap-1.5 border-b px-4 py-3" style={{ borderColor: 'var(--wg-border)' }}>
-        <span className="h-2.5 w-2.5 rounded-full bg-red-400/70" /><span className="h-2.5 w-2.5 rounded-full bg-amber-400/70" /><span className="h-2.5 w-2.5 rounded-full bg-emerald-400/70" />
-        <span className="wg-muted ml-3 rounded-md px-2 py-1 text-[10px]" style={{ background: 'var(--wg-surface-2)' }}>washguard.app/app/tableau-de-bord</span>
-      </div>
-      <div className="flex" style={{ background: 'var(--wg-bg)' }}>
-        <div className="hidden w-32 shrink-0 border-r p-3 sm:block" style={{ borderColor: 'var(--wg-border)', background: 'var(--wg-surface)' }}>
-          <div className="mb-4 flex items-center gap-1.5"><span className="wg-gradient h-5 w-5 rounded-md" /><span className="text-[10px] font-bold">WashGuard</span></div>
-          {['Tableau de bord', 'Mise en route', 'Lavages', 'Prestations', 'Clients', 'Caisse', 'Rapports', 'Paramètres'].map((n, i) => (
-            <div key={n} className={`mb-1 rounded-md px-2 py-1.5 text-[9px] ${i === 0 ? 'wg-btn-primary' : 'wg-muted'}`} style={i === 0 ? {} : { background: 'transparent' }}>{n}</div>
-          ))}
+    <div className="boilerplate-banner sticky top-0 z-50 bg-gray-900 p-4 text-center text-lg font-semibold text-gray-100">
+      Live Demo of Next.js Boilerplate -{' '}
+      <Link to="/inscription" className="text-fuchsia-500 hover:text-indigo-500">
+        Explore the Authentication
+      </Link>
+    </div>
+  );
+}
+
+function DemoBadge() {
+  return (
+    <div className="fixed right-20 bottom-0 z-10">
+      <a href="https://github.com/ixartz/Next-js-Boilerplate">
+        <div className="rounded-md bg-gray-900 px-3 py-2 font-semibold text-gray-100">
+          <span className="text-gray-500">Demo of</span>
+          {` Next.js Boilerplate`}
         </div>
-        <div className="min-w-0 flex-1 p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <div><div className="text-[11px] font-bold">Tableau de bord</div><div className="wg-muted text-[9px]">Chiffres du jour calculés par le serveur</div></div>
-            <span className="wg-gradient h-6 w-6 rounded-full" />
+      </a>
+    </div>
+  );
+}
+
+/** Reflet visuel du sélecteur du modèle : l'i18n n'est pas une fonctionnalité WashGuard. */
+function LocaleSwitcher() {
+  return (
+    <select
+      defaultValue="FR"
+      disabled
+      aria-label="Changer de langue"
+      className="border border-gray-300 bg-white font-medium text-gray-700"
+    >
+      <option value="FR">FR</option>
+      <option value="EN">EN</option>
+    </select>
+  );
+}
+
+function BaseTemplate(props: { leftNav: ReactNode; rightNav?: ReactNode; children: ReactNode }) {
+  return (
+    <div className="w-full px-1 text-gray-700 antialiased">
+      <div className="mx-auto max-w-3xl">
+        <header className="border-b border-gray-300">
+          <div className="pt-16 pb-8">
+            <h1 className="text-3xl font-bold text-gray-900">Nextjs Starter</h1>
+            <h2 className="text-xl">Code de démarrage pour Next.js avec Tailwind CSS</h2>
           </div>
-          <div className="mb-3 grid grid-cols-2 gap-2 xl:grid-cols-4">
-            {['Chiffre d’affaires', 'Lavages', 'Encaissements', 'Dépenses'].map((l) => (
-              <div key={l} className="rounded-lg border p-2.5" style={{ borderColor: 'var(--wg-border)', background: 'var(--wg-surface)' }}>
-                <div className="wg-muted text-[8px] font-bold uppercase">{l}</div>
-                <div className="mt-1.5 text-[13px] font-bold">0 FCFA</div>
-                <div className="mt-2 h-1 w-2/3 rounded-full bg-sky-500/20" />
-              </div>
-            ))}
+
+          <div className="flex justify-between">
+            <nav aria-label="Navigation principale">
+              <ul className="flex flex-wrap gap-x-5 text-xl">{props.leftNav}</ul>
+            </nav>
+
+            <nav>
+              <ul className="flex flex-wrap gap-x-5 text-xl">{props.rightNav}</ul>
+            </nav>
           </div>
-          <div className="rounded-lg border p-3" style={{ borderColor: 'var(--wg-border)', background: 'var(--wg-surface)' }}>
-            <div className="mb-2 flex items-center justify-between text-[9px] font-bold"><span>Dernières opérations</span><span className="wg-muted">Aujourd’hui</span></div>
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="flex items-center gap-2 border-t py-2" style={{ borderColor: 'var(--wg-border)' }}>
-                <span className="wg-gradient h-5 w-5 rounded-md opacity-70" />
-                <span className="h-1.5 flex-1 rounded-full" style={{ background: 'var(--wg-surface-2)' }} />
-                <span className="wg-muted text-[8px]">—</span>
-              </div>
-            ))}
-            <div className="wg-muted mt-1 text-center text-[9px]">Aucune opération : la station n’est pas encore activée.</div>
-          </div>
-        </div>
+        </header>
+
+        <main>{props.children}</main>
+
+        <footer className="border-t border-gray-300 py-8 text-center text-sm">
+          © {new Date().getFullYear()} Nextjs Starter. Fait avec{' '}
+          <a
+            href="https://nextjs-boilerplate.com"
+            className="text-blue-700 hover:border-b-2 hover:border-blue-700"
+          >
+            Next.js Boilerplate
+          </a>
+          .
+        </footer>
       </div>
     </div>
   );
 }
 
-export default function Landing() {
-  const { plans, theme, toggleTheme } = useStore();
-  const [openFaq, setOpenFaq] = useState<number | null>(0);
-  const [menu, setMenu] = useState(false);
-
+function Sponsors() {
+  const rows = [SPONSORS.slice(0, 3), SPONSORS.slice(3, 6), SPONSORS.slice(6, 9)];
   return (
-    <div className="min-h-screen">
-      {/* En-tête */}
-      <header className="sticky top-0 z-50 border-b backdrop-blur-xl" style={{ borderColor: 'var(--wg-border)', background: 'color-mix(in srgb, var(--wg-bg) 85%, transparent)' }}>
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5">
-          <Link to="/"><Logo /></Link>
-          <nav className="hidden items-center gap-7 text-[13px] font-medium md:flex">
-            <a href="#modules" className="wg-muted hover:text-sky-400">Fonctionnalités</a>
-            <a href="#apercu" className="wg-muted hover:text-sky-400">Aperçu</a>
-            <a href="#tarifs" className="wg-muted hover:text-sky-400">Tarifs</a>
-            <a href="#faq" className="wg-muted hover:text-sky-400">Questions fréquentes</a>
-          </nav>
-          <div className="flex items-center gap-2">
-            <button onClick={toggleTheme} className="wg-btn wg-btn-ghost !px-2.5" aria-label="Changer de thème">{theme === 'dark' ? <FiSun size={16} /> : <FiMoon size={16} />}</button>
-            <Link to="/connexion" className="wg-btn wg-btn-ghost hidden sm:inline-flex">Se connecter</Link>
-            <Link to="/inscription" className="wg-btn wg-btn-primary hidden sm:inline-flex">Créer mon espace <FiArrowRight /></Link>
-            <button className="wg-btn wg-btn-ghost !px-2.5 md:hidden" onClick={() => setMenu((v) => !v)} aria-label="Menu">{menu ? <FiX /> : <FiList />}</button>
-          </div>
-        </div>
-        {menu && (
-          <div className="wg-card mx-4 mb-3 flex flex-col gap-1 p-3 md:hidden">
-            {[['#modules', 'Fonctionnalités'], ['#apercu', 'Aperçu'], ['#tarifs', 'Tarifs'], ['#faq', 'Questions fréquentes']].map(([h, l]) => (
-              <a key={h} href={h} onClick={() => setMenu(false)} className="wg-btn wg-btn-ghost !justify-start">{l}</a>
+    <table className="border-collapse">
+      <tbody>
+        {rows.map((row, rowIndex) => (
+          <tr className="h-56" key={rowIndex}>
+            {row.map((sponsor) => (
+              <td className="border-2 border-gray-300 p-3" key={sponsor.label}>
+                <a aria-label={sponsor.label} href={sponsor.href}>
+                  <img
+                    src={sponsor.src}
+                    alt={sponsor.alt}
+                    width={220}
+                    style={{ maxWidth: '100%', height: 'auto' }}
+                  />
+                </a>
+              </td>
             ))}
-            <Link to="/connexion" className="wg-btn wg-btn-ghost !justify-start">Se connecter</Link>
-            <Link to="/inscription" className="wg-btn wg-btn-primary !justify-start">Créer mon espace</Link>
-          </div>
-        )}
-      </header>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
 
-      {/* Héros */}
-      <section className="relative overflow-hidden">
-        <div className="pointer-events-none absolute -top-40 left-1/2 h-[500px] w-[900px] -translate-x-1/2 rounded-full bg-sky-500/10 blur-3xl" />
-        <div className="mx-auto grid max-w-7xl items-center gap-10 px-5 py-14 lg:grid-cols-2 lg:py-20">
-          <div className="wg-fade-in">
-            <Badge tone="accent"><span className="h-1.5 w-1.5 rounded-full bg-sky-400" /> Logiciel de gestion pour stations de lavage</Badge>
-            <h1 className="mt-5 text-4xl font-extrabold leading-[1.1] tracking-tight sm:text-5xl lg:text-[56px]">
-              Votre station,<br /><span className="wg-gradient bg-clip-text text-transparent">du lavage à la paie.</span>
-            </h1>
-            <p className="wg-muted mt-5 max-w-xl text-base leading-relaxed">
-              WashGuard suit chaque fiche, chaque encaissement, chaque dépense et chaque commission.
-              Les chiffres sont calculés sur vos données réelles — pas sur des exemples.
-            </p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <Link to="/inscription" className="wg-btn wg-btn-primary !px-5 !py-3">Créer mon espace <FiArrowRight /></Link>
-              <Link to="/connexion" className="wg-btn wg-btn-ghost !px-5 !py-3">J’ai déjà un compte</Link>
-            </div>
-            <div className="mt-7 flex flex-wrap gap-x-6 gap-y-2 text-xs">
-              {['Montants en FCFA', 'Interface en français', 'Thème sombre / clair', 'Session de 30 jours'].map((t) => (
-                <span key={t} className="wg-muted flex items-center gap-1.5"><FiCheckCircle className="text-sky-400" /> {t}</span>
+/** Section WashGuard conservée : mêmes formules que la facturation, sans nouveau prix local. */
+function Pricing() {
+  const { plans, plansError, dataSource } = useStore();
+  return (
+    <section id="tarifs" className="mt-10 scroll-mt-20 border-t border-gray-300 pt-8">
+      <h2 className="text-2xl font-bold">Formules et tarifs</h2>
+      <p className="text-base">
+        Ces montants sont lus depuis la table des formules : la vitrine et la facturation partagent la même source.
+      </p>
+      {plans.length === 0 && dataSource === 'supabase' && (
+        <div role="alert" className="mt-3 border-2 border-red-300 p-3 text-base text-red-700">
+          Formules et tarifs indisponibles. Aucun prix local n’est affiché en repli :{' '}
+          {plansError ?? 'réessayez dans un instant.'}
+        </div>
+      )}
+      <div className="mt-4 grid gap-4 text-base md:grid-cols-3">
+        {plans.map((plan) => (
+          <div className="border-2 border-gray-300 p-3" key={plan.id}>
+            <h3 className="font-bold">{plan.name}</h3>
+            <p className="mt-2 text-2xl font-bold">{formatFCFA(plan.priceMonthly)} / mois</p>
+            <ul className="mt-3">
+              {plan.features.map((feature) => (
+                <li key={feature}>{feature}</li>
               ))}
-            </div>
+              <li>
+                {plan.limits.stations} station(s) · {plan.limits.employees} comptes ·{' '}
+                {plan.limits.washesPerMonth.toLocaleString('fr-FR')} lavages/mois
+              </li>
+            </ul>
+            <Link
+              to="/inscription"
+              className="mt-4 inline-block border-2 border-blue-700 px-3 py-1 font-semibold text-blue-700 hover:border-b-4"
+            >
+              {plan.trial ? 'Commencer l’essai' : `Choisir ${plan.name}`}
+            </Link>
           </div>
-          <div className="wg-fade-in relative">
-            <div className="absolute -inset-4 rounded-3xl bg-sky-500/10 blur-2xl" />
-            <div className="relative"><AppPreview /></div>
-            <p className="wg-muted mt-3 text-center text-[11px]">Aperçu du rendu de l’application, sans donnée d’exemple.</p>
-          </div>
-        </div>
-      </section>
+        ))}
+      </div>
+      <p className="text-base">
+        Aucun prix de prestation n’est prédéfini : vos tarifs de lavage sont choisis par vous pendant la mise en route.
+      </p>
+    </section>
+  );
+}
 
-      {/* Ce qui est réel */}
-      <section className="mx-auto max-w-7xl px-5 pb-8">
-        <div className="grid gap-3 sm:grid-cols-3">
-          {[
-            { icon: <FiGrid />, t: 'Aperçus réels', d: 'Les écrans présentés viennent du rendu de l’application, pas de maquettes retouchées.' },
-            { icon: <FiLock />, t: 'Tarifs depuis la base', d: 'Les formules affichées sont lues là où la facturation les lit : jamais désynchronisées.' },
-            { icon: <FiShield />, t: 'Aucun avis inventé', d: 'Pas de témoignages pour l’instant. Ils viendront de vraies stations, ou pas du tout.' },
-          ].map((c) => (
-            <div key={c.t} className="wg-card flex items-start gap-3 p-4">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-sky-500/10 text-sky-400">{c.icon}</span>
-              <div><p className="text-sm font-bold">{c.t}</p><p className="wg-muted mt-1 text-xs leading-relaxed">{c.d}</p></div>
-            </div>
-          ))}
+export default function Landing() {
+  return (
+    <div className="wg-boilerplate-landing min-h-screen w-full bg-white">
+      <DemoBanner />
+      <BaseTemplate
+        leftNav={
+          <>
+            <li>
+              <Link to="/" className="border-none text-gray-700 hover:text-gray-900">
+                Accueil
+              </Link>
+            </li>
+            <li>
+              <a href="#a-propos" className="border-none text-gray-700 hover:text-gray-900">
+                A propos
+              </a>
+            </li>
+            <li>
+              <Link
+                to="/app/tableau-de-bord"
+                title="Tableau de bord WashGuard"
+                className="border-none text-gray-700 hover:text-gray-900"
+              >
+                Compteur
+              </Link>
+            </li>
+            <li>
+              <a href="#partenaires" className="border-none text-gray-700 hover:text-gray-900">
+                Portfolio
+              </a>
+            </li>
+            <li>
+              <a href="#tarifs" className="border-none text-gray-700 hover:text-gray-900">
+                Tarifs
+              </a>
+            </li>
+            <li>
+              <a
+                className="border-none text-gray-700 hover:text-gray-900"
+                href="https://github.com/ixartz/Next-js-Boilerplate"
+              >
+                GitHub
+              </a>
+            </li>
+          </>
+        }
+        rightNav={
+          <>
+            <li>
+              <Link to="/connexion" className="border-none text-gray-700 hover:text-gray-900">
+                Se connecter
+              </Link>
+            </li>
+            <li>
+              <Link to="/inscription" className="border-none text-gray-700 hover:text-gray-900">
+                S'inscrire
+              </Link>
+            </li>
+            <li>
+              <LocaleSwitcher />
+            </li>
+          </>
+        }
+      >
+        <div className="boilerplate-main py-5 text-xl">
+          <p id="a-propos">
+            {`Follow `}
+            <a
+              className="text-blue-700 hover:border-b-2 hover:border-blue-700"
+              href="https://twitter.com/ixartz"
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              @Ixartz on Twitter
+            </a>
+            {` for updates and more information about the boilerplate.`}
+          </p>
+          <h2 className="mt-5 text-2xl font-bold">
+            Boilerplate Code for Your Next.js Project with Tailwind CSS
+          </h2>
+          <p className="text-base">
+            Next.js Boilerplate is a developer-friendly starter code for Next.js projects, built with
+            Tailwind CSS and TypeScript.{' '}
+            <span role="img" aria-label="Éclair">
+              ⚡️
+            </span>{' '}
+            Designed with developer experience in mind, it includes:
+          </p>
+          <ul className="mt-3 text-base">
+            <li>🚀 Next.js with App Router support</li>
+            <li>🔥 TypeScript for type checking</li>
+            <li>💎 Tailwind CSS integration</li>
+            <li>
+              🔒 Authentication with{' '}
+              <a
+                className="font-bold text-blue-700 hover:border-b-2 hover:border-blue-700"
+                href="https://clerk.com?utm_source=github&utm_medium=sponsorship&utm_campaign=nextjs-boilerplate"
+              >
+                Clerk
+              </a>{' '}
+              (includes passwordless, social, and multi-factor auth)
+            </li>
+            <li>📦 ORM with DrizzleORM (PostgreSQL, SQLite, MySQL support)</li>
+            <li>
+              💽 Dev database with PGlite and production with{' '}
+              <a
+                className="font-bold text-blue-700 hover:border-b-2 hover:border-blue-700"
+                href="https://get.neon.com/BMFYNtx"
+              >
+                Neon
+              </a>
+            </li>
+            <li>
+              🌐 Multi-language support (i18n) with next-intl and{' '}
+              <a
+                className="font-bold text-blue-700 hover:border-b-2 hover:border-blue-700"
+                href="https://l.crowdin.com/next-js"
+              >
+                Crowdin
+              </a>
+            </li>
+            <li>🔴 Form handling (React Hook Form) and validation (Zod)</li>
+            <li>📏 Linting and formatting (ESLint, Prettier)</li>
+            <li>🦊 Git hooks and commit linting (Husky, Commitlint)</li>
+            <li>🦺 Testing suite (Vitest, React Testing Library, Playwright)</li>
+            <li>🎉 Storybook for UI development</li>
+            <li>
+              🐰 AI-powered code reviews with{' '}
+              <a
+                className="font-bold text-blue-700 hover:border-b-2 hover:border-blue-700"
+                href="https://www.coderabbit.ai?utm_source=next_js_starter&utm_medium=github&utm_campaign=next_js_starter_oss_2025"
+              >
+                CodeRabbit
+              </a>
+            </li>
+            <li>
+              🚨 Error monitoring (
+              <a
+                className="font-bold text-blue-700 hover:border-b-2 hover:border-blue-700"
+                href="https://sentry.io/for/nextjs/?utm_source=github&utm_medium=paid-community&utm_campaign=general-fy25q1-nextjs&utm_content=github-banner-nextjsboilerplate-logo"
+              >
+                Sentry
+              </a>
+              ) and logging (LogTape, an alternative to Pino.js)
+            </li>
+            <li>🖥️ Monitoring as Code (Checkly)</li>
+            <li>
+              🔐 Security and bot protection (
+              <a
+                className="font-bold text-blue-700 hover:border-b-2 hover:border-blue-700"
+                href="https://launch.arcjet.com/Q6eLbRE"
+              >
+                Arcjet
+              </a>
+              )
+            </li>
+            <li>🤖 SEO optimization (metadata, JSON-LD, Open Graph tags)</li>
+            <li>⚙️ Development tools (VSCode config, bundler analyzer, changelog generation)</li>
+          </ul>
+          <p className="text-base">
+            Our sponsors' exceptional support has made this project possible. Their services
+            integrate seamlessly with the boilerplate, and we recommend trying them out.
+          </p>
+          <section id="partenaires" className="scroll-mt-20">
+            <h2 className="mt-5 text-2xl font-bold">Partenaires</h2>
+            <Sponsors />
+          </section>
+          <Pricing />
         </div>
-      </section>
-
-      {/* Aperçu grand écran */}
-      <section id="apercu" className="mx-auto max-w-7xl scroll-mt-20 px-5 py-14">
-        <div className="mb-8 text-center">
-          <Badge tone="accent">Aperçu</Badge>
-          <h2 className="mt-3 text-3xl font-extrabold tracking-tight">Toute l’exploitation, au même endroit</h2>
-          <p className="wg-muted mx-auto mt-2 max-w-2xl text-sm">Un espace unique pour la station, du premier tarif choisi au rapport du mois.</p>
-        </div>
-        <div className="mx-auto max-w-5xl"><AppPreview /></div>
-      </section>
-
-      {/* Modules */}
-      <section id="modules" className="scroll-mt-20 border-y py-14" style={{ borderColor: 'var(--wg-border)', background: 'var(--wg-surface)' }}>
-        <div className="mx-auto max-w-7xl px-5">
-          <div className="mb-8 max-w-2xl">
-            <Badge tone="accent">Fonctionnalités</Badge>
-            <h2 className="mt-3 text-3xl font-extrabold tracking-tight">Ce que fait WashGuard</h2>
-            <p className="wg-muted mt-2 text-sm">Chaque module correspond à un écran réel de l’application.</p>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {MODULES.map((m) => (
-              <div key={m.title} className="wg-card p-5 transition hover:-translate-y-0.5 hover:border-sky-500/40">
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-sky-500/10 text-lg text-sky-400">{m.icon}</span>
-                <h3 className="mt-4 text-sm font-bold">{m.title}</h3>
-                <p className="wg-muted mt-1.5 text-xs leading-relaxed">{m.text}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Mise en route */}
-      <section className="mx-auto max-w-7xl px-5 py-16">
-        <div className="wg-card grid gap-8 p-6 lg:grid-cols-2 lg:p-10">
-          <div>
-            <Badge tone="warn">Mise en route</Badge>
-            <h2 className="mt-3 text-2xl font-extrabold tracking-tight sm:text-3xl">La station ouvre quand vous avez choisi vos tarifs</h2>
-            <p className="wg-muted mt-3 text-sm leading-relaxed">
-              Ce n’est pas un formulaire de bienvenue : c’est un parcours de treize étapes dont l’état est constaté par le serveur sur les données réellement enregistrées. Huit sont obligatoires — identité, horaires, catégories de véhicules, catalogue, grille tarifaire, moyens de paiement.
-            </p>
-            <p className="wg-muted mt-3 text-sm leading-relaxed">
-              Aucun prix n’est inventé et aucune donnée d’exemple n’est ajoutée. Tant que l’activation n’a pas eu lieu, les écritures de métier répondent <code className="rounded bg-amber-500/15 px-1 py-0.5 text-amber-400">409 onboarding_incomplete</code> avec la liste de ce qui manque.
-            </p>
-            <Link to="/inscription" className="wg-btn wg-btn-primary mt-6">Démarrer la mise en route <FiArrowRight /></Link>
-          </div>
-          <div className="rounded-2xl border p-5" style={{ borderColor: 'var(--wg-border)', background: 'var(--wg-surface-2)' }}>
-            <div className="flex items-center justify-between text-xs font-bold"><span>Progression constatée</span><span>0 / 8 obligatoires</span></div>
-            <div className="mt-3"><Progress value={0} max={8} /></div>
-            <div className="mt-5 space-y-2">
-              {['Identité de l’entreprise', 'Identité de la station', 'Horaires d’ouverture', 'Catégories de véhicules', 'Catalogue des prestations', 'Grille tarifaire', 'Moyens de paiement', 'Activation de la station'].map((s, i) => (
-                <div key={s} className="flex items-center gap-3 rounded-lg border px-3 py-2.5 text-xs" style={{ borderColor: 'var(--wg-border)', background: 'var(--wg-surface)' }}>
-                  <span className="wg-muted grid h-6 w-6 shrink-0 place-items-center rounded-full text-[10px] font-bold" style={{ background: 'var(--wg-surface-2)' }}>{i + 1}</span>
-                  <span className="flex-1 font-medium">{s}</span>
-                  <Badge tone="warn">À faire</Badge>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Tarifs */}
-      <section id="tarifs" className="scroll-mt-20 border-y py-16" style={{ borderColor: 'var(--wg-border)', background: 'var(--wg-surface)' }}>
-        <div className="mx-auto max-w-7xl px-5">
-          <div className="mb-8 text-center">
-            <Badge tone="accent">Formules et tarifs</Badge>
-            <h2 className="mt-3 text-3xl font-extrabold tracking-tight">Les prix de la base, affichés tels quels</h2>
-            <p className="wg-muted mx-auto mt-2 max-w-2xl text-sm">Ces montants sont lus depuis la table des formules : la vitrine et la facturation partagent la même source.</p>
-          </div>
-          <div className="grid gap-5 lg:grid-cols-3">
-            {plans.map((plan) => {
-              const featured = plan.id === 'standard';
-              return (
-                <div key={plan.id} className={`wg-card relative flex flex-col p-6 ${featured ? 'border-sky-500 shadow-xl shadow-sky-500/10' : ''}`}>
-                  {featured && <span className="absolute -top-3 left-6"><Badge tone="accent">Le plus choisi</Badge></span>}
-                  <h3 className="text-lg font-extrabold">{plan.name}</h3>
-                  <p className="wg-muted mt-1 text-xs">{plan.trial ? 'Pour ouvrir votre station' : 'Facturé chaque mois, en FCFA'}</p>
-                  <p className="mt-5 text-3xl font-extrabold tracking-tight">{formatFCFA(plan.priceMonthly)}<span className="wg-muted text-sm font-medium"> / mois</span></p>
-                  <div className="my-5 border-t" style={{ borderColor: 'var(--wg-border)' }} />
-                  <ul className="flex-1 space-y-2.5 text-xs">
-                    {plan.features.map((f) => <li key={f} className="flex items-start gap-2"><FiCheck className="mt-0.5 shrink-0 text-sky-400" /><span>{f}</span></li>)}
-                    <li className="flex items-start gap-2"><FiCheck className="mt-0.5 shrink-0 text-sky-400" /><span>{plan.limits.stations} station(s) · {plan.limits.employees} comptes · {plan.limits.washesPerMonth.toLocaleString('fr-FR')} lavages/mois</span></li>
-                  </ul>
-                  <Link to="/inscription" className={`wg-btn mt-6 ${featured ? 'wg-btn-primary' : 'wg-btn-ghost'}`}>
-                    {plan.trial ? 'Commencer l’essai' : `Choisir ${plan.name}`}
-                  </Link>
-                </div>
-              );
-            })}
-          </div>
-          <p className="wg-muted mt-5 text-center text-xs">Aucun prix de prestation n’est prédéfini : vos tarifs de lavage sont choisis par vous pendant la mise en route.</p>
-        </div>
-      </section>
-
-      {/* Pas de témoignages */}
-      <section className="mx-auto max-w-7xl px-5 py-14">
-        <div className="wg-card flex flex-col items-center justify-center border-dashed py-10 text-center">
-          <FiShield className="text-3xl text-sky-400 opacity-70" />
-          <h3 className="mt-3 text-lg font-bold">Pas de témoignages — pour l’instant</h3>
-          <p className="wg-muted mt-2 max-w-xl text-sm leading-relaxed">Des avis inventés seraient pires que pas d’avis du tout. Cette section accueillera les retours de vraies stations quand elles en donneront.</p>
-        </div>
-      </section>
-
-      {/* FAQ */}
-      <section id="faq" className="scroll-mt-20 border-t py-16" style={{ borderColor: 'var(--wg-border)', background: 'var(--wg-surface)' }}>
-        <div className="mx-auto max-w-3xl px-5">
-          <div className="mb-8 text-center">
-            <Badge tone="accent">Questions fréquentes</Badge>
-            <h2 className="mt-3 text-3xl font-extrabold tracking-tight">Les réponses, sans détour</h2>
-          </div>
-          <div className="space-y-2">
-            {FAQ.map((f, i) => (
-              <div key={f.q} className="wg-card overflow-hidden !p-0">
-                <button className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left text-sm font-semibold" onClick={() => setOpenFaq(openFaq === i ? null : i)}>
-                  {f.q}<FiChevronDown className={`wg-muted shrink-0 transition ${openFaq === i ? 'rotate-180' : ''}`} />
-                </button>
-                {openFaq === i && <p className="wg-muted border-t px-5 py-4 text-xs leading-relaxed" style={{ borderColor: 'var(--wg-border)' }}>{f.r}</p>}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA final */}
-      <section className="mx-auto max-w-7xl px-5 py-16">
-        <div className="wg-gradient relative overflow-hidden rounded-3xl px-6 py-12 text-center text-white sm:px-12">
-          <div className="absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10 blur-2xl" />
-          <h2 className="relative text-2xl font-extrabold sm:text-3xl">Prêt à ouvrir votre station ?</h2>
-          <p className="relative mx-auto mt-2 max-w-xl text-sm text-white/85">Inscription en deux temps, puis mise en route guidée. Aucune donnée d’exemple, aucun tarif imposé.</p>
-          <Link to="/inscription" className="wg-btn relative mt-6 !bg-white !px-6 !py-3 !text-sky-700">Créer mon espace <FiArrowRight /></Link>
-        </div>
-      </section>
-
-      <footer className="border-t py-8" style={{ borderColor: 'var(--wg-border)' }}>
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5">
-          <Logo />
-          <p className="wg-muted text-xs">© {new Date().getFullYear()} WashGuard · Interface en français · Montants en FCFA · Dates jj/mm/aaaa</p>
-          <div className="flex gap-4 text-xs"><a href="#modules" className="wg-link">Fonctionnalités</a><a href="#tarifs" className="wg-link">Tarifs</a><Link to="/connexion" className="wg-link">Connexion</Link></div>
-        </div>
-      </footer>
+      </BaseTemplate>
+      <DemoBadge />
     </div>
   );
 }

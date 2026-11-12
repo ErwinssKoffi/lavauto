@@ -233,10 +233,14 @@ export function ToastHost() {
 
 export function useSafeAction() {
   const { notify } = useStore();
-  return (fn: () => void) => {
-    try { fn(); } catch (e) {
-      const err = e as Error & { missing?: string[] };
-      notify('error', err.message + (err.missing?.length ? ` (${err.missing.join(', ')})` : ''));
-    }
+  const report = (e: unknown) => {
+    const err = e as Error & { missing?: string[] };
+    notify('error', err.message + (err.missing?.length ? ` (${err.missing.join(', ')})` : ''));
+  };
+  // Prompt 04/05 : les actions Auth et les RPC sont asynchrones. La fonction
+  // renvoie une Promise que les appelants peuvent attendre ; les erreurs
+  // synchrones ET rejetées sont notifiées exactement de la même manière.
+  return async (fn: () => void | Promise<void>): Promise<void> => {
+    try { await fn(); } catch (e) { report(e); }
   };
 }

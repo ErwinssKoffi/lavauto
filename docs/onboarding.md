@@ -1,6 +1,6 @@
 # Mise en route — parcours d'ouverture
 
-> Ce document décrit le parcours **tel qu'implémenté dans le frontend**. La couche de données locale (`src/lib/store.tsx`) joue le rôle du serveur : elle reproduit le contrat, pas les données. Quand Supabase sera branché, les mêmes règles seront appliquées côté base / RPC.
+> Ce document décrit le parcours **tel qu'implémenté dans le frontend**. Depuis le Prompt 04, l'identité, les permissions et le tenant viennent de Supabase Auth / `my_context()` ; les RPC du Prompt 05 couvrent désormais le cycle lavages ; les autres écritures métier de ce parcours restent simulées par `src/lib/store.tsx`. Le schéma distant applique déjà `company_id`, RLS et les contraintes d'unicité décrites derrière ce contrat.
 
 Ce n'est **pas** un formulaire de bienvenue. C'est un parcours de **treize étapes** dont l'état est **constaté sur les données réellement enregistrées** : aucune étape n'est cochée par le navigateur, aucun bouton ne déclare une étape « faite ». Le badge « Constaté » apparaît uniquement quand les données correspondantes existent.
 
@@ -11,7 +11,7 @@ Le formulaire d'inscription est groupé en deux temps :
 1. **Votre entreprise et sa station** — nom de l'entreprise, nom de la station, téléphone, ville ;
 2. **Votre compte de propriétaire** — nom, e-mail, mot de passe, confirmation.
 
-Le serveur crée **une seule fois** l'entreprise, sa station, le compte propriétaire et l'abonnement d'essai, puis ouvre l'écran **Mise en route**. Une seconde soumission ne recrée rien (idempotence).
+Le contrat crée **une seule fois** l'entreprise, sa station, le compte propriétaire et l'abonnement d'essai, puis ouvre l'écran **Mise en route**. Une seconde soumission ne recrée rien (idempotence). En mode Supabase, `mailer_autoconfirm=false` impose de confirmer l'e-mail avant la première session ; le bootstrap idempotent est déclenché par le trigger `AFTER INSERT ON auth.users`.
 
 À ce stade, la station n'a **ni horaires, ni catégories, ni prestations, ni prix, ni moyens de paiement**. Aucune donnée d'exemple n'est ajoutée et **aucun prix n'est inventé** : la station ouvre quand vous avez choisi vos tarifs.
 

@@ -1,25 +1,39 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { FiArrowRight, FiInfo, FiLock, FiMail, FiShield } from 'react-icons/fi';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { FiArrowRight, FiInfo, FiLock, FiMail } from 'react-icons/fi';
 import AuthLayout from './AuthLayout';
 import { Alert, Badge } from '../../components/ui';
 import { useStore } from '../../lib/store';
 
 export default function SignIn() {
-  const { signIn, signInSupportDemo, state } = useStore();
+  const { signIn, authError, clearAuthError, state } = useStore();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const notice = params.get('confirmed') === '1'
+    ? 'Adresse e-mail confirmée. Vous pouvez maintenant vous connecter.'
+    : params.get('reset') === '1'
+      ? 'Mot de passe mis à jour. Connectez-vous avec votre nouveau mot de passe.'
+      : null;
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    clearAuthError();
+    setBusy(true);
     try {
-      signIn(email, password);
-      navigate(state.station?.activated ? '/app/tableau-de-bord' : '/app/mise-en-route');
+      const result = await signIn(email, password);
+      const activated = result.identity?.stations[0]?.activated ?? state.station?.activated;
+      navigate(result.identity?.isPlatformAdmin
+        ? '/app/plateforme'
+        : activated ? '/app/tableau-de-bord' : '/app/mise-en-route');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Connexion impossible.');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -29,7 +43,10 @@ export default function SignIn() {
       <h1 className="mt-4 text-3xl font-extrabold tracking-tight">Bonjour 👋</h1>
       <p className="mt-2 text-sm text-slate-500">Connectez-vous pour retrouver votre station.</p>
 
-      <form onSubmit={submit} className="mt-7 space-y-4">
+      {notice && <div className="mt-4"><Alert kind="success">{notice}</Alert></div>}
+      {authError && <div className="mt-4"><Alert kind="warn">{authError}</Alert></div>}
+
+      <form onSubmit={(e) => { void submit(e); }} className="mt-7 space-y-4">
         <div>
           <label className="mb-1.5 block text-xs font-bold text-slate-600" htmlFor="email">Adresse e-mail</label>
           <div className="relative">
@@ -42,6 +59,7 @@ export default function SignIn() {
         <div>
           <div className="mb-1.5 flex items-center justify-between">
             <label className="text-xs font-bold text-slate-600" htmlFor="password">Mot de passe</label>
+            <Link to="/mot-de-passe-oublie" className="text-[11px] font-semibold text-sky-600 hover:underline">Mot de passe oublié ?</Link>
           </div>
           <div className="relative">
             <FiLock className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -53,29 +71,23 @@ export default function SignIn() {
 
         {error && <div className="text-xs"><Alert kind="danger">{error}</Alert></div>}
 
-        <button type="submit" className="wg-btn wg-btn-primary w-full !py-3">Se connecter <FiArrowRight /></button>
+        <button type="submit" disabled={busy} className="wg-btn wg-btn-primary w-full !py-3 disabled:opacity-60">
+          {busy ? 'Connexion…' : 'Se connecter'} <FiArrowRight />
+        </button>
       </form>
 
       {/* Aucune connexion tierce : Google / Facebook n'existent pas. */}
-      {/* Aucun « Se souvenir de moi » : la session dure 30 jours, l'option n'aurait aucun effet. */}
+      {/* Aucun « Se souvenir de moi » : JWT 1 h + rotation du refresh token. */}
       <div className="mt-5 rounded-xl border border-sky-100 bg-sky-50 p-3.5 text-xs leading-relaxed text-slate-600">
         <div className="flex items-start gap-2">
           <FiInfo className="mt-0.5 shrink-0 text-sky-600" />
-          <p><strong>Mot de passe oublié ?</strong> WashGuard n’envoie aucun e-mail. Le propriétaire le réinitialise depuis le module <strong>Employés</strong> — c’est la seule voie réelle.</p>
+          <p><strong>Mot de passe oublié ?</strong> Utilisez « Mot de passe oublié » : Supabase Auth envoie un lien de réinitialisation sécurisé à l’adresse du compte. Aucun mot de passe provisoire n’est communiqué à l’entreprise.</p>
         </div>
       </div>
 
       <p className="mt-6 text-center text-sm text-slate-500">
         Pas encore de compte ? <Link to="/inscription" className="font-bold text-sky-600 hover:underline">Créer mon espace</Link>
       </p>
-
-      <div className="mt-7 border-t border-slate-100 pt-5">
-        <button onClick={() => { signInSupportDemo(); navigate('/app/plateforme'); }}
-          className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 py-2.5 text-xs font-semibold text-slate-600 hover:border-sky-400 hover:text-sky-600">
-          <FiShield /> Voir l’espace plateforme (accès support de démonstration)
-        </button>
-        <p className="mt-2 text-center text-[11px] text-slate-400">Démonstration frontend : cette session n’existe pas côté serveur.</p>
-      </div>
     </AuthLayout>
   );
 }

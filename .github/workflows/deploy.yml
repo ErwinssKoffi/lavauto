@@ -1,0 +1,36 @@
+name: Deploy Vercel
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Vérifier la configuration Vercel
+        if: env.VERCEL_TOKEN == ''
+        run: echo "Déploiement ignoré : secrets Vercel absents."
+      - name: Install
+        if: env.VERCEL_TOKEN != ''
+        run: npm ci
+      - name: Vercel pull
+        if: env.VERCEL_TOKEN != ''
+        run: npx vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+      - name: Vercel build
+        if: env.VERCEL_TOKEN != ''
+        run: npx vercel build --prod --token="$VERCEL_TOKEN"
+      - name: Vercel deploy
+        if: env.VERCEL_TOKEN != ''
+        run: npx vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"

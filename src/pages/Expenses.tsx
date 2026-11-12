@@ -14,6 +14,8 @@ export default function Expenses() {
   const [cancelId, setCancelId] = useState<string | null>(null);
   const [reason, setReason] = useState('');
   const [f, setF] = useState({ amount: 0, category: CATEGORIES[0], reason: '', supplier: '', date: todayISO(), method: 'especes' as PayMethod });
+  const newExpenseKey = () => `expense-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const [idempotencyKey, setIdempotencyKey] = useState(newExpenseKey);
   const activated = Boolean(state.station?.activated);
   const methods: PayMethod[] = state.station?.paymentMethods.length ? state.station.paymentMethods : ['especes', 'mobile_money', 'carte', 'virement'];
   const active = state.expenses.filter((e) => e.status === 'enregistree');
@@ -21,7 +23,7 @@ export default function Expenses() {
   return (
     <div>
       <PageHeader title="Dépenses" subtitle="Montant, catégorie, motif, fournisseur, date et moyen de paiement. Rattachement automatique à la caisse ouverte."
-        actions={<button className="wg-btn wg-btn-primary" disabled={!activated} onClick={() => setOpen(true)}><FiPlus /> Nouvelle dépense</button>} />
+        actions={<button className="wg-btn wg-btn-primary" disabled={!activated} onClick={() => { setIdempotencyKey(newExpenseKey()); setOpen(true); }}><FiPlus /> Nouvelle dépense</button>} />
       {!activated && <div className="mb-5"><LockedPanel /></div>}
 
       <div className="mb-5"><Alert kind="info">Une dépense n’est jamais supprimée : son annulation est motivée et conservée dans l’historique.</Alert></div>
@@ -67,13 +69,14 @@ export default function Expenses() {
           <Input label="Date *" type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} />
           <Select label="Moyen de paiement *" value={f.method} onChange={(e) => setF({ ...f, method: e.target.value as PayMethod })}>{methods.map((m) => <option key={m} value={m}>{PAY_METHOD_LABELS[m]}</option>)}</Select>
         </div>
-        <p className="wg-muted mt-3 text-xs">Un paiement en espèces peut exiger une caisse ouverte, selon la règle de la station.</p>
+        <p className="wg-muted mt-3 text-xs">Un paiement en espèces peut exiger une caisse ouverte, selon la règle de la station. Une clé d’idempotence unique protège ce formulaire contre le double clic.</p>
         <div className="mt-5 flex justify-end gap-2">
           <button className="wg-btn wg-btn-ghost" onClick={() => setOpen(false)}><FiX /> Annuler</button>
-          <button className="wg-btn wg-btn-primary" onClick={() => safe(() => {
+          <button className="wg-btn wg-btn-primary" onClick={() => safe(async () => {
             if (f.amount <= 0 || !f.reason.trim()) return;
-            addExpense({ amount: f.amount, category: f.category, reason: f.reason.trim(), supplier: f.supplier.trim(), date: f.date, method: f.method });
+            await addExpense({ amount: f.amount, category: f.category, reason: f.reason.trim(), supplier: f.supplier.trim(), date: f.date, method: f.method, idempotencyKey });
             setOpen(false); setF({ amount: 0, category: CATEGORIES[0], reason: '', supplier: '', date: todayISO(), method: 'especes' });
+            setIdempotencyKey(newExpenseKey());
           })}>Enregistrer</button>
         </div>
       </Modal>
@@ -83,7 +86,7 @@ export default function Expenses() {
         <Input label="Motif de l’annulation *" value={reason} onChange={(e) => setReason(e.target.value)} />
         <div className="mt-5 flex justify-end gap-2">
           <button className="wg-btn wg-btn-ghost" onClick={() => setCancelId(null)}>Revenir</button>
-          <button className="wg-btn wg-btn-danger" onClick={() => safe(() => { if (cancelId) cancelExpense(cancelId, reason); setCancelId(null); })}>Confirmer l’annulation</button>
+          <button className="wg-btn wg-btn-danger" onClick={() => safe(async () => { if (cancelId) await cancelExpense(cancelId, reason); setCancelId(null); })}>Confirmer l’annulation</button>
         </div>
       </Modal>
     </div>

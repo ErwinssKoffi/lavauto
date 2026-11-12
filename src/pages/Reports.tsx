@@ -1,30 +1,73 @@
-import React, { useState } from 'react';
-import { FiDownload, FiFileText } from 'react-icons/fi';
+import React, { useEffect, useState } from 'react';
+import { FiAlertTriangle, FiDownload, FiFileText, FiRefreshCw } from 'react-icons/fi';
 import { useStore } from '../lib/store';
 import { buildReport, periodRange, type Period } from '../lib/metrics';
-import { downloadCSV, formatDate, formatFCFA } from '../lib/format';
-import { PAY_METHOD_LABELS } from '../types';
-import { Badge, Card, EmptyState, PageHeader, StatCard, Tabs } from '../components/ui';
+import { downloadCSV, formatDate, formatFCFA, todayISO } from '../lib/format';
+import { PAY_METHOD_LABELS, type ProfitabilityReport } from '../types';
+import {
+  Alert, Badge, Card, EmptyState, Input, Modal, PageHeader, StatCard, Tabs,
+  Textarea, useSafeAction,
+} from '../components/ui';
 
 const PERIODS: { id: Period; label: string }[] = [
   { id: 'jour', label: 'Jour' }, { id: 'semaine', label: 'Semaine' }, { id: 'mois', label: 'Mois' },
 ];
 
+const dateISO = (d: Date): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+const amount = (n: number | null): string => n === null ? 'Non calculable' : formatFCFA(n);
+
+const monthStartISO = (): string => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+};
+
 export default function Reports() {
-  const { state } = useStore();
+  const { state, dataSource, authReady, identity, refreshFinance, certifyCosts } = useStore();
+  const safe = useSafeAction();
   const [period, setPeriod] = useState<Period>('jour');
+  const [certOpen, setCertOpen] = useState(false);
+  const [cert, setCert] = useState({ start: monthStartISO(), end: todayISO(), attestation: '' });
   const r = buildReport(state, period);
-  const { label } = periodRange(period);
+  const { label, start, end } = periodRange(period);
+  const from = dateISO(start);
+  const to = dateISO(end);
+  const server = state.profitability;
+  // En mode branché, le rapport RPC remplace le calcul local UNIQUEMENT si ses
+  // bornes correspondent à la période affichée ; jamais de mélange silencieux.
+  const p: ProfitabilityReport = server && server.periodStart === from && server.periodEnd === to
+    ? server : r.profitability;
+  const fromRpc = p === server;
+  const labelPartial = p.definitions.partialBalance ?? 'Solde partiel : encaissé − dépenses ; PAS un bénéfice net';
+
+  useEffect(() => {
+    if (dataSource !== 'supabase' || !authReady || !identity) return;
+    void refreshFinance(from, to).catch(() => { /* erreur déjà notifiée par le store */ });
+  }, [dataSource, authReady, identity?.userId, from, to, refreshFinance]);
+
+  const indicatorRows: [string, string, string | number][] = [
+    ['Chiffre d’affaires', 'Total des fiches non annulées', p.revenue],
+    ['Encaissements nets', 'Paiements moins remboursements', p.collected],
+    ['Créances', 'Total moins encaissé', p.receivables],
+    ['Dépenses constatées', 'Dépenses enregistrées', p.expenses],
+    ['Achats valorisés', 'Jamais une charge de période', p.purchases],
+    ['Consommations valorisées', 'Sorties de stock au coût moyen', p.consumptions],
+    ['Charges d’exploitation', 'Hors achats de stock rattachés', p.operatingExpenses ?? p.expenses],
+    ['Commissions validées', 'Relevés figés uniquement', p.commissions],
+    ['Charges fixes', 'Catégories identifiées', p.fixedCosts],
+    ['Solde partiel', labelPartial, p.partialBalance],
+    ['Marge brute', p.certified ? p.definitions.grossMargin ?? 'Marge brute certifiée' : 'Coûts manquants', p.grossMargin ?? '—'],
+    ['Résultat net', p.certified ? p.definitions.result ?? 'Résultat net certifié' : 'Coûts manquants', p.result ?? '—'],
+  ];
 
   const exportCSV = () => {
     const headers = ['Indicateur', 'Détail', 'Valeur'];
     const rows: (string | number)[][] = [
-      ['Période', label, `${formatDate(periodRange(period).start.toISOString())} – ${formatDate(periodRange(period).end.toISOString())}`],
-      ['Lavages', 'Fiches non annulées', r.washes.length],
-      ['Chiffre d’affaires', 'Total des fiches', r.revenue],
-      ['Encaissements', 'Paiements de la période', r.collected],
-      ['Dépenses', 'Dépenses enregistrées', r.expenses],
-      ['Résultat simplifié', 'Encaissements − dépenses', r.result],
+      ['Période', label, `${formatDate(from)} – ${formatDate(to)}`],
+      ['Source', fromRpc ? 'my_profitability()' : 'état local affiché', r.washes.length],
+      ['Etat des coûts', p.costsMissing ? 'COUTS MANQUANTS' : 'complets', p.label],
+      ...indicatorRows.map(([name, detail, value]) => [name, detail, value]),
       [],
       ['Prestation', 'Quantité', 'Chiffre d’affaires'],
       ...r.topServices.map((s) => [s.name, s.count, s.revenue]),
@@ -38,22 +81,54 @@ export default function Reports() {
       ['Client', 'Lavages', 'Chiffre d’affaires'],
       ...r.bestClients.map((c) => [c.name, c.count, c.revenue]),
     ];
-    downloadCSV(`washguard-rapport-${period}-${formatDate(new Date().toISOString()).replace(/\//g, '-')}.csv`, headers, rows);
+    downloadCSV(`washguard-rapport-${period}-${formatDate(to).replace(/\//g, '-')}.csv`, headers, rows);
   };
 
   return (
     <div>
-      <PageHeader title="Rapports" subtitle={`Jour / semaine / mois : chiffres calculés à partir des données enregistrées (${label}).`}
-        actions={<button className="wg-btn wg-btn-primary" onClick={exportCSV}><FiDownload /> Exporter en CSV</button>} />
+      <PageHeader title="Rapports" subtitle={`Jour / semaine / mois : CA, encaissé, créances, coûts et solde partiel (${label}).`}
+        actions={<div className="flex gap-2">
+          {dataSource === 'supabase' && <button className="wg-btn wg-btn-ghost" onClick={() => { void refreshFinance(from, to).catch(() => {}); }}><FiRefreshCw /> Actualiser</button>}
+          <button className="wg-btn wg-btn-ghost" onClick={() => setCertOpen(true)}><FiFileText /> Certifier les coûts</button>
+          <button className="wg-btn wg-btn-primary" onClick={exportCSV}><FiDownload /> Exporter en CSV</button>
+        </div>} />
       <div className="mb-5"><Tabs value={period} onChange={setPeriod} options={PERIODS} /></div>
+
+      <div className="mb-5">{p.costsMissing ? <Alert kind="warn"><FiAlertTriangle className="mr-1 inline" />
+        <strong>Coûts manquants : {p.label}.</strong> Le solde partiel n’est <strong>PAS un bénéfice net</strong>. La marge brute et le résultat restent NULL tant que les consommations valorisées, les achats rattachés et l’attestation de période ne sont pas complets.
+      </Alert> : <Alert kind="success"><FiFileText className="mr-1 inline" />
+        <strong>{p.label}.</strong> Coûts attestés le {p.certifiedAt ? formatDate(p.certifiedAt) : '—'} : marge brute {amount(p.grossMargin)} et résultat net {amount(p.result)}. Le solde partiel n’est <strong>PAS un bénéfice net</strong>.
+      </Alert>}</div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard label="Lavages" value={String(r.washes.length)} hint="Fiches non annulées" icon={<FiFileText />} />
-        <StatCard label="Chiffre d’affaires" value={formatFCFA(r.revenue)} hint="Total des fiches" />
-        <StatCard label="Encaissements" value={formatFCFA(r.collected)} hint={`${r.byMethod.reduce((n, m) => n + m.count, 0)} paiement(s)`} />
-        <StatCard label="Dépenses" value={formatFCFA(r.expenses)} hint="Dépenses enregistrées" />
-        <StatCard label="Résultat simplifié" value={formatFCFA(r.result)} hint="Encaissements − dépenses" accent="bg-emerald-500/10 text-emerald-400" />
+        <StatCard label="Chiffre d’affaires" value={formatFCFA(p.revenue)} hint="Total des fiches" />
+        <StatCard label="Encaissements" value={formatFCFA(p.collected)} hint={`${r.byMethod.reduce((n, m) => n + m.count, 0)} paiement(s)`} />
+        <StatCard label="Créances" value={formatFCFA(p.receivables)} hint="Reste dû par fiche" />
+        <StatCard label="Solde partiel" value={formatFCFA(p.partialBalance)} hint="Encaissé − dépenses, PAS un bénéfice" accent="bg-amber-500/10 text-amber-400" />
       </div>
+
+      <Card className="mt-5">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-bold">Décomposition financière</h2>
+          <Badge tone={p.costsMissing ? 'warn' : 'success'}>{fromRpc ? 'RPC my_profitability()' : 'Calcul local'} · {p.certified ? 'coûts certifiés' : 'coûts manquants'}</Badge>
+        </div>
+        <div className="wg-scroll-x rounded-xl border" style={{ borderColor: 'var(--wg-border)' }}>
+          <table>
+            <thead><tr><th className="wg-th">Indicateur</th><th className="wg-th">Définition</th><th className="wg-th">Valeur</th></tr></thead>
+            <tbody>
+              {indicatorRows.map(([name, detail, value]) => (
+                <tr key={name}>
+                  <td className="wg-td font-semibold">{name}</td>
+                  <td className="wg-muted wg-td text-xs">{detail}</td>
+                  <td className="wg-td whitespace-nowrap font-bold">{typeof value === 'number' ? formatFCFA(value) : value}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="wg-muted mt-3 text-xs">Marge brute : {amount(p.grossMargin)} · Résultat net : {amount(p.result)} · {p.missing.length} poste(s) manquant(s) : {p.missing.join(', ') || 'aucun'}. {p.attestation ? `Attestation : ${p.attestation}.` : ''}</p>
+      </Card>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
         <Card>
@@ -75,15 +150,33 @@ export default function Reports() {
       </div>
 
       <Card className="mt-5">
-        <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-bold">Historique de caisse</h2><Badge>{r.cashSessions.length} session(s)</Badge></div>
-        {r.cashSessions.length === 0 ? <EmptyLine /> : (
-          <SimpleTable head={['Ouverture', 'Fond', 'Compté', 'État']} rows={r.cashSessions.map((c) => [
-            formatDate(c.openedAt), formatFCFA(c.openingFloat), c.countedAmount === null ? '—' : formatFCFA(c.countedAmount), c.status,
+        <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-bold">Relevés de clôture immuables</h2><Badge>{state.cashClosures.length} relevé(s)</Badge></div>
+        {state.cashClosures.length === 0 ? <EmptyLine /> : (
+          <SimpleTable head={['Date', 'Théorique', 'Compté', 'Écart']} rows={state.cashClosures.map((c) => [
+            formatDate(c.createdAt), formatFCFA(c.theoretical), formatFCFA(c.counted),
+            `${c.difference > 0 ? '+' : ''}${formatFCFA(c.difference)}`,
           ])} />
         )}
       </Card>
 
-      <p className="wg-muted mt-4 text-xs">L’export CSV reprend exactement ces indicateurs. Aucune donnée d’exemple n’est incluse.</p>
+      <Modal open={certOpen} onClose={() => setCertOpen(false)} title="Certifier les coûts de la période">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Input label="Début *" type="date" value={cert.start} onChange={(e) => setCert({ ...cert, start: e.target.value })} />
+          <Input label="Fin *" type="date" value={cert.end} onChange={(e) => setCert({ ...cert, end: e.target.value })} />
+        </div>
+        <Textarea label="Attestation *" value={cert.attestation} onChange={(e) => setCert({ ...cert, attestation: e.target.value })}
+          placeholder="Je certifie les achats rattachés, les mouvements valorisés et les commissions validées de la période." />
+        <p className="wg-muted mt-3 text-xs">La publication du résultat net est refusée si des coûts sont ambigus, non valorisés ou non validés. Le relevé certifié est immuable.</p>
+        <div className="mt-5 flex justify-end gap-2"><button className="wg-btn wg-btn-ghost" onClick={() => setCertOpen(false)}>Annuler</button>
+          <button className="wg-btn wg-btn-primary" onClick={() => safe(async () => {
+            await certifyCosts(cert);
+            await refreshFinance(cert.start, cert.end);
+            setCert({ ...cert, attestation: '' });
+            setCertOpen(false);
+          })}>Certifier</button></div>
+      </Modal>
+
+      <p className="wg-muted mt-4 text-xs">L’export CSV reprend exactement ces indicateurs. Aucune donnée d’exemple n’est incluse ; les valeurs NULL ne sont jamais remplacées par un faux zéro.</p>
     </div>
   );
 }

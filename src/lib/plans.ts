@@ -1,14 +1,13 @@
 import type { Plan } from '../types';
 
-// ─── Table `plans` ────────────────────────────────────────────────────────────
+// ─── Table `plans` / cache ───────────────────────────────────────────────────
 // La vitrine lit ses tarifs dans la base pour ne jamais être désynchronisée
-// de la facturation. En attendant le branchement Supabase, cette constante
-// joue le rôle de la table `plans` (une seule source de vérité, partagée par
-// la vitrine, la page Abonnement et l'Espace plateforme).
-//
-// À terme : SELECT * FROM plans WHERE active = true (voir lib/supabase.ts).
-// Aucun prix de prestation n'est prédéfini ici : les tarifs de lavage sont
-// toujours choisis par la station pendant la mise en route.
+// de la facturation. Depuis le Prompt 03, `SupabaseDataAdapter` charge
+// `SELECT … FROM plans WHERE active` + `plan_limits` et alimente le cache
+// ci-dessous via `setPlansCache()`. `PLANS` reste le repli du mode
+// `VITE_DATA_SOURCE=local`, partagé par la vitrine, la page Abonnement et
+// l'Espace plateforme. Aucun prix de prestation n'est prédéfini ici : les
+// tarifs de lavage sont toujours choisis par la station pendant la mise en route.
 
 export const PLANS: Plan[] = [
   {
@@ -55,6 +54,38 @@ export const PLANS: Plan[] = [
   },
 ];
 
+/** Copie défensive du repli local : jamais de mutation partagée. */
+export function clonePlans(): Plan[] {
+  return PLANS.map((plan) => ({
+    ...plan,
+    limits: { ...plan.limits },
+    features: [...plan.features],
+  }));
+}
+
+// ─── Cache des formules ──────────────────────────────────────────────────────
+// `PLANS` est le repli du mode local (rollback immédiat). En mode Supabase,
+// StoreProvider remplace ce cache par les lignes réellement lues dans `plans`
+// et `plan_limits`. La vitrine, la page Abonnement et les actions du store
+// consultent alors la même source que la facturation, sans appel réseau par page.
+let plansCache: Plan[] = clonePlans();
+
+export function getPlans(): Plan[] {
+  return plansCache;
+}
+
+export function setPlansCache(plans: Plan[]): void {
+  plansCache = plans.map((plan) => ({
+    ...plan,
+    limits: { ...plan.limits },
+    features: [...plan.features],
+  }));
+}
+
+export function resetPlansCache(): void {
+  plansCache = clonePlans();
+}
+
 export function planById(id: string | null | undefined): Plan | undefined {
-  return PLANS.find((p) => p.id === id);
+  return plansCache.find((p) => p.id === id);
 }

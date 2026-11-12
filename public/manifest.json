@@ -1,6 +1,6 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "WashGuard",
+  "name": "WashGuard — Gestion de station de lavage",
   "icons": [
     {
       "src": "favicon.ico",
@@ -8,8 +8,9 @@
       "type": "image/x-icon"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "lang": "fr",
+  "theme_color": "#080f1d",
+  "background_color": "#080f1d"
 }

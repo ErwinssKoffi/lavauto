@@ -1,18 +1,22 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FiDatabase, FiLock, FiSave, FiShield, FiTrash2 } from 'react-icons/fi';
 import { useStore, DEFAULT_DAYS } from '../lib/store';
 import { isSupabaseConfigured as sbConfigured } from '../lib/supabase';
 import { formatDateTime } from '../lib/format';
 import { Alert, Badge, Card, Input, PageHeader, SectionTitle } from '../components/ui';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 export default function Settings() {
-  const { state, updateStation, updateCompany, setHours, resetAll, notify } = useStore();
+  const { state, updateStation, updateCompany, setHours, resetAll, notify, authKind } = useStore();
+  const navigate = useNavigate();
   const st = state.station;
   const co = state.company;
   const [stationDraft, setStationDraft] = useState({ name: st?.name ?? '', address: st?.address ?? '', city: st?.city ?? '', phone: st?.phone ?? '', logoUrl: st?.logoUrl ?? '' });
   const [companyDraft, setCompanyDraft] = useState({ name: co?.name ?? '', city: co?.city ?? '', phone: co?.phone ?? '' });
   const [rules, setRules] = useState({ cashRequiresOpen: st?.cashRequiresOpen ?? true, maxCashierDiscount: st?.maxCashierDiscount ?? 0, commissionRate: st?.commissionRate ?? 0, monthlyTarget: st?.monthlyTarget ?? 0 });
   const [hours, setLocalHours] = useState(st?.hours?.length ? st.hours : DEFAULT_DAYS.map((h) => ({ ...h })));
+  const [confirmReset, setConfirmReset] = useState(false);
 
   return (
     <div>
@@ -93,9 +97,19 @@ export default function Settings() {
           <Badge><FiShield /> Thème sombre par défaut, clair disponible</Badge>
           <Badge><FiLock /> Montants FCFA · dates jj/mm/aaaa</Badge>
         </div>
-        <p className="wg-muted mt-3 text-xs leading-relaxed">Le frontend tourne aujourd’hui sur une couche de données locale qui reproduit le contrat du serveur (mise en route constatée, 409 onboarding_incomplete, caisse, commissions). Les données sont conservées dans ce navigateur uniquement.</p>
-        <button className="wg-btn wg-btn-danger mt-4" onClick={() => { if (window.confirm('Effacer toutes les données locales de démonstration et repartir à vide ?')) { resetAll(); window.location.href = '/'; } }}><FiTrash2 /> Réinitialiser la démonstration</button>
+        <p className="wg-muted mt-3 text-xs leading-relaxed">L’authentification et les permissions sont servies par {authKind === 'supabase' ? 'Supabase Auth et les RPC RBAC' : 'le mode local de démonstration'}. Les données métier écrites depuis ces écrans restent locales jusqu’aux prompts suivants ; seules les formules sont lues dans la base en mode connecté.</p>
+        <button className="wg-btn wg-btn-danger mt-4" onClick={() => setConfirmReset(true)}><FiTrash2 /> Réinitialiser la démonstration</button>
       </Card>
+
+      <ConfirmDialog
+        open={confirmReset}
+        title="Effacer les données de démonstration ?"
+        description="Toutes les données conservées dans ce navigateur (entreprise, station, lavages, caisse, dépenses) seront supprimées. Cette action est définitive et ne peut pas être annulée."
+        confirmLabel="Tout effacer"
+        cancelLabel="Conserver les données"
+        onClose={() => setConfirmReset(false)}
+        onConfirm={() => { setConfirmReset(false); void resetAll().then(() => navigate('/', { replace: true })); }}
+      />
     </div>
   );
 }

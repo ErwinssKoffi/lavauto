@@ -1,5 +1,7 @@
-import type { AppState, Wash, PayMethod } from '../types';
+import type { AppState, PayMethod, Wash } from '../types';
 import { PAY_METHOD_LABELS } from '../types';
+import { finishedWashes } from './washLifecycle';
+import { buildProfitability, type FinanceSnapshot } from './finance';
 
 export type Period = 'jour' | 'semaine' | 'mois';
 
@@ -29,15 +31,26 @@ export function inRange(iso: string, start: Date, end: Date): boolean {
 }
 
 export function activeWashes(state: AppState): Wash[] {
-  return state.washes.filter((w) => w.status !== 'annule');
+  return state.washes.filter((w) => w.status !== 'cancelled');
 }
 
+/** Rapport P06 : plus aucun « résultat simplifié » présenté comme un bénéfice. */
 export interface Report {
   washes: Wash[];
   revenue: number;
   collected: number;
+  receivables: number;
   expenses: number;
-  result: number;
+  purchases: number;
+  consumptions: number;
+  commissions: number;
+  fixedCosts: number;
+  /** SOLDE PARTIEL : encaissé − dépenses constatées. Jamais un bénéfice net. */
+  partialBalance: number;
+  grossMargin: number | null;
+  netResult: number | null;
+  costsMissing: boolean;
+  profitability: ReturnType<typeof buildProfitability>;
   topServices: { name: string; count: number; revenue: number }[];
   byEmployee: { id: string; name: string; count: number; revenue: number }[];
   byMethod: { method: PayMethod; amount: number; count: number }[];
@@ -48,14 +61,13 @@ export interface Report {
 export function buildReport(state: AppState, period: Period): Report {
   const { start, end } = periodRange(period);
   const washes = activeWashes(state).filter((w) => inRange(w.createdAt, start, end));
-  const revenue = washes.reduce((s, w) => s + w.total, 0);
-
-  const payments = washes.flatMap((w) => w.payments).filter((p) => inRange(p.at, start, end));
-  const collected = payments.reduce((s, p) => s + p.amount, 0);
-  const exps = state.expenses.filter(
-    (e) => e.status === 'enregistree' && inRange(e.date + 'T00:00:00', start, end)
+  const profitability = buildProfitability(state, start, end);
+  const cancelledIds = new Set(
+    (state.paymentCancellations ?? []).map((c) => c.paymentId)
   );
-  const expenses = exps.reduce((s, e) => s + e.amount, 0);
+  const payments = washes.flatMap((w) => w.payments ?? []).filter(
+    (p) => inRange(p.at, start, end) && !cancelledIds.has(p.id) && !p.cancelledAt
+  );
 
   const serviceMap = new Map<string, { name: string; count: number; revenue: number }>();
   washes.forEach((w) =>
@@ -100,10 +112,19 @@ export function buildReport(state: AppState, period: Period): Report {
 
   return {
     washes,
-    revenue,
-    collected,
-    expenses,
-    result: collected - expenses,
+    revenue: profitability.revenue,
+    collected: profitability.collected,
+    receivables: profitability.receivables,
+    expenses: profitability.expenses,
+    purchases: profitability.purchases,
+    consumptions: profitability.consumptions,
+    commissions: profitability.commissions,
+    fixedCosts: profitability.fixedCosts,
+    partialBalance: profitability.partialBalance,
+    grossMargin: profitability.grossMargin,
+    netResult: profitability.result,
+    costsMissing: profitability.costsMissing,
+    profitability,
     topServices,
     byEmployee,
     byMethod,
@@ -122,42 +143,76 @@ export interface CommissionLine {
   amount: number;
 }
 
-/** Lavages TERMINÉS de la période, barème de la station ou exception du compte. */
+/**
+ * Aperçu BROUILLON des commissions. P06 répartit une fiche entre TOUS les
+ * employés affectés ; le relevé figé serveur reste la source pour la paie.
+ */
 export function buildCommissions(state: AppState, period: Period): CommissionLine[] {
   const { start, end } = periodRange(period);
-  const washes = state.washes.filter(
-    (w) => w.status === 'termine' && inRange(w.finishedAt ?? w.createdAt, start, end)
+  const washes = finishedWashes(state.washes).filter(
+    (w) => inRange(w.finishedAt ?? w.createdAt, start, end)
   );
-  const byUser = new Map<string, number>();
-  washes.forEach((w) => byUser.set(w.employeeId, (byUser.get(w.employeeId) ?? 0) + w.total));
+  const byUser = new Map<string, { base: number; washes: number }>();
+  washes.forEach((w) => {
+    const ids = Array.isArray(w.assignedUserIds) && w.assignedUserIds.length
+      ? [...new Set(w.assignedUserIds)]
+      : [w.employeeId];
+    const share = w.total / Math.max(ids.length, 1);
+    ids.forEach((userId) => {
+      const cur = byUser.get(userId) ?? { base: 0, washes: 0 };
+      cur.base += share;
+      cur.washes += 1;
+      byUser.set(userId, cur);
+    });
+  });
 
-  return [...byUser.entries()].map(([userId, base]) => {
+  return [...byUser.entries()].map(([userId, totals]) => {
     const user = state.users.find((u) => u.id === userId);
     const override = user?.commissionRateOverride !== null && user?.commissionRateOverride !== undefined;
     const rate = override ? (user?.commissionRateOverride as number) : state.station?.commissionRate ?? 0;
     return {
       userId,
       name: user?.name ?? 'Employé supprimé',
-      washes: washes.filter((w) => w.employeeId === userId).length,
-      base,
+      washes: totals.washes,
+      base: Math.round(totals.base),
       rate,
       override,
-      amount: Math.round((base * rate) / 100),
+      amount: Math.round((totals.base * rate) / 100),
     };
   }).sort((a, b) => b.amount - a.amount);
 }
 
 export const METHOD_LABEL = PAY_METHOD_LABELS;
 
+/**
+ * Solde théorique = fond + encaissements espèces − décaissements espèces.
+ * Les mouvements `closing` ne sont pas des flux : ils ne sont pas recomptés.
+ */
 export function theoreticalCash(state: AppState, sessionId: string): number {
   const s = state.cashSessions.find((c) => c.id === sessionId);
   if (!s) return 0;
+  const start = s.reopenedAt ?? s.openedAt;
+  const base = s.reopenedAt ? (s.countedAmount ?? s.openingFloat) : s.openingFloat;
+  const movements = (state.cashMovements ?? []).filter(
+    (m) => m.cashSessionId === sessionId && m.createdAt >= start
+  );
+  const hasLedger = (state.cashMovements ?? []).some((m) => m.cashSessionId === sessionId);
+  if (hasLedger) {
+    return base + movements
+      .filter((m) => ['payment_in', 'expense_out', 'adjustment'].includes(m.kind))
+      .reduce((sum, m) => sum + m.amount, 0);
+  }
+  // Repli pour un ancien état local importé avant P06, sans mouvements.
   const cashPayments = state.washes
-    .flatMap((w) => w.payments)
-    .filter((p) => p.method === 'especes' && p.at >= s.openedAt && (!s.closedAt || p.at <= s.closedAt))
+    .flatMap((w) => w.payments ?? [])
+    .filter((p) => p.method === 'especes' && p.at >= start && (!s.closedAt || p.at <= s.closedAt))
     .reduce((sum, p) => sum + p.amount, 0);
   const cashExpenses = state.expenses
-    .filter((e) => e.status === 'enregistree' && e.method === 'especes' && e.cashSessionId === s.id)
+    .filter((e) => e.status === 'enregistree' && e.method === 'especes'
+      && e.cashSessionId === s.id && e.createdAt >= start)
     .reduce((sum, e) => sum + e.amount, 0);
-  return s.openingFloat + cashPayments - cashExpenses;
+  return base + cashPayments - cashExpenses;
 }
+
+/** Exposé pour les tests : le snapshot local respecte le contrat P06. */
+export type { FinanceSnapshot };

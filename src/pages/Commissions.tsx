@@ -1,23 +1,48 @@
-import React, { useState } from 'react';
-import { FiDownload, FiLock, FiPieChart } from 'react-icons/fi';
+import React, { useEffect, useState } from 'react';
+import { FiDownload, FiLock, FiPieChart, FiRefreshCw } from 'react-icons/fi';
 import { useStore } from '../lib/store';
-import { buildCommissions, periodRange, type Period } from '../lib/metrics';
+import { usePermissions } from '../lib/usePermissions';
+import { buildCommissions, periodRange, type CommissionLine, type Period } from '../lib/metrics';
 import { downloadCSV, formatDate, formatFCFA } from '../lib/format';
-import { Alert, Badge, Card, EmptyState, PageHeader, StatCard, Tabs } from '../components/ui';
+import type { CommissionStatementLine } from '../types';
+import {
+  Alert, Badge, Card, Input, PageHeader, StatCard, Tabs, useSafeAction,
+} from '../components/ui';
+import { DataTable, type Column } from '../components/DataTable';
 
 const PERIODS: { id: Period; label: string }[] = [
   { id: 'jour', label: 'Jour' }, { id: 'semaine', label: 'Semaine' }, { id: 'mois', label: 'Mois' },
 ];
 
+const dateISO = (d: Date): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
 export default function Commissions() {
-  const { state } = useStore();
+  const {
+    state, dataSource, authReady, identity, createCommissionPeriod,
+    validateCommissionPeriod, recordCommissionPayout, refreshFinance,
+  } = useStore();
+  const { can } = usePermissions();
+  const safe = useSafeAction();
   const [period, setPeriod] = useState<Period>('mois');
-  const role = state.session?.role;
-  const allowed = role === 'proprietaire' || role === 'gerant';
+  const [pStart, setPStart] = useState(() => dateISO(periodRange('mois').start));
+  const [pEnd, setPEnd] = useState(() => dateISO(periodRange('mois').end));
+  const allowed = can('commissions.view');
+  const canValidate = dataSource === 'local' || can('commissions.validate');
   const lines = buildCommissions(state, period);
   const { label } = periodRange(period);
+  const periodLines = state.commissionLines ?? [];
+  const periods = state.commissionPeriods ?? [];
+  const payouts = state.commissionPayouts ?? [];
+  const frozenTotal = periodLines.reduce((sum, l) => sum + l.amount, 0);
   const totalDue = lines.reduce((s, l) => s + l.amount, 0);
   const totalBase = lines.reduce((s, l) => s + l.base, 0);
+
+  useEffect(() => {
+    const range = periodRange(period);
+    setPStart(dateISO(range.start));
+    setPEnd(dateISO(range.end));
+  }, [period]);
 
   if (!allowed) {
     return (
@@ -31,54 +56,143 @@ export default function Commissions() {
     );
   }
 
+  const commissionColumns: Column<CommissionLine>[] = [
+    { key: 'name', header: 'Laveur', sortValue: (line) => line.name, render: (line) => <span className="font-bold">{line.name}</span> },
+    { key: 'washes', header: 'Lavages terminés', sortValue: (line) => line.washes, render: (line) => line.washes },
+    { key: 'base', header: 'Base', sortValue: (line) => line.base, render: (line) => formatFCFA(line.base) },
+    { key: 'rate', header: 'Barème', sortValue: (line) => line.rate, render: (line) => `${line.rate} %` },
+    { key: 'origin', header: 'Origine', render: (line) => <Badge tone={line.override ? 'accent' : 'neutral'}>{line.override ? 'Exception sur le compte' : 'Barème station'}</Badge> },
+    { key: 'amount', header: 'Aperçu', sortValue: (line) => line.amount, render: (line) => <span className="font-bold">{formatFCFA(line.amount)}</span> },
+  ];
+
+  const frozenColumns: Column<CommissionStatementLine>[] = [
+    { key: 'name', header: 'Laveur', sortValue: (l) => l.userName, render: (l) => <span className="font-bold">{l.userName}</span> },
+    { key: 'washes', header: 'Lavages', sortValue: (l) => l.washes, render: (l) => l.washes },
+    { key: 'base', header: 'Base figée', sortValue: (l) => l.base, render: (l) => formatFCFA(l.base) },
+    { key: 'rate', header: 'Taux', sortValue: (l) => l.rate, render: (l) => `${l.rate} %` },
+    { key: 'origin', header: 'Origine', render: (l) => <Badge>{l.rateOrigin === 'contract' ? 'Contrat' : 'Station'}</Badge> },
+    { key: 'amount', header: 'Montant dû', sortValue: (l) => l.amount, render: (l) => <span className="font-bold">{formatFCFA(l.amount)}</span> },
+    { key: 'payout', header: 'Paie', render: (l) => {
+      const paid = payouts.some((p) => p.periodId === l.periodId && p.userId === l.userId);
+      const periodRow = periods.find((p) => p.id === l.periodId);
+      if (paid) return <Badge tone="success">Payée</Badge>;
+      if (!canValidate || (periodRow && periodRow.status === 'draft')) return <Badge>Brouillon</Badge>;
+      return (
+        <button className="wg-link text-xs" onClick={() => safe(async () => {
+          await recordCommissionPayout(l.periodId, l.userId, l.amount,
+            `PAIE-${l.periodId.slice(0, 8)}-${l.userId.slice(0, 4)}`);
+        })}>Enregistrer la paie</button>
+      );
+    } },
+  ];
+
   const exportCSV = () => {
+    // La paie exporte les relevés FIGÉS. Sans relevé validé, l'export est
+    // explicitement marqué BROUILLON : jamais un montant recalculé présenté
+    // comme une dette validée.
+    if (periodLines.length > 0) {
+      downloadCSV(
+        `washguard-commissions-figees-${period}.csv`,
+        ['Laveur', 'Lavages', 'Base figée (FCFA)', 'Taux (%)', 'Origine', 'Montant dû (FCFA)', 'Statut paie'],
+        periodLines.map((l) => [
+          l.userName, l.washes, l.base, l.rate, l.rateOrigin, l.amount,
+          payouts.some((p) => p.periodId === l.periodId && p.userId === l.userId) ? 'Payée' : 'À payer',
+        ])
+      );
+      return;
+    }
     downloadCSV(
-      `washguard-commissions-${period}-${formatDate(new Date().toISOString()).replace(/\//g, '-')}.csv`,
-      ['Laveur', 'Lavages terminés', 'Base (FCFA)', 'Barème (%)', 'Origine du barème', 'Montant dû (FCFA)'],
-      lines.map((l) => [l.name, l.washes, l.base, l.rate, l.override ? 'Exception sur le compte' : 'Barème de la station', l.amount])
+      `washguard-commissions-BROUILLON-${period}.csv`,
+      ['AVERTISSEMENT', 'Laveur', 'Lavages', 'Base (FCFA)', 'Barème (%)', 'Origine', 'Aperçu (FCFA)'],
+      [['BROUILLON NON VALIDE', '', '', '', '', '', ''], ...lines.map((l) => [
+        'BROUILLON', l.name, l.washes, l.base, l.rate,
+        l.override ? 'Exception sur le compte' : 'Barème de la station', l.amount,
+      ])]
     );
   };
 
   return (
     <div>
-      <PageHeader title="Commissions" subtitle={`Ce que la station doit à chaque laveur sur les lavages terminés (${label}).`}
-        actions={<button className="wg-btn wg-btn-primary" onClick={exportCSV}><FiDownload /> Export CSV pour la paie</button>} />
+      <PageHeader title="Commissions" subtitle={`Aperçu brouillon, relevés validés figés et paie tracée (${label}).`}
+        actions={<div className="flex gap-2">
+          {dataSource === 'supabase' && authReady && identity &&
+            <button className="wg-btn wg-btn-ghost" onClick={() => safe(() => refreshFinance())}><FiRefreshCw /> Actualiser</button>}
+          <button className="wg-btn wg-btn-primary" onClick={exportCSV}><FiDownload /> Export CSV pour la paie</button>
+        </div>} />
       <div className="mb-5"><Tabs value={period} onChange={setPeriod} options={PERIODS} /></div>
 
-      <div className="mb-5"><Alert kind="info">Seuls les lavages <strong>terminés</strong> de la période sont retenus. Le barème appliqué est celui de la station, sauf exception posée sur un compte dans Employés.</Alert></div>
+      <div className="mb-5"><Alert kind="info">L’aperçu recalcule les lavages <strong>terminés</strong> à titre indicatif. La paie utilise uniquement les <strong>relevés validés et figés</strong> : une période validée n’est jamais recalculée ni remise en brouillon.</Alert></div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="Montant total dû" value={formatFCFA(totalDue)} hint="Somme des commissions" icon={<FiPieChart />} />
+        <StatCard label={periodLines.length ? 'Montant total figé' : 'Aperçu brouillon (non dû)'} value={formatFCFA(periodLines.length ? frozenTotal : totalDue)} hint={`${periodLines.length || lines.length} ligne(s) · ${periodLines.length ? 'relevés validés' : 'aucun relevé validé'}`} icon={<FiPieChart />} />
         <StatCard label="Base des lavages terminés" value={formatFCFA(totalBase)} hint={`${lines.reduce((s, l) => s + l.washes, 0)} lavage(s) terminé(s)`} />
         <StatCard label="Barème de la station" value={`${state.station?.commissionRate ?? 0} %`} hint="Modifiable dans Paramètres" accent="bg-emerald-500/10 text-emerald-400" />
       </div>
 
       <Card className="mt-5">
-        <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-bold">Détail par laveur</h2><Badge>{lines.length} laveur(s)</Badge></div>
-        {lines.length === 0 ? (
-          <EmptyState icon={<FiPieChart />} title="Aucune commission sur la période" description="Marquez des fiches comme « terminé » et fixez un barème pour voir apparaître les montants dus." />
-        ) : (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-sm font-bold">Périodes de commission</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <Input type="date" value={pStart} onChange={(e) => setPStart(e.target.value)} />
+            <Input type="date" value={pEnd} onChange={(e) => setPEnd(e.target.value)} />
+            <button className="wg-btn wg-btn-primary" disabled={!canValidate || !state.station?.activated}
+              onClick={() => safe(async () => {
+                await createCommissionPeriod(state.station!.id, pStart, pEnd);
+              })}>Créer un brouillon</button>
+          </div>
+        </div>
+        {periods.length === 0 ? <p className="wg-muted text-xs">Aucune période. Créez un brouillon, puis validez-le pour figer les lignes.</p> : (
           <div className="wg-scroll-x rounded-xl border" style={{ borderColor: 'var(--wg-border)' }}>
-            <table>
-              <thead><tr><th className="wg-th">Laveur</th><th className="wg-th">Lavages terminés</th><th className="wg-th">Base</th><th className="wg-th">Barème</th><th className="wg-th">Origine</th><th className="wg-th">Montant dû</th></tr></thead>
-              <tbody>
-                {lines.map((l) => (
-                  <tr key={l.userId}>
-                    <td className="wg-td font-bold">{l.name}</td>
-                    <td className="wg-td">{l.washes}</td>
-                    <td className="wg-td">{formatFCFA(l.base)}</td>
-                    <td className="wg-td">{l.rate} %</td>
-                    <td className="wg-td"><Badge tone={l.override ? 'accent' : 'neutral'}>{l.override ? 'Exception sur le compte' : 'Barème station'}</Badge></td>
-                    <td className="wg-td font-bold">{formatFCFA(l.amount)}</td>
-                  </tr>
-                ))}
-                <tr><td className="wg-td font-bold" colSpan={5}>Total à payer</td><td className="wg-td font-bold text-emerald-400">{formatFCFA(totalDue)}</td></tr>
-              </tbody>
+            <table><thead><tr><th className="wg-th">Période</th><th className="wg-th">Statut</th><th className="wg-th">Lignes</th><th className="wg-th" /></tr></thead>
+              <tbody>{periods.map((p) => (
+                <tr key={p.id}>
+                  <td className="wg-td">{formatDate(p.start)} – {formatDate(p.end)}</td>
+                  <td className="wg-td"><Badge tone={p.status === 'draft' ? 'warn' : p.status === 'paid' ? 'success' : 'accent'}>{p.status === 'draft' ? 'Brouillon' : p.status === 'paid' ? 'Payée' : 'Validée · figée'}</Badge></td>
+                  <td className="wg-td">{periodLines.filter((l) => l.periodId === p.id).length}</td>
+                  <td className="wg-td">{p.status === 'draft' && canValidate &&
+                    <button className="wg-link text-xs" onClick={() => safe(async () => {
+                      await validateCommissionPeriod(p.id);
+                    })}><FiLock className="inline" /> Valider et figer</button>}
+                  </td>
+                </tr>
+              ))}</tbody>
             </table>
           </div>
         )}
       </Card>
-      <p className="wg-muted mt-4 text-xs">L’export CSV reprend ces colonnes pour la paie. Objectif de chiffre d’affaires du mois suivi sur le tableau de bord.</p>
+
+      <Card className="mt-5">
+        <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-bold">Relevés figés — source de la paie</h2><Badge>{periodLines.length} ligne(s)</Badge></div>
+        <DataTable<CommissionStatementLine>
+          rows={periodLines}
+          rowKey={(line) => line.id}
+          columns={frozenColumns}
+          searchText={(line) => `${line.userName} ${line.rateOrigin}`}
+          searchPlaceholder="Rechercher un laveur…"
+          emptyTitle="Aucun relevé validé"
+          emptyDescription="Créez une période puis validez-la : les montants seront figés et ne pourront plus être recalculés."
+          footer={periodLines.length > 0 ? (
+            <tr><td className="wg-td font-bold" colSpan={5}>Total figé de tous les relevés</td><td className="wg-td font-bold text-emerald-400">{formatFCFA(frozenTotal)}</td><td /></tr>
+          ) : undefined}
+        />
+      </Card>
+
+      <Card className="mt-5">
+        <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-bold">Aperçu brouillon par laveur</h2><Badge tone="warn">Non validé · recalculable</Badge></div>
+        <DataTable<CommissionLine>
+          rows={lines}
+          rowKey={(line) => line.userId}
+          columns={commissionColumns}
+          searchText={(line) => `${line.name} ${line.override ? 'exception sur le compte' : 'barème station'}`}
+          searchPlaceholder="Rechercher un laveur…"
+          emptyTitle="Aucune commission sur la période"
+          emptyDescription="Marquez des fiches comme « terminé » et fixez un barème pour voir apparaître les montants dus."
+          footer={lines.length > 0 ? (
+            <tr><td className="wg-td font-bold" colSpan={5}>Total indicatif (tous laveurs)</td><td className="wg-td font-bold">{formatFCFA(totalDue)}</td></tr>
+          ) : undefined}
+        />
+      </Card>
+      <p className="wg-muted mt-4 text-xs">L’export CSV privilégie les relevés figés ; sans relevé, il est nommé BROUILLON. Le total porte sur tous les laveurs de la période, même lorsqu’un filtre de recherche est appliqué.</p>
     </div>
   );
 }

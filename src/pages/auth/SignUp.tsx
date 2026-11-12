@@ -16,18 +16,29 @@ export default function SignUp() {
     ownerName: '', email: '', password: '', confirm: '',
   });
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [busy, setBusy] = useState(false);
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setNotice('');
     if (form.password !== form.confirm) return setError('Les deux mots de passe ne correspondent pas.');
     if (form.password.length < 8) return setError('Le mot de passe doit contenir au moins 8 caractères.');
+    setBusy(true);
     try {
-      signUp(form);
-      navigate('/app/mise-en-route');
+      const result = await signUp(form);
+      if (result.confirmationRequired) {
+        setNotice(result.message ?? 'Confirmez votre adresse e-mail avant la première connexion.');
+        return;
+      }
+      const activated = result.identity?.stations[0]?.activated ?? false;
+      navigate(activated ? '/app/tableau-de-bord' : '/app/mise-en-route');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Inscription impossible.');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -37,7 +48,7 @@ export default function SignUp() {
       <h1 className="mt-4 text-3xl font-extrabold tracking-tight">Créer mon espace</h1>
       <p className="mt-2 text-sm text-slate-500">Deux temps, quatre informations sur votre station, puis votre compte.</p>
 
-      <form onSubmit={submit} className="mt-6 space-y-5">
+      <form onSubmit={(e) => { void submit(e); }} className="mt-6 space-y-5">
         {/* Temps 1 */}
         <section className="rounded-2xl border border-slate-200 p-4">
           <div className="mb-4 flex items-center gap-2">
@@ -73,20 +84,23 @@ export default function SignUp() {
         </section>
 
         {error && <div className="text-xs"><Alert kind="danger">{error}</Alert></div>}
+        {notice && <div className="text-xs"><Alert kind="success">{notice}</Alert></div>}
 
         <div className="rounded-xl bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-500">
           <div className="flex items-start gap-2"><FiInfo className="mt-0.5 shrink-0 text-sky-600" />
-            <p>Le serveur crée <strong>une seule fois</strong> l’entreprise, sa station, le compte propriétaire et l’abonnement d’essai, puis ouvre l’écran <strong>Mise en route</strong>. Aucune donnée d’exemple ni aucun tarif de lavage n’est prérempli.</p>
+            <p>Supabase Auth crée <strong>une seule fois</strong> l’entreprise, sa station, le profil propriétaire et l’abonnement d’essai. Un e-mail de confirmation est requis avant la première connexion. Aucune donnée d’exemple ni aucun tarif de lavage n’est prérempli.</p>
           </div>
         </div>
 
-        <button type="submit" className="wg-btn wg-btn-primary w-full !py-3">Créer mon espace <FiArrowRight /></button>
+        <button type="submit" disabled={busy} className="wg-btn wg-btn-primary w-full !py-3 disabled:opacity-60">
+          {busy ? 'Création…' : 'Créer mon espace'} <FiArrowRight />
+        </button>
       </form>
 
       <p className="mt-5 text-center text-sm text-slate-500">
         Déjà inscrit ? <Link to="/connexion" className="font-bold text-sky-600 hover:underline">Se connecter</Link>
       </p>
-      <div className="mt-5 flex items-center justify-center gap-2 text-[11px] text-slate-400"><FiCheckCircle /> <FiLock /> Session de 30 jours · aucune connexion Google / Facebook</div>
+      <div className="mt-5 flex items-center justify-center gap-2 text-[11px] text-slate-400"><FiCheckCircle /> <FiLock /> JWT 1 h · refresh token renouvelé · aucune connexion Google / Facebook</div>
     </AuthLayout>
   );
 }

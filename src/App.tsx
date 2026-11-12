@@ -1,12 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { FiLock } from 'react-icons/fi';
 import AppShell from './components/AppShell';
-import { ToastHost } from './components/ui';
-import { fetchMeOnce, useStore } from './lib/store';
+import { Alert, Badge, Card, ToastHost } from './components/ui';
+import { useStore } from './lib/store';
+import { usePermissions } from './lib/usePermissions';
+import { permissionForRoles } from './lib/permissionCatalog';
+import { LoadingState } from './components/feedback';
+import { ROLE_LABELS, type Role } from './types';
 
 import Landing from './pages/Landing';
 import SignIn from './pages/auth/SignIn';
 import SignUp from './pages/auth/SignUp';
+import ForgotPassword from './pages/auth/ForgotPassword';
+import ResetPassword from './pages/auth/ResetPassword';
 import Onboarding from './pages/Onboarding';
 import Dashboard from './pages/Dashboard';
 import Washes from './pages/Washes';
@@ -19,31 +26,72 @@ import Reports from './pages/Reports';
 import Commissions from './pages/Commissions';
 import Settings from './pages/Settings';
 import Subscription from './pages/Subscription';
-import Platform from './pages/Platform';
 
-/** Un seul appel à /auth/me par visiteur, même sans cookie (voir store.tsx). */
+// P10 : les écrans lourds sont chargés à la demande. Le harnais JSDOM
+// résout ces imports avant les assertions ; aucun écran n'est supprimé.
+const Consolidation = React.lazy(() => import('./pages/Consolidation'));
+const Stock = React.lazy(() => import('./pages/Stock'));
+const Consumptions = React.lazy(() => import('./pages/Consumptions'));
+const Fidelisation = React.lazy(() => import('./pages/Fidelisation'));
+const Flottes = React.lazy(() => import('./pages/Flottes'));
+const Platform = React.lazy(() => import('./pages/Platform'));
+const Quality = React.lazy(() => import('./pages/Quality'));
+
+const STAFF: Role[] = ['proprietaire', 'gerant', 'caissier', 'laveur'];
+const MANAGERS: Role[] = ['proprietaire', 'gerant'];
+const OWNER: Role[] = ['proprietaire'];
+const PLATFORM: Role[] = ['super_admin'];
+
+/** L'état Auth est alimenté par `onAuthStateChange` dans StoreProvider : aucun
+ *  fetchMeOnce(), aucun 401 en boucle, aucune session lue en localStorage. */
 function SessionGate({ children }: { children: React.ReactNode }) {
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    let alive = true;
-    fetchMeOnce().then(() => { if (alive) setReady(true); });
-    return () => { alive = false; };
-  }, []);
-  if (!ready) return (
-    <div className="grid min-h-screen place-items-center">
-      <div className="flex flex-col items-center gap-3">
-        <span className="wg-gradient h-10 w-10 animate-pulse rounded-xl" />
-        <p className="wg-muted text-xs">Vérification de la session…</p>
-      </div>
-    </div>
+  const { authReady, authError } = useStore();
+  if (!authReady) return <LoadingState label="Vérification de la session…" />;
+  return (
+    <>
+      {authError && (
+        <div className="fixed left-1/2 top-3 z-[120] w-[min(92vw,34rem)] -translate-x-1/2">
+          <Alert kind="warn">{authError}</Alert>
+        </div>
+      )}
+      {children}
+    </>
   );
+}
+
+/** Garde de CONFORT : une URL saisie directement n'affiche pas un écran dont
+ *  la permission serveur est absente. La sécurité est assurée par la RLS et
+ *  les fonctions SECURITY DEFINER, jamais par ce composant. */
+function RoleRoute({
+  roles, permission, children,
+}: { roles: Role[]; permission?: string; children: React.ReactNode }) {
+  const { state } = useStore();
+  const { role, can } = usePermissions();
+  const required = permission ?? permissionForRoles(roles);
+  if (!state.session || !can(required)) {
+    return (
+      <Card className="flex items-start gap-3 border-red-500/30">
+        <FiLock className="mt-0.5 text-xl text-red-400" />
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-sm font-bold">Accès refusé</h2>
+            <Badge tone="danger">Permission insuffisante</Badge>
+          </div>
+          <p className="wg-muted mt-1 text-xs leading-relaxed">
+            Cet écran demande la permission « {required} » (rôles : {roles.map((r) => ROLE_LABELS[r]).join(', ')}).
+            Votre compte est « {role ? ROLE_LABELS[role] : 'non connecté'} ».
+          </p>
+        </div>
+      </Card>
+    );
+  }
   return <>{children}</>;
 }
 
 function LandingRoute() {
   const { state } = useStore();
   if (state.session) {
-    if (state.session.role === 'support') return <Navigate to="/app/plateforme" replace />;
+    if (state.session.role === 'super_admin') return <Navigate to="/app/plateforme" replace />;
     if (!state.station?.activated) return <Navigate to="/app/mise-en-route" replace />;
     return <Navigate to="/app/tableau-de-bord" replace />;
   }
@@ -52,7 +100,9 @@ function LandingRoute() {
 
 function AuthRoute({ children }: { children: React.ReactNode }) {
   const { state } = useStore();
-  if (state.session) return <Navigate to="/app/tableau-de-bord" replace />;
+  if (state.session) {
+    return <Navigate to={state.session.role === 'super_admin' ? '/app/plateforme' : '/app/tableau-de-bord'} replace />;
+  }
   return <>{children}</>;
 }
 
@@ -66,29 +116,39 @@ export default function App() {
   return (
     <SessionGate>
       <ToastHost />
+      <React.Suspense fallback={<LoadingState label="Chargement de l’écran…" />}>
       <Routes>
         <Route path="/" element={<LandingRoute />} />
         <Route path="/connexion" element={<AuthRoute><SignIn /></AuthRoute>} />
         <Route path="/inscription" element={<AuthRoute><SignUp /></AuthRoute>} />
+        <Route path="/mot-de-passe-oublie" element={<AuthRoute><ForgotPassword /></AuthRoute>} />
+        <Route path="/reinitialiser-mot-de-passe" element={<ResetPassword />} />
         <Route path="/auth/*" element={<Navigate to="/connexion" replace />} />
         <Route path="/app" element={<AppRoute><AppShell /></AppRoute>}>
           <Route index element={<Navigate to="tableau-de-bord" replace />} />
-          <Route path="tableau-de-bord" element={<Dashboard />} />
-          <Route path="mise-en-route" element={<Onboarding />} />
-          <Route path="lavages" element={<Washes />} />
-          <Route path="prestations" element={<Services />} />
-          <Route path="clients" element={<Clients />} />
-          <Route path="employes" element={<Employees />} />
-          <Route path="caisse" element={<Cash />} />
-          <Route path="depenses" element={<Expenses />} />
-          <Route path="rapports" element={<Reports />} />
-          <Route path="commissions" element={<Commissions />} />
-          <Route path="parametres" element={<Settings />} />
-          <Route path="abonnement" element={<Subscription />} />
-          <Route path="plateforme" element={<Platform />} />
+          <Route path="tableau-de-bord" element={<RoleRoute roles={STAFF} permission="washes.view"><Dashboard /></RoleRoute>} />
+          <Route path="mise-en-route" element={<RoleRoute roles={MANAGERS} permission="settings.manage"><Onboarding /></RoleRoute>} />
+          <Route path="lavages" element={<RoleRoute roles={STAFF} permission="washes.view"><Washes /></RoleRoute>} />
+          <Route path="prestations" element={<RoleRoute roles={MANAGERS} permission="catalog.manage"><Services /></RoleRoute>} />
+          <Route path="clients" element={<RoleRoute roles={STAFF} permission="customers.view"><Clients /></RoleRoute>} />
+          <Route path="employes" element={<RoleRoute roles={MANAGERS} permission="employees.manage"><Employees /></RoleRoute>} />
+          <Route path="caisse" element={<RoleRoute roles={STAFF} permission="cash.open"><Cash /></RoleRoute>} />
+          <Route path="depenses" element={<RoleRoute roles={STAFF} permission="expenses.create"><Expenses /></RoleRoute>} />
+          <Route path="rapports" element={<RoleRoute roles={MANAGERS} permission="reports.view"><Reports /></RoleRoute>} />
+          <Route path="consolidation" element={<RoleRoute roles={MANAGERS} permission="analytics.view"><Consolidation /></RoleRoute>} />
+          <Route path="commissions" element={<RoleRoute roles={MANAGERS} permission="commissions.view"><Commissions /></RoleRoute>} />
+          <Route path="stock" element={<RoleRoute roles={MANAGERS} permission="inventory.view"><Stock /></RoleRoute>} />
+          <Route path="consommations" element={<RoleRoute roles={MANAGERS} permission="inventory.consume"><Consumptions /></RoleRoute>} />
+          <Route path="fidelisation" element={<RoleRoute roles={STAFF} permission="crm.view"><Fidelisation /></RoleRoute>} />
+          <Route path="flottes" element={<RoleRoute roles={STAFF} permission="fleets.view"><Flottes /></RoleRoute>} />
+          <Route path="parametres" element={<RoleRoute roles={MANAGERS} permission="settings.manage"><Settings /></RoleRoute>} />
+          <Route path="abonnement" element={<RoleRoute roles={OWNER} permission="subscription.manage"><Subscription /></RoleRoute>} />
+          <Route path="plateforme" element={<RoleRoute roles={PLATFORM} permission="platform.view"><Platform /></RoleRoute>} />
+          <Route path="qualite" element={<RoleRoute roles={[...MANAGERS, ...PLATFORM]} permission="reports.view"><Quality /></RoleRoute>} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </React.Suspense>
     </SessionGate>
   );
 }
