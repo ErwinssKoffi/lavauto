@@ -1,5 +1,12 @@
 # Changelog
 
+## Non publié — Résolution de conflit avec `main` (PR #2)
+
+- `origin/main` a reçu après la base `b119692` trois commits (`ccf9e1c`, `4343790`, `45ac7ff`) d'une refonte parallèle. La PR #3 est passée `CONFLICTING` ; `origin/main` a été fusionnée dans `arena/868cde36-lavauto` sans changer de branche.
+- Les 27 fichiers en conflit et les 4 fichiers auto-fusionnés (`ui.tsx`, `Onboarding.tsx`, `Services.tsx`, `Subscription.tsx`) sont résolus en faveur de la livraison P01–P10 : port `5173`, `allowedHosts` restreint, Auth/RBAC serveur, 19 routes, Storage privé et CI/CD conservés.
+- Les composants sources inutilisés de la branche parallèle (`RoleGuard`, `StationSwitcher`, `TodayActivityWidget`, `rbac.ts`) sont retirés du résultat de fusion pour garder `tsc -b` vert ; `docs/database-schema.md`, l'asset public, `seed.sql` et les 3 migrations datées sont conservés comme historiques non appliqués.
+- `scripts/check.cjs` et `scripts/lint.cjs` ne comptent désormais que les migrations `^\d{3}_` : 49 migrations appliquées, `048` absent, `050` présent.
+
 ## Non publié — Prompt 10 : QA, sécurité, performance, Storage et déploiement
 
 - **Validation** : `p10_complet` + `levee_totale` reçues après le rapport final P09. Les migrations `001`–`044` restent figées ; P10 est strictement additif via `045_qa_performance`, `046_storage_foundation`, `047_qa_hardening`, `049_storage_rls_guard` et `050_storage_rls_restrictive` → **49 migrations**. Le fichier `048_storage_grants_fix.sql` a été retiré après trois échecs de révocation (`42501` sur `SET ROLE supabase_storage_admin`, rôles réservés, `0A000` sur `GRANTED BY`) : la sécurité Storage est assurée par RLS, pas par des grants.

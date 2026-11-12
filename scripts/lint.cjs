@@ -59,8 +59,9 @@ const rules = [
     exists('src/lib/usePermissions.ts') && read('src/lib/usePermissions.ts').includes('my_context()') &&
     read('src/components/navigation.tsx').includes('granted.includes(entry.permission)') &&
     read('src/App.tsx').includes('usePermissions') && read('src/App.tsx').includes('RoleRoute')],
-  ['49 migrations SQL, 17 documents et 6 tests distants en ROLLBACK', () => {
-    const migrations = fs.readdirSync(path.join(ROOT, 'supabase/migrations')).filter((f) => f.endsWith('.sql'));
+  ['49 migrations numérotées, documentation P10 et 6 tests distants en ROLLBACK', () => {
+    const migrations = fs.readdirSync(path.join(ROOT, 'supabase/migrations'))
+      .filter((f) => /^\d{3}_.*\.sql$/.test(f));
     return migrations.length === 49 && exists('docs/auth-rbac.md') &&
       exists('docs/washes.md') && exists('docs/finance.md') && exists('docs/stock.md') &&
       exists('docs/crm.md') && exists('docs/analytics.md') &&

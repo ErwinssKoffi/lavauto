@@ -90,7 +90,7 @@ src/
     ui.tsx              briques d'interface
     AppShell.tsx        sidebar, topbar, navigation par rôle
   pages/                vitrine, auth, 18 modules
-supabase/migrations/    49 migrations SQL versionnées (Prompts 03–10)
+supabase/migrations/    49 migrations numérotées appliquées (Prompts 03–10) + 3 fichiers historiques non appliqués
 supabase/functions/     Edge Function d'invitation (JWT + permission serveur)
 scripts/check.cjs       contrôles reproductibles (npm run check)
 scripts/lint.cjs        lint statique (npm run lint)

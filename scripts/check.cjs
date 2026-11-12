@@ -531,14 +531,18 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
   // ── 7. Database & adaptateurs (Prompt 03) ─────────────────────────────────
   console.log('\n[7] Schéma, RLS et adaptateurs (Prompt 03)');
   const migrationsDir = path.join(ROOT, 'supabase/migrations');
-  const sqlFiles = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).sort();
+  // Seules les migrations numerotees 001..050 sont appliquees au projet
+  // Supabase. Les fichiers dates issus de la branche parallele restent
+  // historiques et ne sont pas comptes comme migrations livrees.
+  const sqlFiles = fs.readdirSync(migrationsDir)
+    .filter((f) => /^\d{3}_.*\.sql$/.test(f)).sort();
   const sql = sqlFiles.map((f) => read('supabase/migrations/' + f)).join('\n');
   const s002 = read('supabase/migrations/002_identity_rbac.sql');
   const s008 = read('supabase/migrations/008_saas.sql');
   const s009 = read('supabase/migrations/009_rls.sql');
   const s010 = read('supabase/migrations/010_functions_triggers.sql');
 
-  check('49 migrations SQL versionnées 001 → 050, correctif 048 non appliqué',
+  check('49 migrations numérotées 001 → 050, correctif 048 non appliqué',
     sqlFiles.length === 49 && sqlFiles[0].startsWith('001_') && sqlFiles[19].startsWith('020_') &&
     sqlFiles[20].startsWith('021_') && sqlFiles[21].startsWith('022_') && sqlFiles[22].startsWith('023_') &&
     sqlFiles[23].startsWith('024_') && sqlFiles[24].startsWith('025_') && sqlFiles[25].startsWith('026_') &&

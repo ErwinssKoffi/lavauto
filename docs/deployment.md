@@ -54,7 +54,7 @@ Le workflow de déploiement est séparé et protégé par les secrets ; aucun se
 ## 5. Sauvegardes et rollback
 
 - Avant toute migration de production : `pg_dump --schema-only` et `pg_dump --data-only` horodatés, conservés hors du dépôt.
-- Les migrations sont **additives** : aucune `DROP TABLE`, aucune réécriture de `001`–`044`.
+- Les migrations appliquées sont **additives** et numérotées `001`–`050` : aucune `DROP TABLE`, aucune réécriture de `001`–`044`. Les 3 fichiers SQL datés présents dans le dépôt après fusion de `main` sont historiques et ne doivent pas être rejoués sur ce projet.
 - Stratégie de retour arrière : restaurer le dump, puis rejouer les migrations jusqu’à la version cible depuis `supabase/migrations/`. Ne jamais réappliquer une migration déjà enregistrée dans `schema_migrations`.
 - Chaque phase dispose d’un test `BEGIN … ROLLBACK` : `p05` 17/17, `p06` 32/32, `p07` 22/22, `p08` 35/35, `p09` 30/30, `p10` 30/30. Le test P10 couvre en plus la RLS restrictive Storage avec un objet réel et 0 ligne visible par `anon`. Aucun test ne laisse de fixture.
 - `docs/database.md` et `CHANGELOG.md` conservent les compteurs attendus après chaque phase.
