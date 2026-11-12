@@ -397,3 +397,49 @@ export function certifyCostsLocal(state: AppState, p: CostCertificationPayload):
     new Date(`${start}T00:00:00`), new Date(`${end}T23:59:59`));
   return withStockDefaults(next);
 }
+
+export function updateProductThresholdLocal(
+  state: AppState, productId: string, reorderLevel: number
+): AppState {
+  const s = withStockDefaults(state);
+  const nextProducts = s.products.map((p) =>
+    p.id === productId ? { ...p, reorderLevel: Math.max(0, Math.round(reorderLevel)) } : p
+  );
+  return withStockDefaults({ ...s, products: nextProducts });
+}
+
+export function adjustProductStockQtyLocal(
+  state: AppState, productId: string, qtyOnHand: number
+): AppState {
+  const s = withStockDefaults(state);
+  const level = s.stockLevels.find((l) => l.productId === productId);
+  const current = level?.qtyOnHand ?? 0;
+  const target = Math.max(0, Math.round(qtyOnHand));
+  const diff = target - current;
+  if (diff === 0) return s;
+
+  const movement: StockMovement = {
+    id: localId('mvt'),
+    stationId: level?.stationId ?? s.station?.id ?? '',
+    productId,
+    kind: diff > 0 ? 'inventory_adjustment' : 'consumption',
+    qtyDelta: diff,
+    unitCostMinor: level?.averageCostMinor ?? 0,
+    referenceType: 'quick_adjustment',
+    referenceId: null,
+    idempotencyKey: localId('adj'),
+    note: diff > 0 ? `Réapprovisionnement (+${diff})` : `Consommation / Ajustement (${diff})`,
+    createdAt: nowISO(),
+  };
+
+  const nextLevels = s.stockLevels.map((l) =>
+    l.productId === productId ? { ...l, qtyOnHand: target, valueMinor: target * l.averageCostMinor } : l
+  );
+
+  return withStockDefaults({
+    ...s,
+    stockLevels: nextLevels,
+    stockMovements: [movement, ...s.stockMovements],
+  });
+}
+

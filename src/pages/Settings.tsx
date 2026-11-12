@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FiDatabase, FiLock, FiSave, FiShield, FiTrash2 } from 'react-icons/fi';
+import { Link, useNavigate } from 'react-router-dom';
+import {
+  FiAlertTriangle, FiBox, FiCheck, FiDatabase, FiLock,
+  FiMinus, FiPlus, FiSave, FiShield, FiTrash2,
+} from 'react-icons/fi';
 import { useStore, DEFAULT_DAYS } from '../lib/store';
 import { isSupabaseConfigured as sbConfigured } from '../lib/supabase';
 import { formatDateTime } from '../lib/format';
@@ -8,7 +11,10 @@ import { Alert, Badge, Card, Input, PageHeader, SectionTitle } from '../componen
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
 export default function Settings() {
-  const { state, updateStation, updateCompany, setHours, resetAll, notify, authKind } = useStore();
+  const {
+    state, updateStation, updateCompany, setHours, resetAll, notify, authKind,
+    updateStockThreshold, adjustProductStock,
+  } = useStore();
   const navigate = useNavigate();
   const st = state.station;
   const co = state.company;
@@ -86,6 +92,96 @@ export default function Settings() {
                 </div>
               ))}
             </div>
+          </div>
+        </Card>
+
+        {/* ── Section dédiée : Seuils d'alerte stock & Consommables ──── */}
+        <Card id="stock" className="lg:col-span-2 border-amber-500/30">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <FiBox className="text-amber-400" size={18} />
+                <h3 className="text-sm font-bold text-white">Seuils d’alerte stock & Consommables critiques</h3>
+                {state.stockAlerts.length > 0 ? (
+                  <Badge tone="warn">{state.stockAlerts.length} produit(s) sous le seuil critique</Badge>
+                ) : (
+                  <Badge tone="success">Tous les stocks sont au-dessus des seuils</Badge>
+                )}
+              </div>
+              <p className="wg-muted mt-1 text-xs">
+                Définissez le seuil d’alerte critique pour chaque produit (shampoing, cire, dégraissant). Une alerte en temps réel est déclenchée dès que le stock descend à ou sous ce seuil.
+              </p>
+            </div>
+            <Link to="/app/stock" className="wg-link text-xs">Ouvrir le module Stocks complet →</Link>
+          </div>
+
+          <div className="mt-4 divide-y" style={{ borderColor: 'var(--wg-border)' }}>
+            {state.products.length === 0 ? (
+              <p className="wg-muted py-4 text-xs">Aucun produit configuré.</p>
+            ) : (
+              state.products.map((p) => {
+                const level = state.stockLevels.find((l) => l.productId === p.id);
+                const qty = level?.qtyOnHand ?? 0;
+                const isRupture = qty === 0;
+                const isAlert = qty <= p.reorderLevel;
+
+                return (
+                  <div key={p.id} className="py-3 flex flex-wrap items-center justify-between gap-4 text-xs">
+                    <div className="min-w-[200px]">
+                      <div className="flex items-center gap-2">
+                        <p className="font-bold text-white">{p.name}</p>
+                        <span className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">{p.sku}</span>
+                      </div>
+                      <p className="wg-muted text-[11px]">{p.category || 'Consommable'} · Unité : {p.unit}</p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-4">
+                      <div className="text-right">
+                        <p className="text-[10px] text-slate-400 uppercase font-semibold">Stock actuel</p>
+                        <p className={`font-bold ${isRupture ? 'text-red-400' : isAlert ? 'text-amber-400' : 'text-emerald-400'}`}>
+                          {qty} {p.unit}
+                        </p>
+                      </div>
+
+                      <div className="w-32">
+                        <label className="text-[10px] text-slate-400 block mb-0.5 font-semibold">Seuil critique ({p.unit})</label>
+                        <input
+                          type="number"
+                          min="0"
+                          className="wg-input !py-1 !text-xs font-bold"
+                          defaultValue={p.reorderLevel}
+                          onBlur={(e) => updateStockThreshold(p.id, Number(e.target.value))}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              updateStockThreshold(p.id, Number((e.target as HTMLInputElement).value));
+                            }
+                          }}
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => adjustProductStock(p.id, Math.max(0, qty - 1))}
+                          className="rounded bg-rose-500/10 px-2 py-1 text-[11px] font-bold text-rose-300 hover:bg-rose-500/20"
+                          title="Simuler une consommation (-1) pour tester l’alerte temps réel"
+                        >
+                          <FiMinus size={10} className="inline mr-0.5" /> 1 {p.unit}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => adjustProductStock(p.id, qty + 5)}
+                          className="rounded bg-sky-500/10 px-2 py-1 text-[11px] font-bold text-sky-300 hover:bg-sky-500/20"
+                          title="Réapprovisionner (+5 unités)"
+                        >
+                          <FiPlus size={10} className="inline mr-0.5" /> 5 {p.unit}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </Card>
       </div>

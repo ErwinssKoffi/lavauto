@@ -214,5 +214,59 @@ export function theoreticalCash(state: AppState, sessionId: string): number {
   return base + cashPayments - cashExpenses;
 }
 
+export interface DayChartPoint {
+  date: string;
+  label: string;
+  fullDate: string;
+  revenue: number;
+  collected: number;
+  washesCount: number;
+}
+
+export function getLast7DaysChartData(state: AppState, now = new Date()): DayChartPoint[] {
+  const points: DayChartPoint[] = [];
+  const currentStationId = state.station?.id;
+  const washes = state.washes.filter(
+    (w) => w.status !== 'cancelled' && (!currentStationId || w.stationId === currentStationId)
+  );
+
+  const daysShort = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+  const monthsShort = ['janv', 'févr', 'mars', 'avr', 'mai', 'juin', 'juil', 'août', 'sept', 'oct', 'nov', 'déc'];
+
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    d.setHours(0, 0, 0, 0);
+
+    const nextD = new Date(d);
+    nextD.setDate(nextD.getDate() + 1);
+
+    const dayWashes = washes.filter((w) => {
+      const t = new Date(w.createdAt).getTime();
+      return t >= d.getTime() && t < nextD.getTime();
+    });
+
+    const revenue = dayWashes.reduce((sum, w) => sum + w.total, 0);
+    const collected = dayWashes
+      .flatMap((w) => w.payments ?? [])
+      .reduce((sum, p) => sum + p.amount, 0);
+
+    const dateStr = d.toISOString().slice(0, 10);
+    const label = i === 0 ? 'Aujourd’hui' : `${daysShort[d.getDay()]} ${d.getDate()}`;
+    const fullDate = `${d.getDate()} ${monthsShort[d.getMonth()]}`;
+
+    points.push({
+      date: dateStr,
+      label,
+      fullDate,
+      revenue,
+      collected,
+      washesCount: dayWashes.length,
+    });
+  }
+
+  return points;
+}
+
 /** Exposé pour les tests : le snapshot local respecte le contrat P06. */
 export type { FinanceSnapshot };

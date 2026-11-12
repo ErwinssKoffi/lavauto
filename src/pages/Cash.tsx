@@ -194,15 +194,68 @@ export default function Cash() {
       </Modal>
 
       <Modal open={closeMode} onClose={() => setCloseMode(false)} title="Clôturer la caisse avec comptage">
-        <p className="wg-muted mb-4 text-sm">Comptez les espèces présentes, puis saisissez le montant. Le relevé théorique / compté / écart est conservé sans jamais être réécrit.</p>
-        <div className="mb-4 grid gap-3 sm:grid-cols-2">
-          <Card className="!p-3"><p className="wg-muted text-[11px]">Théorique</p><p className="mt-1 font-bold">{formatFCFA(theoretical)}</p></Card>
-          <Card className="!p-3"><p className="wg-muted text-[11px]">Écart au comptage</p><p className={`mt-1 font-bold ${counted - theoretical === 0 ? 'text-emerald-400' : 'text-amber-400'}`}>{counted - theoretical > 0 ? '+' : ''}{formatFCFA(counted - theoretical)}</p></Card>
-        </div>
-        <Input label="Montant compté (FCFA) *" type="number" min="0" value={counted} onChange={(e) => setCounted(Number(e.target.value))} />
+        <p className="wg-muted mb-4 text-sm leading-relaxed">
+          Comptez physiquement les espèces en caisse et saisissez le montant. L’écart avec le théorique est calculé en temps réel et scellé de manière immuable.
+        </p>
+
+        {open && (
+          <div className="mb-4 grid gap-3 sm:grid-cols-3">
+            <Card className="!p-3">
+              <p className="wg-muted text-[11px]">Fond de départ</p>
+              <p className="mt-1 font-semibold">{formatFCFA(open.openingFloat)}</p>
+            </Card>
+            <Card className="!p-3">
+              <p className="wg-muted text-[11px]">Théorique attendu</p>
+              <p className="mt-1 font-bold text-sky-400">{formatFCFA(theoretical)}</p>
+            </Card>
+            <Card className="!p-3">
+              <p className="wg-muted text-[11px]">Écart au comptage</p>
+              <p className={`mt-1 font-bold ${counted - theoretical === 0 ? 'text-emerald-400' : counted - theoretical > 0 ? 'text-sky-400' : 'text-red-400'}`}>
+                {counted - theoretical > 0 ? '+' : ''}{formatFCFA(counted - theoretical)}
+              </p>
+            </Card>
+          </div>
+        )}
+
+        {counted - theoretical !== 0 && (
+          <div
+            className="mb-4 rounded-xl border p-3 text-xs leading-relaxed"
+            style={{
+              background: counted - theoretical > 0 ? 'rgba(56, 189, 248, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+              borderColor: counted - theoretical > 0 ? 'rgba(56, 189, 248, 0.3)' : 'rgba(239, 68, 68, 0.3)',
+            }}
+          >
+            <p className="font-bold mb-1" style={{ color: counted - theoretical > 0 ? '#38bdf8' : '#f87171' }}>
+              {counted - theoretical > 0 ? 'Excédent de caisse détecté' : 'Déficit de caisse constaté'}
+            </p>
+            <p className="wg-muted">
+              {counted - theoretical > 0
+                ? `Le comptage physique dépasse le solde théorique de ${formatFCFA(counted - theoretical)}. L'écart sera conservé dans le relevé immuable.`
+                : `Il manque ${formatFCFA(Math.abs(counted - theoretical))} par rapport aux flux enregistrés. Cet écart sera scellé dans le journal d'audit.`}
+            </p>
+          </div>
+        )}
+
+        <Input
+          label="Montant physique compté (FCFA) *"
+          type="number"
+          min="0"
+          value={counted}
+          onChange={(e) => setCounted(Number(e.target.value))}
+          hint="Saisissez la valeur exacte des billets et pièces comptés."
+        />
+
         <div className="mt-5 flex justify-end gap-2">
           <button className="wg-btn wg-btn-ghost" onClick={() => setCloseMode(false)}>Annuler</button>
-          <button className="wg-btn wg-btn-primary" onClick={() => safe(async () => { await closeCash(counted); setCloseMode(false); })}><FiLock /> Clôturer</button>
+          <button
+            className="wg-btn wg-btn-primary"
+            onClick={() => safe(async () => {
+              await closeCash(counted);
+              setCloseMode(false);
+            })}
+          >
+            <FiLock /> Sceller et clôturer
+          </button>
         </div>
       </Modal>
 

@@ -212,17 +212,104 @@ export function stockValuationFrom(state: Partial<AppState>): StockValuation {
   };
 }
 
+export const DEFAULT_CARWASH_PRODUCTS: Omit<Product, 'id' | 'stationId'>[] = [
+  {
+    categoryId: null,
+    sku: 'SAV-MOUSS-01',
+    name: 'Shampoing carrosserie moussant',
+    category: 'Lavage carrosserie',
+    unit: 'Litre',
+    reorderLevel: 10,
+    averageCostMinor: 1500,
+    active: true,
+  },
+  {
+    categoryId: null,
+    sku: 'CIR-LUST-02',
+    name: 'Cire lustrante déperlante',
+    category: 'Finition & Lustrage',
+    unit: 'Litre',
+    reorderLevel: 5,
+    averageCostMinor: 4500,
+    active: true,
+  },
+  {
+    categoryId: null,
+    sku: 'DEG-JANT-03',
+    name: 'Dégraissant jantes & bas de caisse',
+    category: 'Dégraissage',
+    unit: 'Litre',
+    reorderLevel: 8,
+    averageCostMinor: 2200,
+    active: true,
+  },
+  {
+    categoryId: null,
+    sku: 'MIC-SECH-04',
+    name: 'Microfibres de séchage 40x40',
+    category: 'Accessoires',
+    unit: 'Pièce',
+    reorderLevel: 15,
+    averageCostMinor: 800,
+    active: true,
+  },
+  {
+    categoryId: null,
+    sku: 'VIT-ECLA-05',
+    name: 'Nettoyant vitres anti-reflets',
+    category: 'Finition',
+    unit: 'Litre',
+    reorderLevel: 6,
+    averageCostMinor: 1200,
+    active: true,
+  },
+];
+
+const INITIAL_STOCK_QTYS: Record<string, number> = {
+  'SAV-MOUSS-01': 4, // 4L <= 10L -> SEUIL CRITIQUE
+  'CIR-LUST-02': 1,  // 1L <= 5L  -> SEUIL CRITIQUE
+  'DEG-JANT-03': 0,  // 0L <= 8L  -> RUPTURE
+  'MIC-SECH-04': 24, // 24 >= 15 -> NORMAL
+  'VIT-ECLA-05': 14, // 14 >= 6  -> NORMAL
+};
+
 /** Normalise un état local ou serveur : aucune collection n'est undefined. */
 export function withStockDefaults(state: AppState): AppState {
   const collections = emptyStockCollections();
+  let products = state.products ?? collections.products;
+  let stockLevels = state.stockLevels ?? collections.stockLevels;
+
+  // Initialisation automatique des consommables de lavage si la station existe et n'a aucun produit
+  if (state.station && products.length === 0) {
+    const stationId = state.station.id;
+    products = DEFAULT_CARWASH_PRODUCTS.map((def, idx) => ({
+      ...def,
+      id: `prod-init-${idx + 1}-${stationId.slice(-4)}`,
+      stationId,
+    }));
+    stockLevels = products.map((p) => {
+      const initialQty = INITIAL_STOCK_QTYS[p.sku] ?? 0;
+      return {
+        productId: p.id,
+        stationId: p.stationId,
+        name: p.name,
+        unit: p.unit,
+        reorderLevel: p.reorderLevel,
+        qtyOnHand: initialQty,
+        averageCostMinor: p.averageCostMinor,
+        valueMinor: initialQty * p.averageCostMinor,
+      };
+    });
+  }
+
   const next: AppState = {
     ...state,
     productCategories: state.productCategories ?? collections.productCategories,
     suppliers: state.suppliers ?? collections.suppliers,
-    products: state.products ?? collections.products,
+    products,
     purchaseOrders: state.purchaseOrders ?? collections.purchaseOrders,
     purchaseOrderItems: state.purchaseOrderItems ?? collections.purchaseOrderItems,
-    stockLevels: state.stockLevels ?? collections.stockLevels,
+    stockLevels,
     stockMovements: state.stockMovements ?? collections.stockMovements,
     inventorySessions: state.inventorySessions ?? collections.inventorySessions,
     inventoryItems: state.inventoryItems ?? collections.inventoryItems,

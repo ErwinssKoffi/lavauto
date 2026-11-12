@@ -41,7 +41,7 @@ export default function Washes() {
   const stationId = state.station?.id ?? '';
   const posts = state.washPosts.filter((p) => p.active && (!stationId || !p.stationId || p.stationId === stationId));
   const methods: PayMethod[] = state.station?.paymentMethods.length
-    ? state.station.paymentMethods : ['especes', 'mobile_money', 'carte', 'virement'];
+    ? state.station.paymentMethods : ['especes', 'wave', 'orange_money', 'mtn_momo', 'carte', 'virement'];
 
   const washes = useMemo(() => state.washes.filter((w) => {
     const q = search.trim().toLowerCase();

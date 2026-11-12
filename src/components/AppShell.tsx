@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   FiChevronDown, FiChevronLeft, FiChevronRight, FiHelpCircle, FiLogOut,
   FiMenu, FiMoon, FiSearch, FiShield, FiSliders, FiSun, FiX, FiActivity,
+  FiBell,
 } from 'react-icons/fi';
 import { useStore } from '../lib/store';
 import { Badge, Card, Logo } from './ui';
@@ -11,6 +12,7 @@ import { CommandPalette } from './CommandPalette';
 import { findEntry, groupsForRole } from './navigation';
 import { ROLE_LABELS, type Role } from '../types';
 import { usePermissions } from '../lib/usePermissions';
+import StockAlertBanner from './StockAlertBanner';
 
 const SIDEBAR_KEY = 'washguard.sidebar.collapsed';
 
@@ -18,6 +20,7 @@ export default function AppShell() {
   const { state, theme, toggleTheme, signOut, missing } = useStore();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [alertsOpen, setAlertsOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [closedGroups, setClosedGroups] = useState<string[]>([]);
   const [collapsed, setCollapsed] = useState(() => {
@@ -200,6 +203,71 @@ export default function AppShell() {
               {theme === 'dark' ? <FiSun size={16} /> : <FiMoon size={16} />}
             </button>
             <a href="/#faq" className="wg-btn wg-btn-ghost !px-2.5" title="Questions fréquentes" aria-label="Questions fréquentes"><FiHelpCircle size={16} /></a>
+
+            {/* Cloche d'alertes stock en temps réel */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setAlertsOpen((v) => !v)}
+                className={`wg-btn wg-btn-ghost relative !px-2.5 ${state.stockAlerts.length > 0 ? '!text-amber-400' : ''}`}
+                aria-label="Alertes stock"
+                title={state.stockAlerts.length > 0 ? `${state.stockAlerts.length} produit(s) sous le seuil critique` : 'Stock normal'}
+              >
+                <FiBell size={16} />
+                {state.stockAlerts.length > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-black text-white animate-pulse">
+                    {state.stockAlerts.length}
+                  </span>
+                )}
+              </button>
+              {alertsOpen && (
+                <div className="wg-card wg-elev-2 absolute right-0 top-12 z-50 w-72 sm:w-80 p-3">
+                  <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: 'var(--wg-border)' }}>
+                    <div className="flex items-center gap-1.5 font-bold text-xs text-white">
+                      <FiBell className="text-amber-400" />
+                      <span>Alertes Stock en direct</span>
+                    </div>
+                    <Badge tone={state.stockAlerts.length > 0 ? 'warn' : 'success'}>
+                      {state.stockAlerts.length > 0 ? `${state.stockAlerts.length} critique(s)` : 'Normal'}
+                    </Badge>
+                  </div>
+                  <div className="my-2 max-h-60 overflow-y-auto space-y-2 text-xs">
+                    {state.stockAlerts.length === 0 ? (
+                      <p className="wg-muted py-3 text-center text-xs">Tous les produits sont au-dessus de leur seuil d'alerte.</p>
+                    ) : (
+                      state.stockAlerts.map((a) => (
+                        <div key={a.productId} className="rounded-lg p-2" style={{ background: 'var(--wg-surface-2)' }}>
+                          <div className="flex items-center justify-between font-bold">
+                            <span className="truncate">{a.name}</span>
+                            <span className={a.severity === 'rupture' ? 'text-red-400' : 'text-amber-400'}>
+                              {a.severity === 'rupture' ? 'RUPTURE' : `${a.qtyOnHand} restant(s)`}
+                            </span>
+                          </div>
+                          <p className="wg-muted mt-0.5 text-[11px]">Seuil critique : {a.reorderLevel}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <div className="border-t pt-2 flex justify-between text-xs" style={{ borderColor: 'var(--wg-border)' }}>
+                    <button
+                      type="button"
+                      className="wg-link text-[11px]"
+                      onClick={() => { setAlertsOpen(false); navigate('/app/parametres#stock'); }}
+                    >
+                      Ajuster les seuils
+                    </button>
+                    <button
+                      type="button"
+                      className="wg-link font-bold text-[11px]"
+                      onClick={() => { setAlertsOpen(false); navigate('/app/stock'); }}
+                    >
+                      Gérer le stock →
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="relative">
               <button type="button" onClick={() => setMenuOpen((value) => !value)} className="flex items-center gap-2 rounded-xl px-2 py-1.5 hover:bg-sky-500/10" aria-expanded={menuOpen} aria-label="Menu du compte">
                 <span className="grid h-8 w-8 place-items-center rounded-lg text-xs font-bold text-white wg-gradient">
@@ -228,6 +296,7 @@ export default function AppShell() {
         </header>
 
         <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
+          <StockAlertBanner />
           {!state.station?.activated && role !== 'super_admin' && location.pathname !== '/app/mise-en-route' && (
             <div className="wg-card mb-5 flex flex-wrap items-center justify-between gap-3 !border-amber-500/30 px-4 py-3">
               <div className="flex items-center gap-2 text-xs">

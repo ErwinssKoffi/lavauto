@@ -48,18 +48,31 @@ export const WASH_STATUS_FLOW: Record<WashStatus, WashStatus[]> = {
   cancelled: [],
 };
 
-export type PayMethod = 'especes' | 'mobile_money' | 'carte' | 'virement';
+export type PayMethod =
+  | 'especes'
+  | 'wave'
+  | 'orange_money'
+  | 'mtn_momo'
+  | 'mobile_money'
+  | 'carte'
+  | 'virement';
 
 export const PAY_METHOD_LABELS: Record<PayMethod, string> = {
   especes: 'Espèces',
+  wave: 'Wave CI',
+  orange_money: 'Orange Money',
+  mtn_momo: 'MTN MoMo',
   mobile_money: 'Mobile Money',
-  carte: 'Carte',
-  virement: 'Virement',
+  carte: 'Carte bancaire',
+  virement: 'Virement bancaire',
 };
 
 /** Clé serveur `payment_methods.key` ↔ moyen de paiement de l'interface. */
 export const PAY_METHOD_DB_KEY: Record<PayMethod, string> = {
   especes: 'cash',
+  wave: 'wave',
+  orange_money: 'orange_money',
+  mtn_momo: 'mtn_momo',
   mobile_money: 'mobile_money',
   carte: 'card',
   virement: 'transfer',
@@ -68,6 +81,9 @@ export const PAY_METHOD_DB_KEY: Record<PayMethod, string> = {
 /** Clé serveur `payment_methods.key` → moyen de paiement de l'interface. */
 export const PAY_METHOD_FROM_DB_KEY: Record<string, PayMethod> = {
   cash: 'especes',
+  wave: 'wave',
+  orange_money: 'orange_money',
+  mtn_momo: 'mtn_momo',
   mobile_money: 'mobile_money',
   card: 'carte',
   transfer: 'virement',

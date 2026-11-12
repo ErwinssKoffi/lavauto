@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from 'recharts';
 import {
-  FiActivity, FiAlertTriangle, FiArrowRight, FiCreditCard, FiDollarSign,
+  FiActivity, FiAlertTriangle, FiArrowRight, FiBox, FiCreditCard, FiDollarSign,
   FiDroplet, FiTrendingUp, FiTruck,
 } from 'react-icons/fi';
 import { useStore } from '../lib/store';
@@ -11,6 +11,7 @@ import { formatDate, formatFCFA } from '../lib/format';
 import { Alert, Badge, Card, EmptyState, LockedPanel, PageHeader, Progress, StatCard } from '../components/ui';
 import { WASH_STATUS_LABELS, PAY_METHOD_LABELS } from '../types';
 import { washStatusTone, finishedWashes } from '../lib/washLifecycle';
+import Revenue7DaysLineChart from '../components/Revenue7DaysLineChart';
 
 export default function Dashboard() {
   const { state, analyticsBoard } = useStore();
@@ -27,6 +28,12 @@ export default function Dashboard() {
   if (unpaid.length > 0) alerts.push({ tone: 'accent', text: `${unpaid.length} fiche(s) avec un reste à payer.` });
   if (state.expenses.some((e) => e.status === 'annulee')) alerts.push({ tone: 'accent', text: 'Des dépenses annulées sont conservées dans le journal.' });
   if (state.subscription?.pendingPlanId) alerts.push({ tone: 'accent', text: 'Une demande de changement de formule est en attente.' });
+  if (state.stockAlerts.length > 0) {
+    alerts.push({
+      tone: 'danger',
+      text: `Stock critique : ${state.stockAlerts.length} consommable(s) sous le seuil (${state.stockAlerts.map((a) => `${a.name} : ${a.qtyOnHand}`).slice(0, 2).join(', ')}).`,
+    });
+  }
 
   return (
     <div>
@@ -46,6 +53,10 @@ export default function Dashboard() {
         <StatCard label="Lavages du jour" value={String(day.washes.length)} hint={`${finishedWashes(day.washes).length} terminé(s)`} icon={<FiDroplet />} accent="bg-emerald-500/10 text-emerald-400" />
         <StatCard label="Encaissements du jour" value={formatFCFA(day.collected)} hint={`${day.byMethod.reduce((n, m) => n + m.count, 0)} paiement(s)`} icon={<FiCreditCard />} accent="bg-sky-500/10 text-sky-400" />
         <StatCard label="Dépenses du jour" value={formatFCFA(day.expenses)} hint={`Solde partiel : ${formatFCFA(day.partialBalance)} · PAS un bénéfice`} icon={<FiCreditCard />} accent="bg-amber-500/10 text-amber-400" />
+      </div>
+
+      <div className="mt-5">
+        <Revenue7DaysLineChart />
       </div>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-3">
@@ -103,6 +114,40 @@ export default function Dashboard() {
             <p className="wg-muted text-xs">sur {target > 0 ? formatFCFA(target) : 'aucun objectif fixé'}</p>
             <div className="mt-3"><Progress value={month.revenue} max={target || 1} tone={target && month.revenue >= target ? 'success' : 'accent'} /></div>
             {target === 0 && <p className="wg-muted mt-2 text-[11px]">Fixez un objectif dans Paramètres ou pendant la mise en route.</p>}
+          </Card>
+
+          <Card>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-bold flex items-center gap-1.5">
+                <FiBox className="text-amber-400" /> Consommables & Alertes
+              </h2>
+              <Badge tone={state.stockAlerts.length > 0 ? 'warn' : 'success'}>
+                {state.stockAlerts.length > 0 ? `${state.stockAlerts.length} alerte(s)` : 'Normal'}
+              </Badge>
+            </div>
+            {state.stockAlerts.length === 0 ? (
+              <p className="wg-muted text-xs">Tous les consommables sont au-dessus de leur seuil critique.</p>
+            ) : (
+              <div className="space-y-2 text-xs">
+                {state.stockAlerts.slice(0, 3).map((a) => (
+                  <div key={a.productId} className="rounded-lg p-2" style={{ background: 'var(--wg-surface-2)' }}>
+                    <div className="flex justify-between font-bold">
+                      <span className="truncate">{a.name}</span>
+                      <span className={a.severity === 'rupture' ? 'text-red-400' : 'text-amber-400'}>
+                        {a.severity === 'rupture' ? 'Rupture (0)' : `${a.qtyOnHand} restant(s)`}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex justify-between text-[11px] text-slate-400">
+                      <span>Seuil critique défini : {a.reorderLevel}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="mt-3 flex justify-between text-xs pt-1 border-t" style={{ borderColor: 'var(--wg-border)' }}>
+              <Link to="/app/parametres#stock" className="wg-link text-[11px]">Seuils d’alerte</Link>
+              <Link to="/app/stock" className="wg-link font-bold text-[11px]">Gérer les stocks →</Link>
+            </div>
           </Card>
         </div>
       </div>

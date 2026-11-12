@@ -17,7 +17,7 @@ export default function Expenses() {
   const newExpenseKey = () => `expense-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   const [idempotencyKey, setIdempotencyKey] = useState(newExpenseKey);
   const activated = Boolean(state.station?.activated);
-  const methods: PayMethod[] = state.station?.paymentMethods.length ? state.station.paymentMethods : ['especes', 'mobile_money', 'carte', 'virement'];
+  const methods: PayMethod[] = state.station?.paymentMethods.length ? state.station.paymentMethods : ['especes', 'wave', 'orange_money', 'mtn_momo', 'carte', 'virement'];
   const active = state.expenses.filter((e) => e.status === 'enregistree');
 
   return (

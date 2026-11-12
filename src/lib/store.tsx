@@ -27,6 +27,7 @@ import {
   createPurchaseOrderLocal, linkExpenseToOrderLocal, receivePurchaseLinesLocal,
   recordInventoryCountLocal, saveProductLocal, saveServiceConsumptionLocal,
   saveSupplierLocal, startInventoryLocal,
+  updateProductThresholdLocal, adjustProductStockQtyLocal,
 } from './stockState';
 import {
   crmBoardFromState, emptyCrmCollections, withCrmDefaults,
@@ -372,6 +373,8 @@ interface Ctx {
   consumeWash: (washId: string) => void | Promise<void>;
   linkExpenseToOrder: (expenseId: string, orderId: string) => void | Promise<void>;
   certifyCosts: (p: CostCertificationPayload) => void | Promise<void>;
+  updateStockThreshold: (productId: string, reorderLevel: number) => void;
+  adjustProductStock: (productId: string, qtyOnHand: number) => void;
   // Prompt 08 : CRM, fidélité, forfaits, promotions, flottes, file d'attente.
   refreshCrm: () => Promise<void>;
   saveCustomerProfile: (p: CustomerProfilePayload) => string | Promise<string>;
@@ -1635,6 +1638,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     notify('success', 'Coûts certifiés : résultat net publié.');
   }, [assertActivated, serverStock, stockRpc, notify]);
 
+  const updateStockThreshold = useCallback((productId: string, reorderLevel: number) => {
+    setState((cur) => updateProductThresholdLocal(cur, productId, reorderLevel));
+    notify('success', 'Seuil critique mis à jour.');
+  }, [notify]);
+
+  const adjustProductStock = useCallback((productId: string, qtyOnHand: number) => {
+    setState((cur) => adjustProductStockQtyLocal(cur, productId, qtyOnHand));
+    notify('info', 'Niveau de stock ajusté.');
+  }, [notify]);
+
   // ── P09 : formules, limites, abonnements, suspension ─────────────────────
   const savePlan = useCallback(async (p: PlanPayload): Promise<string> => {
     if (serverAnalytics) return analyticsRpc((c) => c.savePlan(p));
@@ -1781,6 +1794,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     refreshStock, saveSupplier, saveProduct, createPurchaseOrder, receivePurchaseLines,
     startInventory, recordInventoryCount, closeInventory, saveServiceConsumption,
     consumeWash, linkExpenseToOrder, certifyCosts,
+    updateStockThreshold, adjustProductStock,
     refreshCrm, saveCustomerProfile, saveCustomerVehicle, createLoyaltyProgram,
     enrollLoyaltyCustomer, recordLoyaltyTransaction, accrueLoyaltyForWash,
     savePackagePlan, sellPackageToCustomer, consumePackageForWash,
