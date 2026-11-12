@@ -62,12 +62,13 @@ export function buildReport(state: AppState, period: Period): Report {
   const { start, end } = periodRange(period);
   const washes = activeWashes(state).filter((w) => inRange(w.createdAt, start, end));
   const profitability = buildProfitability(state, start, end);
-  const cancelledIds = new Set(
-    (state.paymentCancellations ?? []).map((c) => c.paymentId)
-  );
-  const payments = washes.flatMap((w) => w.payments ?? []).filter(
-    (p) => inRange(p.at, start, end) && !cancelledIds.has(p.id) && !p.cancelledAt
-  );
+  // Les paiements d’une fiche antérieure appartiennent à la période de leur
+  // encaissement ; l’annulation est un flux négatif à sa propre date.
+  const stationId = state.station?.id;
+  const allPayments = state.washes.filter((w) => !stationId || w.stationId === stationId)
+    .flatMap((w) => w.payments ?? []);
+  const payments = allPayments.filter((p) => inRange(p.at, start, end));
+  const cancellationByPayment = new Map((state.paymentCancellations ?? []).map((c) => [c.paymentId, c]));
 
   const serviceMap = new Map<string, { name: string; count: number; revenue: number }>();
   washes.forEach((w) =>
@@ -95,6 +96,14 @@ export function buildReport(state: AppState, period: Period): Report {
     const cur = methodMap.get(p.method) ?? { method: p.method, amount: 0, count: 0 };
     cur.amount += p.amount;
     cur.count += 1;
+    methodMap.set(p.method, cur);
+  });
+  allPayments.forEach((p) => {
+    const cancellation = cancellationByPayment.get(p.id);
+    const cancelledAt = cancellation?.at ?? p.cancelledAt;
+    if (!cancelledAt || !inRange(cancelledAt, start, end)) return;
+    const cur = methodMap.get(p.method) ?? { method: p.method, amount: 0, count: 0 };
+    cur.amount -= cancellation?.amount ?? p.amount;
     methodMap.set(p.method, cur);
   });
   const byMethod = [...methodMap.values()].sort((a, b) => b.amount - a.amount);
@@ -219,7 +228,7 @@ export interface DayChartPoint {
   label: string;
   fullDate: string;
   revenue: number;
-  collected: number;
+  collected: number | null;
   washesCount: number;
 }
 
@@ -247,11 +256,21 @@ export function getLast7DaysChartData(state: AppState, now = new Date()): DayCha
     });
 
     const revenue = dayWashes.reduce((sum, w) => sum + w.total, 0);
-    const collected = dayWashes
-      .flatMap((w) => w.payments ?? [])
-      .reduce((sum, p) => sum + p.amount, 0);
+    const payments = state.washes.filter((w) => !currentStationId || w.stationId === currentStationId)
+      .flatMap((w) => w.payments ?? []);
+    const cancellations = new Map((state.paymentCancellations ?? []).map((c) => [c.paymentId, c]));
+    const inDay = (value: string): boolean => {
+      const time = new Date(value).getTime();
+      return time >= d.getTime() && time < nextD.getTime();
+    };
+    const collected = payments.reduce((sum, p) => {
+      const cancellation = cancellations.get(p.id);
+      const cancelledAt = cancellation?.at ?? p.cancelledAt;
+      return sum + (inDay(p.at) ? p.amount : 0)
+        - (cancelledAt && inDay(cancelledAt) ? cancellation?.amount ?? p.amount : 0);
+    }, 0);
 
-    const dateStr = d.toISOString().slice(0, 10);
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const label = i === 0 ? 'Aujourd’hui' : `${daysShort[d.getDay()]} ${d.getDate()}`;
     const fullDate = `${d.getDate()} ${monthsShort[d.getMonth()]}`;
 

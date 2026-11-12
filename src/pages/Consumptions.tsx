@@ -1,3 +1,4 @@
+import { readNumber } from '../lib/validation';
 import React, { useState } from 'react';
 import { FiAlertTriangle, FiLayers, FiPlus, FiRefreshCw, FiX } from 'react-icons/fi';
 import { useStore } from '../lib/store';
@@ -113,7 +114,7 @@ export default function Consumptions() {
           <Select label="Produit *" value={f.productId} onChange={(e) => setF({ ...f, productId: e.target.value })}>
             <option value="">Choisir un produit</option>{state.products.filter((p) => p.active).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </Select>
-          <Input label="Quantité par lavage *" type="number" min="0.01" step="0.01" value={f.qtyPerWash} onChange={(e) => setF({ ...f, qtyPerWash: Number(e.target.value) })} />
+          <Input label="Quantité par lavage *" type="number" min="0.01" step="0.01" value={f.qtyPerWash} onChange={(e) => setF({ ...f, qtyPerWash: readNumber(e.target.value) })} />
           <Select label="État" value={f.active ? 'active' : 'inactive'} onChange={(e) => setF({ ...f, active: e.target.value === 'active' })}>
             <option value="active">Active</option><option value="inactive">Inactive</option>
           </Select>

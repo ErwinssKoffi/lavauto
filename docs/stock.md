@@ -44,6 +44,12 @@ Après contrôle, un relevé `finance_cost_periods` immuable fige CA, consommati
 - Pages : `/app/stock` (produits, fournisseurs, commandes, réceptions, inventaires, mouvements, rattachements, attestations) et `/app/consommations` (normes, fiches à consommer, exécutions valorisées, sorties). `Rapports` affiche l'état certifié et propose l'attestation.
 - Navigation : les deux entrées `step 07` sont devenues de vrais liens, filtrés par `inventory.view` / `inventory.consume`.
 
+### Simulations et seuils dans Paramètres
+
+Les raccourcis `−1` et `+5` de Paramètres et du bandeau sont des simulations locales, pas des réceptions ni des consommations serveur. Ils ne sont affichés et acceptés que si la source **et** l’Auth sont locales, indépendamment du drapeau d’interface `demoMode`. Les exemples de produits sont créés uniquement dans cette configuration ; un board serveur vide reste vide.
+
+En mode connecté ou mixte, les seuils de Paramètres sont en lecture seule : l’ancien champ les changeait seulement dans le navigateur. L’interface connectée ne permet pas encore de modifier le seuil d’un produit existant. Pour les mouvements, utiliser les parcours de réception, de consommation et d’inventaire existants ; en mode Supabase complet, ils passent par les RPC P07 et leurs permissions. Si la configuration est mixte ou si le port RPC manque, les écritures stock sont refusées plutôt que d’être traitées localement. Les caches de stock déjà présents dans le navigateur ne sont pas purgés : ils doivent être actualisés depuis le serveur avant d’être considérés comme confirmés.
+
 ## 5. Test distant
 
 [`supabase/tests/p07_rollback.sql`](../supabase/tests/p07_rollback.sql) exécute des contrôles dans `BEGIN … ROLLBACK` : 33 migrations et 0 fixture, grants et révocations, création par RPC, commande sans mouvement, deux réceptions partielles et coût moyen `1500`, idempotence, consommation `2 × 1500 = 3000`, inventaire `+2`, refus de certification avant rattachement, publication après attestation, immuabilité, board camelCase, écriture directe `42501` et isolation A/B.

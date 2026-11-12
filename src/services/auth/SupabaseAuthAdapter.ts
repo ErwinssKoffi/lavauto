@@ -83,8 +83,10 @@ export class SupabaseAuthAdapter implements AuthPort {
   private identity: AuthIdentity | null = null;
   private handlers = new Set<(change: AuthChange) => void>();
   private pending: Promise<AuthIdentity | null> | null = null;
+  private pendingToken: string | undefined;
   private lastKey = '';
   private lastAcceptedKey = '';
+  private generation = 0;
 
   constructor(private client: SupabaseClient | AuthSupabaseClient) {}
 
@@ -99,10 +101,16 @@ export class SupabaseAuthAdapter implements AuthPort {
    * relancer `/auth/v1/user` et `my_context()` en boucle.
    */
   private sync(type: AuthEvent, token?: string): Promise<AuthIdentity | null> {
-    if (this.pending) return this.pending;
+    if (this.pending && (token === undefined || token === this.pendingToken)) return this.pending;
+    // Un événement muni d'un autre jeton ne doit pas réutiliser la lecture
+    // en vol pour l'identité précédente, même sans événement SIGNED_OUT.
+    if (this.pending) this.generation += 1;
     const client = asClient(this.client);
-    this.pending = (async () => {
+    const generation = this.generation;
+    const current = () => generation === this.generation;
+    const task = (async () => {
       const { data, error } = await client.auth.getUser();
+      if (!current()) return null;
       const user = data.user;
       if (error || !user) {
         this.lastKey = '';
@@ -111,24 +119,27 @@ export class SupabaseAuthAdapter implements AuthPort {
       }
       const emailConfirmed = Boolean(user.email_confirmed_at);
       const key = `${user.id}:${token ?? ''}:${emailConfirmed ? '1' : '0'}`;
-      if (this.identity && key === this.lastKey) {
+      if (this.identity && key === this.lastKey && type !== 'TOKEN_REFRESHED') {
         this.emit({ type, identity: this.identity });
         return this.identity;
       }
       const { data: rawContext, error: contextError } = await client.rpc('my_context');
+      if (!current()) return null;
       if (contextError) throw toApiError(contextError, 'context_failed');
       const identity = mapMyContext(rawContext, emailConfirmed);
-      if (!identity) {
+      if (!identity || identity.userId !== user.id) {
         this.emit({ type: 'SIGNED_OUT', identity: null, reason: 'session_expired' });
         return null;
       }
       if (!identity.emailConfirmed) {
         await client.auth.signOut({ scope: 'local' }).catch(() => undefined);
+        if (!current()) return null;
         this.emit({ type: 'SIGNED_OUT', identity: null, reason: 'email_unconfirmed' });
         return null;
       }
       if (!identity.active) {
         await client.auth.signOut({ scope: 'local' }).catch(() => undefined);
+        if (!current()) return null;
         this.emit({ type: 'SIGNED_OUT', identity: null, reason: 'account_disabled' });
         return null;
       }
@@ -136,13 +147,20 @@ export class SupabaseAuthAdapter implements AuthPort {
           (type === 'SIGNED_IN' || type === 'PASSWORD_RECOVERY') &&
           this.lastAcceptedKey !== key) {
         this.lastAcceptedKey = key;
-        await client.rpc('accept_my_invitations').catch(() => undefined);
+        // Le client Supabase renvoie un PostgrestBuilder thenable, pas une
+        // Promise avec .catch(). L'acceptation reste best-effort.
+        try { await client.rpc('accept_my_invitations'); } catch { /* invitation indisponible */ }
+        if (!current()) return null;
       }
       this.lastKey = key;
       this.emit({ type, identity });
       return identity;
-    })().finally(() => { this.pending = null; });
-    return this.pending;
+    })();
+    this.pending = task;
+    this.pendingToken = token;
+    const clear = () => { if (this.pending === task) { this.pending = null; this.pendingToken = undefined; } };
+    void task.then(clear, clear);
+    return task;
   }
 
   async getIdentity(): Promise<AuthIdentity | null> {
@@ -157,7 +175,11 @@ export class SupabaseAuthAdapter implements AuthPort {
     const { data } = client.auth.onAuthStateChange((event, session) => {
       const token = session?.access_token;
       if (event === 'SIGNED_OUT') {
+        this.generation += 1;
+        this.pending = null;
+        this.pendingToken = undefined;
         this.lastKey = '';
+        this.lastAcceptedKey = '';
         this.emit({ type: 'SIGNED_OUT', identity: null });
         return;
       }
@@ -167,7 +189,13 @@ export class SupabaseAuthAdapter implements AuthPort {
         event === 'SIGNED_IN' ? 'SIGNED_IN' : 'INITIAL_SESSION';
       // Pas d'await dans le callback supabase-js : la file est unique et
       // l'émission se fait après vérification serveur.
-      void this.sync(type, token);
+      const task = this.sync(type, token);
+      const generation = this.generation;
+      void task.catch(() => {
+        if (generation !== this.generation) return;
+        this.generation += 1; this.lastKey = '';
+        this.emit({ type: 'SIGNED_OUT', identity: null, reason: 'session_expired' });
+      });
     });
     return { unsubscribe: () => {
       this.handlers.delete(handler);
@@ -218,6 +246,12 @@ export class SupabaseAuthAdapter implements AuthPort {
   }
 
   async signOut(): Promise<void> {
+    this.generation += 1;
+    this.pending = null;
+    this.pendingToken = undefined;
+    this.lastKey = '';
+    this.lastAcceptedKey = '';
+    this.identity = null;
     const client = asClient(this.client);
     const { error } = await client.auth.signOut({ scope: 'global' });
     if (error) throw toApiError(error, 'signout_failed');

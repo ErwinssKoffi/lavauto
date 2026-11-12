@@ -1,3 +1,4 @@
+import { validateExpense, validateMoney, validatePeriod } from '../../lib/validation';
 import type {
   ExpenseCreatePayload, FinanceCommands,
 } from './DataAdapter';
@@ -10,7 +11,9 @@ import type { SupabaseReader, SupabaseResult } from './SupabaseDataAdapter';
 // l'UI : le tenant et l'utilisateur sont déduits du JWT côté serveur.
 
 function dbMethod(method: PayMethod): string {
-  return PAY_METHOD_DB_KEY[method] ?? 'cash';
+  const key = PAY_METHOD_DB_KEY[method];
+  if (!key) throw new Error('Moyen de paiement invalide.');
+  return key;
 }
 
 export class SupabaseFinanceCommands implements FinanceCommands {
@@ -23,18 +26,20 @@ export class SupabaseFinanceCommands implements FinanceCommands {
   }
 
   async openCash(stationId: string, openingFloat: number, number = ''): Promise<string> {
+    validateMoney(openingFloat);
     const data = await this.rpc('open_cash_session', {
       p_station_id: stationId,
-      p_opening_float_minor: Math.round(openingFloat),
+      p_opening_float_minor: openingFloat,
       p_number: number,
     });
     return String(data);
   }
 
   async closeCash(sessionId: string, counted: number): Promise<void> {
+    validateMoney(counted);
     await this.rpc('close_cash_session', {
       p_session_id: sessionId,
-      p_counted_minor: Math.round(counted),
+      p_counted_minor: counted,
     });
   }
 
@@ -46,9 +51,10 @@ export class SupabaseFinanceCommands implements FinanceCommands {
   }
 
   async addExpense(p: ExpenseCreatePayload): Promise<string> {
+    validateExpense(p);
     const data = await this.rpc('record_expense_by_key', {
       p_station_id: p.stationId,
-      p_amount_minor: Math.round(p.amount),
+      p_amount_minor: p.amount,
       p_category_name: p.category,
       p_reason: p.reason,
       p_supplier: p.supplier,
@@ -68,15 +74,17 @@ export class SupabaseFinanceCommands implements FinanceCommands {
   }
 
   async reconcileChannel(methodId: string, start: string, end: string, counted: number): Promise<void> {
+    validatePeriod(start, end); validateMoney(counted);
     await this.rpc('reconcile_channel', {
       p_method_id: methodId,
       p_start: start,
       p_end: end,
-      p_counted_minor: Math.round(counted),
+      p_counted_minor: counted,
     });
   }
 
   async createCommissionPeriod(stationId: string, start: string, end: string): Promise<string> {
+    validatePeriod(start, end);
     const data = await this.rpc('create_commission_period', {
       p_station_id: stationId, p_start: start, p_end: end,
     });
@@ -88,10 +96,11 @@ export class SupabaseFinanceCommands implements FinanceCommands {
   }
 
   async recordCommissionPayout(periodId: string, userId: string, amount: number, reference: string): Promise<void> {
+    validateMoney(amount);
     await this.rpc('record_commission_payout', {
       p_period_id: periodId,
       p_user_id: userId,
-      p_amount_minor: Math.round(amount),
+      p_amount_minor: amount,
       p_reference: reference,
     });
   }

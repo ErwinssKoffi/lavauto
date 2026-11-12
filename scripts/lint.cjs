@@ -59,10 +59,13 @@ const rules = [
     exists('src/lib/usePermissions.ts') && read('src/lib/usePermissions.ts').includes('my_context()') &&
     read('src/components/navigation.tsx').includes('granted.includes(entry.permission)') &&
     read('src/App.tsx').includes('usePermissions') && read('src/App.tsx').includes('RoleRoute')],
-  ['49 migrations numérotées, documentation P10 et 6 tests distants en ROLLBACK', () => {
+  ['54 migrations locales numérotées, documentation et tests SQL en ROLLBACK', () => {
     const migrations = fs.readdirSync(path.join(ROOT, 'supabase/migrations'))
       .filter((f) => /^\d{3}_.*\.sql$/.test(f));
-    return migrations.length === 49 && exists('docs/auth-rbac.md') &&
+    return migrations.length === 54 && migrations.includes('052_atomic_wash_creation.sql') &&
+      migrations.includes('053_whatsapp_wash_notifications.sql') &&
+      migrations.includes('054_station_scope_and_metrics.sql') && migrations.includes('055_shared_form_validation.sql') &&
+      exists('docs/auth-rbac.md') &&
       exists('docs/washes.md') && exists('docs/finance.md') && exists('docs/stock.md') &&
       exists('docs/crm.md') && exists('docs/analytics.md') &&
       exists('docs/installation.md') && exists('docs/architecture.md') &&
@@ -70,7 +73,10 @@ const rules = [
       exists('docs/deployment.md') && exists('docs/testing.md') &&
       exists('supabase/tests/p06_rollback.sql') && exists('supabase/tests/p07_rollback.sql') &&
       exists('supabase/tests/p08_rollback.sql') && exists('supabase/tests/p09_rollback.sql') &&
-      exists('supabase/tests/p10_rollback.sql');
+      exists('supabase/tests/p10_rollback.sql') && exists('supabase/tests/station_logo_rollback.sql') &&
+      exists('supabase/tests/atomic_wash_rollback.sql') && exists('supabase/tests/whatsapp_wash_rollback.sql') &&
+      /^BEGIN;/m.test(read('supabase/tests/station_scope_rollback.sql')) &&
+      read('supabase/tests/station_scope_rollback.sql').trim().endsWith('ROLLBACK;');
   }],
   ['P06 : aucun « Résultat simplifié » ni faux bénéfice net dans l’UI', () =>
     !uiPages.includes('Résultat simplifié') && !metrics.includes('result: collected - expenses') &&
@@ -97,7 +103,8 @@ const rules = [
     !read('src/services/adapters/SupabaseStockCommands.ts').includes('company_id') &&
     !read('src/services/adapters/SupabaseStockCommands.ts').includes('.from(') &&
     read('src/lib/store.tsx').includes('stockRpc') &&
-    read('src/services/adapters/SupabaseDataAdapter.ts').includes("rpc('my_stock_board')")],
+    read('src/services/adapters/SupabaseDataAdapter.ts').includes("'my_station_stock_board' : 'my_stock_board'") &&
+    read('supabase/migrations/054_station_scope_and_metrics.sql').includes('PERFORM public.assert_my_station(p_station_id)')],
   ['P07 : coûts valorisés, certification obligatoire avant résultat net', () =>
     read('supabase/migrations/031_stock_commands.sql').includes('average_cost_minor') &&
     read('supabase/migrations/033_finance_cost_certification.sql').includes("'costsMissing', false") &&
@@ -122,7 +129,7 @@ const rules = [
     !read('src/services/adapters/SupabaseCrmCommands.ts').includes('company_id') &&
     !read('src/services/adapters/SupabaseCrmCommands.ts').includes('.from(') &&
     read('src/lib/store.tsx').includes('crmRpc') &&
-    read('src/services/adapters/SupabaseDataAdapter.ts').includes("rpc('my_crm_board')") &&
+    read('src/services/adapters/SupabaseDataAdapter.ts').includes("'my_station_crm_board' : 'my_crm_board'") &&
     read('src/lib/permissionCatalog.ts').includes("'/app/fidelisation': 'crm.view'")],
   ['P08 : 2 routes réelles et fiche client enrichie, plus aucune entrée « step 08 »', () =>
     read('src/components/navigation.tsx').includes("to: '/app/fidelisation'") &&
@@ -174,6 +181,18 @@ const rules = [
       /BEGIN;/.test(t) && t.trim().endsWith('ROLLBACK;') &&
       t.includes('SELECT label, ok, detail FROM p09_result') &&
       t.includes('quota : 3e lavage refuse 23514');
+  }],
+  ['WhatsApp : secrets serveur, RPC utilisateur, webhook HMAC et reçu local', () => {
+    const wa = read('supabase/functions/_shared/whatsapp.ts');
+    const commands = read('src/services/adapters/SupabaseWhatsappCommands.ts');
+    const config = read('supabase/config.toml');
+    return !/META_ACCESS_TOKEN|META_APP_SECRET|META_VERIFY_TOKEN|WHATSAPP_DISPATCH_SECRET/.test(src) &&
+      commands.includes('this.client.rpc(name, args)') && !commands.includes('company_id') && !commands.includes('.from(') &&
+      wa.includes('crypto.subtle.verify') && wa.includes("val(env, 'WHATSAPP_SEND_ENABLED') !== 'true'") &&
+      config.includes('[functions.whatsapp-webhook]\nverify_jwt = false') &&
+      config.includes('[functions.whatsapp-dispatch]\nverify_jwt = false') &&
+      exists('public/fonts/DejaVuSans.ttf') && exists('docs/whatsapp-receipts.md') &&
+      read('src/lib/receiptPdf.ts').includes("await import('jspdf')");
   }],
   ['P10 : QA, Storage privé, pagination, Playwright, CI/CD et 7 documents', () => {
     const nav = read('src/components/navigation.tsx');

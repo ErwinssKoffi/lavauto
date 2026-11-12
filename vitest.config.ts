@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config';
 
-// Tests unitaires des règles pures : aucune base, aucun navigateur, aucun réseau.
+// Tests unitaires et PostgreSQL isolé en mémoire ; aucun réseau ni projet distant.
 export default defineConfig({
   test: {
     environment: 'node',

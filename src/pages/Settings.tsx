@@ -1,3 +1,4 @@
+import { readNumber } from '../lib/validation';
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -7,18 +8,20 @@ import {
 import { useStore, DEFAULT_DAYS } from '../lib/store';
 import { isSupabaseConfigured as sbConfigured } from '../lib/supabase';
 import { formatDateTime } from '../lib/format';
-import { Alert, Badge, Card, Input, PageHeader, SectionTitle } from '../components/ui';
+import { Alert, Badge, Card, Input, PageHeader, SectionTitle, useSafeAction } from '../components/ui';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { StationLogoEditor } from '../components/StationLogoEditor';
 
 export default function Settings() {
   const {
-    state, updateStation, updateCompany, setHours, resetAll, notify, authKind,
+    state, updateStation, updateCompany, setHours, resetAll, notify, authKind, dataSource, isLocalStockDemo, isServerStock,
     updateStockThreshold, adjustProductStock,
   } = useStore();
   const navigate = useNavigate();
+  const safe = useSafeAction();
   const st = state.station;
   const co = state.company;
-  const [stationDraft, setStationDraft] = useState({ name: st?.name ?? '', address: st?.address ?? '', city: st?.city ?? '', phone: st?.phone ?? '', logoUrl: st?.logoUrl ?? '' });
+  const [stationDraft, setStationDraft] = useState({ name: st?.name ?? '', address: st?.address ?? '', city: st?.city ?? '', phone: st?.phone ?? '' });
   const [companyDraft, setCompanyDraft] = useState({ name: co?.name ?? '', city: co?.city ?? '', phone: co?.phone ?? '' });
   const [rules, setRules] = useState({ cashRequiresOpen: st?.cashRequiresOpen ?? true, maxCashierDiscount: st?.maxCashierDiscount ?? 0, commissionRate: st?.commissionRate ?? 0, monthlyTarget: st?.monthlyTarget ?? 0 });
   const [hours, setLocalHours] = useState(st?.hours?.length ? st.hours : DEFAULT_DAYS.map((h) => ({ ...h })));
@@ -31,30 +34,33 @@ export default function Settings() {
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Card>
-          <SectionTitle hint="Apparaît sur les fiches et les rapports.">Identité de la station</SectionTitle>
+          <SectionTitle hint="Nom et coordonnées de la station.">Identité de la station</SectionTitle>
           <div className="grid gap-3 sm:grid-cols-2">
             <Input label="Nom" value={stationDraft.name} onChange={(e) => setStationDraft({ ...stationDraft, name: e.target.value })} />
             <Input label="Adresse" value={stationDraft.address} onChange={(e) => setStationDraft({ ...stationDraft, address: e.target.value })} />
             <Input label="Ville" value={stationDraft.city} onChange={(e) => setStationDraft({ ...stationDraft, city: e.target.value })} />
             <Input label="Téléphone" value={stationDraft.phone} onChange={(e) => setStationDraft({ ...stationDraft, phone: e.target.value })} />
-            <Input label="Logo (URL)" value={stationDraft.logoUrl} onChange={(e) => setStationDraft({ ...stationDraft, logoUrl: e.target.value })} />
             <Input label="Devise" value="FCFA" disabled hint="La devise est fixée en FCFA pour toutes les stations." />
           </div>
-          <button className="wg-btn wg-btn-primary mt-4" onClick={() => { updateStation({ ...stationDraft, logoUrl: stationDraft.logoUrl.trim() || null }); notify('success', 'Identité de la station enregistrée.'); }}><FiSave /> Enregistrer</button>
+          <button className="wg-btn wg-btn-primary mt-4" onClick={() => safe(() => { updateStation(stationDraft); notify('success', 'Identité de la station enregistrée.'); })}><FiSave /> Enregistrer</button>
+          <StationLogoEditor />
         </Card>
 
         <Card>
-          <SectionTitle hint="Règles appliquées aux fiches et aux encaissements.">Caisse et remises</SectionTitle>
+          <SectionTitle hint="Réglages conservés dans ce navigateur.">Caisse et remises</SectionTitle>
+          {(dataSource === 'supabase' || authKind === 'supabase') && (
+            <div className="mb-4"><Alert kind="warn">Ces réglages ne sont pas transmis au serveur. En mode connecté, la base exige une caisse ouverte pour les espèces et ne contrôle pas le plafond de remise du caissier ; les barèmes modifiés ici ne configurent pas les relevés serveur.</Alert></div>
+          )}
           <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border p-4" style={{ borderColor: 'var(--wg-border)' }}>
-            <div><p className="text-sm font-bold">Espèces : caisse ouverte obligatoire</p><p className="wg-muted text-xs">Désactivable station par station. Mobile Money enregistrable à tout moment.</p></div>
+            <div><p className="text-sm font-bold">Espèces : caisse ouverte obligatoire</p><p className="wg-muted text-xs">Désactivable uniquement pour les calculs locaux. Mobile Money enregistrable à tout moment.</p></div>
             <input type="checkbox" className="h-5 w-5 accent-sky-500" checked={rules.cashRequiresOpen} onChange={(e) => setRules({ ...rules, cashRequiresOpen: e.target.checked })} />
           </label>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <Input label="Remise maximale du caissier (FCFA)" type="number" min="0" value={rules.maxCashierDiscount} onChange={(e) => setRules({ ...rules, maxCashierDiscount: Number(e.target.value) })} />
-            <Input label="Barème des commissions (%)" type="number" min="0" max="100" value={rules.commissionRate} onChange={(e) => setRules({ ...rules, commissionRate: Number(e.target.value) })} />
-            <Input label="Objectif de CA du mois (FCFA)" type="number" min="0" value={rules.monthlyTarget} onChange={(e) => setRules({ ...rules, monthlyTarget: Number(e.target.value) })} />
+            <Input label="Remise maximale du caissier (FCFA)" type="number" min="0" value={rules.maxCashierDiscount} onChange={(e) => setRules({ ...rules, maxCashierDiscount: readNumber(e.target.value) })} />
+            <Input label="Barème des commissions (%)" type="number" min="0" max="100" value={rules.commissionRate} onChange={(e) => setRules({ ...rules, commissionRate: readNumber(e.target.value) })} />
+            <Input label="Objectif de CA du mois (FCFA)" type="number" min="0" value={rules.monthlyTarget} onChange={(e) => setRules({ ...rules, monthlyTarget: readNumber(e.target.value) })} />
           </div>
-          <button className="wg-btn wg-btn-primary mt-4" onClick={() => { updateStation({ cashRequiresOpen: rules.cashRequiresOpen, maxCashierDiscount: Math.max(0, rules.maxCashierDiscount), commissionRate: Math.min(100, Math.max(0, rules.commissionRate)), monthlyTarget: Math.max(0, rules.monthlyTarget) }); notify('success', 'Règles enregistrées.'); }}><FiSave /> Enregistrer</button>
+          <button className="wg-btn wg-btn-primary mt-4" onClick={() => safe(() => { updateStation(rules); notify('success', 'Règles enregistrées dans ce navigateur.'); })}><FiSave /> Enregistrer</button>
         </Card>
 
         <Card>
@@ -80,7 +86,7 @@ export default function Settings() {
             <Input label="Ville" value={companyDraft.city} onChange={(e) => setCompanyDraft({ ...companyDraft, city: e.target.value })} />
             <Input label="Téléphone" value={companyDraft.phone} onChange={(e) => setCompanyDraft({ ...companyDraft, phone: e.target.value })} />
           </div>
-          <button className="wg-btn wg-btn-primary mt-4" onClick={() => { updateCompany(companyDraft); notify('success', 'Entreprise enregistrée.'); }}><FiSave /> Enregistrer</button>
+          <button className="wg-btn wg-btn-primary mt-4" onClick={() => safe(() => { updateCompany(companyDraft); notify('success', 'Entreprise enregistrée.'); })}><FiSave /> Enregistrer</button>
 
           <div className="mt-6 border-t pt-5" style={{ borderColor: 'var(--wg-border)' }}>
             <SectionTitle hint="Les opérations sensibles sont conservées, jamais effacées.">Journal des opérations sensibles</SectionTitle>
@@ -109,7 +115,14 @@ export default function Settings() {
                 )}
               </div>
               <p className="wg-muted mt-1 text-xs">
-                Définissez le seuil d’alerte critique pour chaque produit (shampoing, cire, dégraissant). Une alerte en temps réel est déclenchée dès que le stock descend à ou sous ce seuil.
+                Une alerte est déclenchée dès que le stock descend à ou sous le seuil critique.
+              </p>
+              <p className="wg-muted mt-1 text-xs">
+                {isLocalStockDemo
+                  ? 'Démonstration locale : les changements de seuil et les simulations de consommation ou de réapprovisionnement restent dans ce navigateur. Aucun mouvement n’est envoyé au serveur.'
+                  : isServerStock
+                    ? 'Seuils en lecture seule : leur modification est indisponible depuis cet écran hors démonstration locale. Pour les opérations de stock, utilisez le module Stocks & achats.'
+                    : 'Seuils en lecture seule. Configuration de stock indisponible ou mixte : les opérations sont bloquées pour éviter un enregistrement uniquement local.'}
               </p>
             </div>
             <Link to="/app/stock" className="wg-link text-xs">Ouvrir le module Stocks complet →</Link>
@@ -144,39 +157,50 @@ export default function Settings() {
                       </div>
 
                       <div className="w-32">
-                        <label className="text-[10px] text-slate-400 block mb-0.5 font-semibold">Seuil critique ({p.unit})</label>
-                        <input
-                          type="number"
-                          min="0"
-                          className="wg-input !py-1 !text-xs font-bold"
-                          defaultValue={p.reorderLevel}
-                          onBlur={(e) => updateStockThreshold(p.id, Number(e.target.value))}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              updateStockThreshold(p.id, Number((e.target as HTMLInputElement).value));
-                            }
-                          }}
-                        />
+                        {isLocalStockDemo ? (
+                          <>
+                            <label htmlFor={`stock-threshold-${p.id}`} className="text-[10px] text-slate-400 block mb-0.5 font-semibold">Seuil critique ({p.unit})</label>
+                            <input
+                              id={`stock-threshold-${p.id}`}
+                              type="number"
+                              min="0"
+                              className="wg-input !py-1 !text-xs font-bold"
+                              defaultValue={p.reorderLevel}
+                              onBlur={(e) => { const value = readNumber(e.target.value); void safe(() => updateStockThreshold(p.id, value)); }}
+                              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                            />
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-[10px] text-slate-400 mb-0.5 font-semibold">Seuil critique</p>
+                            <p className="font-bold">{p.reorderLevel} {p.unit}</p>
+                          </>
+                        )}
                       </div>
 
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => adjustProductStock(p.id, Math.max(0, qty - 1))}
-                          className="rounded bg-rose-500/10 px-2 py-1 text-[11px] font-bold text-rose-300 hover:bg-rose-500/20"
-                          title="Simuler une consommation (-1) pour tester l’alerte temps réel"
-                        >
-                          <FiMinus size={10} className="inline mr-0.5" /> 1 {p.unit}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => adjustProductStock(p.id, qty + 5)}
-                          className="rounded bg-sky-500/10 px-2 py-1 text-[11px] font-bold text-sky-300 hover:bg-sky-500/20"
-                          title="Réapprovisionner (+5 unités)"
-                        >
-                          <FiPlus size={10} className="inline mr-0.5" /> 5 {p.unit}
-                        </button>
-                      </div>
+                      {isLocalStockDemo && (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="wg-muted text-[10px]">Simulation locale :</span>
+                          <button
+                            type="button"
+                            onClick={() => adjustProductStock(p.id, Math.max(0, qty - 1))}
+                            className="rounded bg-rose-500/10 px-2 py-1 text-[11px] font-bold text-rose-300 hover:bg-rose-500/20"
+                            title="Simuler une consommation dans ce navigateur"
+                            aria-label={`Simuler une consommation de 1 ${p.unit} pour ${p.name}`}
+                          >
+                            <FiMinus size={10} className="inline mr-0.5" aria-hidden="true" /> 1 {p.unit}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => adjustProductStock(p.id, qty + 5)}
+                            className="rounded bg-sky-500/10 px-2 py-1 text-[11px] font-bold text-sky-300 hover:bg-sky-500/20"
+                            title="Simuler un réapprovisionnement dans ce navigateur"
+                            aria-label={`Simuler un réapprovisionnement de 5 ${p.unit} pour ${p.name}`}
+                          >
+                            <FiPlus size={10} className="inline mr-0.5" aria-hidden="true" /> 5 {p.unit}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -193,7 +217,7 @@ export default function Settings() {
           <Badge><FiShield /> Thème sombre par défaut, clair disponible</Badge>
           <Badge><FiLock /> Montants FCFA · dates jj/mm/aaaa</Badge>
         </div>
-        <p className="wg-muted mt-3 text-xs leading-relaxed">L’authentification et les permissions sont servies par {authKind === 'supabase' ? 'Supabase Auth et les RPC RBAC' : 'le mode local de démonstration'}. Les données métier écrites depuis ces écrans restent locales jusqu’aux prompts suivants ; seules les formules sont lues dans la base en mode connecté.</p>
+        <p className="wg-muted mt-3 text-xs leading-relaxed">L’authentification et les permissions sont servies par {authKind === 'supabase' ? 'Supabase Auth et les RPC RBAC' : 'le mode local de démonstration'}. En mode connecté, le logo est associé à la station dans Supabase ; les autres champs d’identité de cet écran restent enregistrés localement.</p>
         <button className="wg-btn wg-btn-danger mt-4" onClick={() => setConfirmReset(true)}><FiTrash2 /> Réinitialiser la démonstration</button>
       </Card>
 

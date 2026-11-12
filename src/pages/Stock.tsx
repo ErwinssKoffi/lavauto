@@ -1,3 +1,4 @@
+import { readNumber } from '../lib/validation';
 import React, { useState } from 'react';
 import { FiAlertTriangle, FiBox, FiPackage, FiPlus, FiRefreshCw, FiTruck, FiX } from 'react-icons/fi';
 import { useStore } from '../lib/store';
@@ -257,7 +258,7 @@ export default function Stock() {
           <Input label="Référence" value={product.sku} onChange={(e) => setProduct({ ...product, sku: e.target.value })} />
           <Input label="Catégorie" value={product.category} onChange={(e) => setProduct({ ...product, category: e.target.value })} />
           <Input label="Unité" value={product.unit} onChange={(e) => setProduct({ ...product, unit: e.target.value })} />
-          <Input label="Seuil d’alerte" type="number" min="0" value={product.reorderLevel} onChange={(e) => setProduct({ ...product, reorderLevel: Number(e.target.value) })} />
+          <Input label="Seuil d’alerte" type="number" min="0" value={product.reorderLevel} onChange={(e) => setProduct({ ...product, reorderLevel: readNumber(e.target.value) })} />
         </div>
         <p className="wg-muted mt-3 text-xs">Le coût moyen démarre à zéro et sera calculé à la première réception valorisée.</p>
         <div className="mt-5 flex justify-end gap-2"><button className="wg-btn wg-btn-ghost" onClick={close}><FiX /> Annuler</button>
@@ -290,8 +291,8 @@ export default function Stock() {
           <Select label="Produit *" value={order.productId} onChange={(e) => setOrder({ ...order, productId: e.target.value })}>
             <option value="">Choisir un produit</option>{state.products.filter((p) => p.active).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </Select>
-          <Input label="Quantité commandée *" type="number" min="1" value={order.qty} onChange={(e) => setOrder({ ...order, qty: Number(e.target.value) })} />
-          <Input label="Coût unitaire prévu (FCFA)" type="number" min="0" value={order.unitCost} onChange={(e) => setOrder({ ...order, unitCost: Number(e.target.value) })} />
+          <Input label="Quantité commandée *" type="number" min="1" value={order.qty} onChange={(e) => setOrder({ ...order, qty: readNumber(e.target.value) })} />
+          <Input label="Coût unitaire prévu (FCFA)" type="number" min="0" value={order.unitCost} onChange={(e) => setOrder({ ...order, unitCost: readNumber(e.target.value) })} />
           <Input label="Livraison prévue" type="date" value={order.expectedAt} onChange={(e) => setOrder({ ...order, expectedAt: e.target.value })} />
         </div>
         <p className="wg-muted mt-3 text-xs">Clé d’idempotence : {order.idempotencyKey}. La commande n’incrémente pas le stock.</p>
@@ -300,7 +301,7 @@ export default function Stock() {
             await createPurchaseOrder({
               stationId, number: order.number, supplierId: order.supplierId || null,
               orderedAt: todayISO(), expectedAt: order.expectedAt || null,
-              lines: [{ productId: order.productId, qtyOrdered: Math.round(order.qty), unitCostMinor: Math.round(order.unitCost) }],
+              lines: [{ productId: order.productId, qtyOrdered: order.qty, unitCostMinor: order.unitCost }],
               idempotencyKey: order.idempotencyKey,
             });
             close();
@@ -315,8 +316,8 @@ export default function Stock() {
           <Select label="Produit *" value={receipt.productId} onChange={(e) => setReceipt({ ...receipt, productId: e.target.value })}>
             <option value="">Choisir un produit</option>{state.purchaseOrderItems.filter((i) => !receipt.orderId || i.orderId === receipt.orderId).map((i) => <option key={i.id} value={i.productId}>{productById.get(i.productId)?.name ?? i.productId}</option>)}
           </Select>
-          <Input label="Quantité reçue *" type="number" min="1" value={receipt.qty} onChange={(e) => setReceipt({ ...receipt, qty: Number(e.target.value) })} />
-          <Input label="Coût unitaire réel (FCFA)" type="number" min="0" value={receipt.unitCost} onChange={(e) => setReceipt({ ...receipt, unitCost: Number(e.target.value) })} />
+          <Input label="Quantité reçue *" type="number" min="1" value={receipt.qty} onChange={(e) => setReceipt({ ...receipt, qty: readNumber(e.target.value) })} />
+          <Input label="Coût unitaire réel (FCFA)" type="number" min="0" value={receipt.unitCost} onChange={(e) => setReceipt({ ...receipt, unitCost: readNumber(e.target.value) })} />
           <Input label="Clé de réception" value={receipt.receiptKey} onChange={(e) => setReceipt({ ...receipt, receiptKey: e.target.value })} />
         </div>
         <p className="wg-muted mt-3 text-xs">La réception partielle met à jour le coût moyen pondéré et crée un mouvement immuable.</p>
@@ -324,7 +325,7 @@ export default function Stock() {
           <button className="wg-btn wg-btn-primary" onClick={() => safe(async () => {
             await receivePurchaseLines({
               orderId: receipt.orderId, receiptKey: receipt.receiptKey,
-              lines: [{ productId: receipt.productId, qty: Math.round(receipt.qty), unitCostMinor: Math.round(receipt.unitCost) }],
+              lines: [{ productId: receipt.productId, qty: receipt.qty, unitCostMinor: receipt.unitCost }],
             });
             close();
           })}>Valider la réception</button></div>
@@ -335,12 +336,12 @@ export default function Stock() {
           <Select label="Produit *" value={count.productId} onChange={(e) => setCount({ ...count, productId: e.target.value })}>
             <option value="">Choisir un produit</option>{state.inventoryItems.filter((i) => i.sessionId === (openSession?.id ?? '')).map((i) => <option key={i.id} value={i.productId}>{productById.get(i.productId)?.name ?? i.productId}</option>)}
           </Select>
-          <Input label="Quantité comptée *" type="number" min="0" value={count.countedQty} onChange={(e) => setCount({ ...count, countedQty: Number(e.target.value) })} />
+          <Input label="Quantité comptée *" type="number" min="0" value={count.countedQty} onChange={(e) => setCount({ ...count, countedQty: readNumber(e.target.value) })} />
         </div>
         <Textarea label="Motif de l’écart" value={count.reason} onChange={(e) => setCount({ ...count, reason: e.target.value })} />
         <div className="mt-5 flex justify-end gap-2"><button className="wg-btn wg-btn-ghost" onClick={close}><FiX /> Annuler</button>
           <button className="wg-btn wg-btn-primary" onClick={() => safe(async () => {
-            await recordInventoryCount({ sessionId: openSession?.id ?? count.sessionId, productId: count.productId, countedQty: Math.round(count.countedQty), reason: count.reason });
+            await recordInventoryCount({ sessionId: openSession?.id ?? count.sessionId, productId: count.productId, countedQty: count.countedQty, reason: count.reason });
             setCount({ sessionId: openSession?.id ?? '', productId: '', countedQty: 0, reason: '' }); close();
           })}>Enregistrer</button></div>
       </Modal>

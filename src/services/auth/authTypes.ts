@@ -1,4 +1,5 @@
-import type { AppUser, Company, Role, Station } from '../../types';
+import type { AppUser, Company, DayHours, Role, Station } from '../../types';
+import { isStationLogoPath } from '../../lib/image';
 
 // ─── Types du domaine Auth / RBAC (Prompt 04) ────────────────────────────────
 
@@ -16,7 +17,12 @@ export interface StationSummary {
   id: string;
   name: string;
   city: string;
+  address?: string;
+  phone?: string;
+  hours?: DayHours[];
   activated: boolean;
+  activatedAt?: string | null;
+  logoPath: string | null;
 }
 
 export interface AuthIdentity {
@@ -139,13 +145,21 @@ export function mapMyContext(raw: unknown, emailConfirmed = false): AuthIdentity
     suspended: asBoolean(companyRaw.suspended),
     createdAt: asString(companyRaw.created_at, new Date().toISOString()),
   } : null;
+  const companyId = asString(r.companyId) || company?.id || null;
   const stations: StationSummary[] = asArray(r.stations).map((entry) => {
     const s = (entry && typeof entry === 'object' ? entry : {}) as Record<string, unknown>;
     return {
       id: asString(s.id),
       name: asString(s.name),
       city: asString(s.city),
+      address: asString(s.address),
+      phone: asString(s.phone),
+      hours: Array.isArray(s.hours) ? s.hours.filter((h): h is DayHours =>
+        Boolean(h && typeof h === 'object' && typeof h.day === 'string'
+          && typeof h.open === 'string' && typeof h.close === 'string' && typeof h.closed === 'boolean')) : [],
       activated: asBoolean(s.activated),
+      activatedAt: typeof s.activatedAt === 'string' ? s.activatedAt : null,
+      logoPath: isStationLogoPath(s.logoPath) && s.logoPath.startsWith(`${companyId}/`) ? s.logoPath : null,
     };
   }).filter((s) => s.id);
   const roleKey = asString(r.roleKey);
@@ -156,7 +170,7 @@ export function mapMyContext(raw: unknown, emailConfirmed = false): AuthIdentity
     role: dbRoleToUi(roleKey),
     roleKey,
     permissions: asArray(r.permissions).filter((p): p is string => typeof p === 'string'),
-    companyId: asString(r.companyId) || company?.id || null,
+    companyId,
     stationIds: stations.map((s) => s.id),
     stations,
     company,
@@ -208,7 +222,8 @@ export function mapInvitations(raw: unknown): Invitation[] {
 /** Projette le contexte serveur dans les objets métier déjà utilisés par l'UI. */
 export function mapIdentityToAppState(
   identity: AuthIdentity,
-  users: CompanyUser[]
+  users: CompanyUser[],
+  stationId?: string | null,
 ): { company: Company | null; station: Station | null; users: AppUser[] } {
   const company: Company | null = identity.company ? {
     id: identity.company.id,
@@ -218,24 +233,24 @@ export function mapIdentityToAppState(
     createdAt: identity.company.createdAt,
     suspended: identity.company.suspended,
   } : null;
-  const first = identity.stations[0];
-  const station: Station | null = first ? {
-    id: first.id,
+  const selected = stationId ? identity.stations.find((s) => s.id === stationId) : identity.stations[0];
+  const station: Station | null = selected ? {
+    id: selected.id,
     companyId: identity.companyId ?? '',
-    name: first.name,
-    address: '',
-    city: first.city,
-    phone: identity.company?.phone ?? '',
+    name: selected.name,
+    address: selected.address ?? '',
+    city: selected.city,
+    phone: selected.phone ?? '',
     currency: 'FCFA',
-    logoUrl: null,
-    hours: [],
+    logoPath: selected.logoPath,
+    hours: selected.hours ?? [],
     paymentMethods: [],
     cashRequiresOpen: true,
     maxCashierDiscount: 0,
     commissionRate: 0,
     monthlyTarget: 0,
-    activated: first.activated,
-    activatedAt: first.activated ? identity.company?.createdAt ?? null : null,
+    activated: selected.activated,
+    activatedAt: selected.activatedAt ?? null,
   } : null;
   const appUsers: AppUser[] = users.map((u) => ({
     id: u.id,

@@ -1,3 +1,4 @@
+import { readNumber } from '../lib/validation';
 import React, { useState } from 'react';
 import { FiBriefcase, FiRefreshCw, FiTruck, FiUsers } from 'react-icons/fi';
 import { useStore } from '../lib/store';
@@ -56,7 +57,7 @@ export default function Flottes() {
         <StatCard label="Flottes" value={String(stats.fleets)} hint={`${state.fleetContracts.length} contrat(s)`} icon={<FiBriefcase />} />
         <StatCard label="Véhicules rattachés" value={String(state.fleetVehicles.length)} hint={`${state.vehicles.length} véhicule(s)`} icon={<FiTruck />} />
         <StatCard label="Créances ouvertes" value={formatFCFA(stats.openReceivablesMinor)} hint={`${state.fleetReceivables.filter((r) => r.status === 'open').length} ligne(s)`} />
-        <StatCard label="Notifications en attente" value={String(stats.pendingNotifications)} hint="Aucun fournisseur connecté" icon={<FiUsers />} />
+        <StatCard label="File CRM en attente" value={String(stats.pendingNotifications)} hint="Aucun envoi pour cette file" icon={<FiUsers />} />
       </div>
 
       <div className="mb-5"><Alert kind="info">
@@ -71,7 +72,7 @@ export default function Flottes() {
             <Input label="Contact" value={fleet.contactName} onChange={(e) => setFleet({ ...fleet, contactName: e.target.value })} />
             <Input label="Téléphone" value={fleet.phone} onChange={(e) => setFleet({ ...fleet, phone: e.target.value })} />
             <Input label="E-mail" value={fleet.email} onChange={(e) => setFleet({ ...fleet, email: e.target.value })} />
-            <Input label="Limite de crédit" type="number" min={0} value={fleet.creditLimit} onChange={(e) => setFleet({ ...fleet, creditLimit: Number(e.target.value) })} />
+            <Input label="Limite de crédit" type="number" min={0} value={fleet.creditLimit} onChange={(e) => setFleet({ ...fleet, creditLimit: readNumber(e.target.value) })} />
             <Select label="Canal préféré" value={fleet.channel} onChange={(e) => setFleet({ ...fleet, channel: e.target.value })}>
               <option value="none">Aucun</option><option value="sms">SMS</option><option value="email">E-mail</option><option value="whatsapp">WhatsApp</option>
             </Select>
@@ -92,8 +93,8 @@ export default function Flottes() {
             <Input label="Numéro *" value={contract.number} onChange={(e) => setContract({ ...contract, number: e.target.value.toUpperCase() })} />
             <Input label="Début" type="date" value={contract.startDate} onChange={(e) => setContract({ ...contract, startDate: e.target.value })} />
             <Input label="Fin" type="date" value={contract.endDate} onChange={(e) => setContract({ ...contract, endDate: e.target.value })} />
-            <Input label="Remise (%)" type="number" min={0} max={100} value={contract.discountPercent} onChange={(e) => setContract({ ...contract, discountPercent: Number(e.target.value) })} />
-            <Input label="Limite de crédit" type="number" min={0} value={contract.creditLimit} onChange={(e) => setContract({ ...contract, creditLimit: Number(e.target.value) })} />
+            <Input label="Remise (%)" type="number" min={0} max={100} value={contract.discountPercent} onChange={(e) => setContract({ ...contract, discountPercent: readNumber(e.target.value) })} />
+            <Input label="Limite de crédit" type="number" min={0} value={contract.creditLimit} onChange={(e) => setContract({ ...contract, creditLimit: readNumber(e.target.value) })} />
           </div>
           <button className="wg-btn wg-btn-primary mt-4" disabled={!activated} onClick={() => safe(async () => {
             await saveFleetContract({ stationId, ...contract, endDate: contract.endDate || undefined });
@@ -130,7 +131,7 @@ export default function Flottes() {
             <Select label="Contrat actif *" value={receivable.contractId} onChange={(e) => setReceivable({ ...receivable, contractId: e.target.value })}>
               <option value="">Choisir…</option>{openContracts.filter((c) => c.fleetId === receivable.fleetId).map((c) => <option key={c.id} value={c.id}>{c.number}</option>)}
             </Select>
-            <Input label="Montant" type="number" min={1} value={receivable.amount} onChange={(e) => setReceivable({ ...receivable, amount: Number(e.target.value) })} />
+            <Input label="Montant" type="number" min={1} value={receivable.amount} onChange={(e) => setReceivable({ ...receivable, amount: readNumber(e.target.value) })} />
             <Input label="Échéance" type="date" value={receivable.dueDate} onChange={(e) => setReceivable({ ...receivable, dueDate: e.target.value })} />
             <Select label="Fiche de lavage" value={receivable.washId} onChange={(e) => setReceivable({ ...receivable, washId: e.target.value })}>
               <option value="">Aucune</option>{state.washes.map((w) => <option key={w.id} value={w.id}>{w.number}</option>)}
@@ -145,7 +146,7 @@ export default function Flottes() {
 
         <Card>
           <h2 className="mb-3 text-sm font-bold">Notification en attente</h2>
-          <p className="wg-muted mb-3 text-xs">Le canal choisi sur la flotte est obligatoire. La ligne reste `pending` ; aucun envoi.</p>
+          <p className="wg-muted mb-3 text-xs">File CRM historique distincte des avis WhatsApp de lavage prêt. Le canal choisi sur la flotte est obligatoire ; cette ligne reste en attente et n’est pas envoyée.</p>
           <div className="grid gap-3">
             <Select label="Flotte *" value={notification.fleetId} onChange={(e) => setNotification({ ...notification, fleetId: e.target.value })}>
               <option value="">Choisir…</option>{state.fleets.map((f) => <option key={f.id} value={f.id}>{f.name} ({f.preferredChannel})</option>)}

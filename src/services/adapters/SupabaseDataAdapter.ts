@@ -1,8 +1,13 @@
-import type { Client, Plan, ProfitabilityReport, Wash, WashPost } from '../../types';
+import { PaymentCommandError } from '../../lib/paymentAttempt';
+import { validateMoney } from '../../lib/validation';
+import type { AppUser, Client, Plan, ProfitabilityReport, Wash, WashPost } from '../../types';
+import { dbRoleToUi } from '../auth/authTypes';
 import { PAY_METHOD_DB_KEY } from '../../types';
+import { WashCreationError } from '../../lib/washCreation';
 import { normalizeWashes } from '../../lib/washLifecycle';
 import { mapClientRows } from '../../lib/catalog';
 import { mapFinanceBoard, mapProfitability, type FinanceSnapshot } from '../../lib/finance';
+import { mapStationMetrics, type StationMetrics } from '../../lib/stationMetrics';
 import { SupabaseFinanceCommands } from './SupabaseFinanceCommands';
 import { SupabaseStockCommands } from './SupabaseStockCommands';
 import { SupabaseCrmCommands } from './SupabaseCrmCommands';
@@ -33,7 +38,9 @@ type Row = Record<string, unknown>;
 
 export interface SupabaseResult<T> {
   data: T;
-  error: { message: string } | null;
+  error: { message: string; code?: string } | null;
+  /** PostgREST indique 0 en cas d'échec réseau ; certains faux lecteurs l'omettent. */
+  status?: number;
 }
 
 export interface SupabaseQuery extends PromiseLike<SupabaseResult<Row[]>> {
@@ -195,25 +202,48 @@ export class SupabaseWashCommands implements WashCommands {
   }
 
   async createWash(p: WashCreatePayload): Promise<string> {
-    const id = await this.call('create_wash_full', {
-      p_payload: {
-        station_id: p.stationId,
-        category_id: p.categoryId,
-        plate: p.plate,
-        customer_id: p.clientId,
-        customer_name: p.clientName,
-        discount_minor: p.discount,
-        items: p.items.map((i) => ({ serviceId: i.serviceId, qty: i.qty })),
-        employee_ids: p.employeeIds,
-        post_id: p.postId,
-        idempotency_key: p.idempotencyKey,
-      },
-    });
-    const washId = typeof id === 'string' ? id : '';
-    if (p.payment && p.payment.amount > 0 && washId) {
-      await this.addPayment(washId, p.payment.amount, p.payment.method, `pay:${p.idempotencyKey}`);
+    // Une seule RPC : si le paiement est refusé, toute la transaction est
+    // annulée. Ne jamais revenir aux deux anciennes RPC si 052 manque.
+    let result: SupabaseResult<unknown>;
+    try {
+      result = await this.client.rpc('create_wash_atomic', {
+        p_payload: {
+          station_id: p.stationId,
+          category_id: p.categoryId,
+          plate: p.plate,
+          customer_id: p.clientId,
+          customer_name: p.clientName,
+          discount_minor: p.discount,
+          items: p.items.map((i) => ({ serviceId: i.serviceId, qty: i.qty })),
+          employee_ids: p.employeeIds,
+          post_id: p.postId,
+          idempotency_key: p.idempotencyKey,
+          initial_payment: p.payment && p.payment.amount > 0
+            ? { amount_minor: p.payment.amount, method_key: PAY_METHOD_DB_KEY[p.payment.method] }
+            : null,
+        },
+      });
+    } catch (error) {
+      throw new WashCreationError(`Résultat de la création incertain : ${error instanceof Error ? error.message : 'réponse réseau absente'}`, 'unknown');
     }
-    return washId;
+    if (result.error) {
+      const status = result.status;
+      // Une 4xx explicite (sauf timeout/throttling) ou une erreur SQL typée
+      // sans statut est un refus ; 0, 5xx et réponse réseau sont incertains.
+      // Une collision de clé peut désigner une ancienne fiche déjà créée :
+      // conserver la tentative pour vérification, même si HTTP vaut 409.
+      const rejected = result.error.code !== '23505' && (status !== undefined
+        ? status >= 400 && status < 500 && status !== 408 && status !== 429
+        : Boolean(result.error.code && /^(?:[0-9A-Z]{5}|PGRST\d+)$/.test(result.error.code)));
+      const message = result.error.code === 'PGRST202'
+        ? 'Commande de création atomique indisponible : appliquez la migration 052 avant ce frontend.'
+        : `RPC create_wash_atomic : ${result.error.message}`;
+      throw new WashCreationError(message, rejected ? 'rejected' : 'unknown');
+    }
+    if (typeof result.data !== 'string' || !result.data.trim()) {
+      throw new WashCreationError('Résultat de la création incertain : identifiant serveur absent.', 'unknown');
+    }
+    return result.data;
   }
 
   async transitionStatus(id: string, to: string, reason = ''): Promise<void> {
@@ -229,10 +259,27 @@ export class SupabaseWashCommands implements WashCommands {
   }
 
   async addPayment(id: string, amount: number, method: keyof typeof PAY_METHOD_DB_KEY, key: string): Promise<void> {
-    await this.call('record_wash_payment_by_key', {
-      p_wash_id: id, p_amount_minor: amount, p_method_key: PAY_METHOD_DB_KEY[method],
-      p_reference: '', p_idempotency_key: key,
-    });
+    validateMoney(amount, true);
+    if (!PAY_METHOD_DB_KEY[method]) throw new Error('Moyen de paiement invalide.');
+    let result: SupabaseResult<unknown>;
+    try {
+      result = await this.client.rpc('record_wash_payment_by_key', {
+        p_wash_id: id, p_amount_minor: amount, p_method_key: PAY_METHOD_DB_KEY[method],
+        p_reference: '', p_idempotency_key: key,
+      });
+    } catch (error) {
+      throw new PaymentCommandError(`Résultat du paiement incertain : ${error instanceof Error ? error.message : 'réponse réseau absente'}`, 'unknown');
+    }
+    if (result.error) {
+      const status = result.status;
+      const rejected = result.error.code !== '23505' && (status !== undefined
+        ? status >= 400 && status < 500 && status !== 408 && status !== 429
+        : Boolean(result.error.code && /^(?:[0-9A-Z]{5}|PGRST\d+)$/.test(result.error.code)));
+      throw new PaymentCommandError(`Paiement : ${result.error.message}`, rejected ? 'rejected' : 'unknown');
+    }
+    if (typeof result.data !== 'string' || !result.data.trim()) {
+      throw new PaymentCommandError('Résultat du paiement incertain : identifiant serveur absent.', 'unknown');
+    }
   }
 
   async createPost(name: string, capacity: number, stationId?: string | null): Promise<void> {
@@ -241,8 +288,10 @@ export class SupabaseWashCommands implements WashCommands {
     });
   }
 
-  async vehicleHistory(plate: string): Promise<Wash[]> {
-    const data = await this.call('my_vehicle_history', { p_plate: plate });
+  async vehicleHistory(plate: string, stationId?: string): Promise<Wash[]> {
+    const data = stationId
+      ? await this.call('my_station_wash_board', { p_station_id: stationId, p_plate: plate })
+      : await this.call('my_vehicle_history', { p_plate: plate });
     return normalizeWashes(Array.isArray(data) ? data : []);
   }
 }
@@ -266,7 +315,7 @@ export class SupabaseDataAdapter implements DataAdapter {
   async listAnalyticsBoard(
     start: string, end: string, compareStart: string | null, compareEnd: string | null,
   ): Promise<AnalyticsSnapshot> {
-    const { data, error } = await this.client.rpc('my_analytics_board', {
+    const { data, error } = await this.client.rpc('my_accessible_analytics_board', {
       p_start: start, p_end: end,
       p_compare_start: compareStart, p_compare_end: compareEnd,
     });
@@ -288,44 +337,78 @@ export class SupabaseDataAdapter implements DataAdapter {
     return mapPlatformBoard(data);
   }
 
-  async listCrmBoard(): Promise<CrmSnapshot> {
-    const { data, error } = await this.client.rpc('my_crm_board');
+  async listCrmBoard(stationId?: string): Promise<CrmSnapshot> {
+    const { data, error } = await this.client.rpc(stationId ? 'my_station_crm_board' : 'my_crm_board',
+      stationId ? { p_station_id: stationId } : undefined);
     if (error) throw new Error(error.message);
     return mapCrmBoard(data);
   }
 
-  async listStockBoard(): Promise<StockSnapshot> {
-    const { data, error } = await this.client.rpc('my_stock_board');
+  async listStockBoard(stationId?: string): Promise<StockSnapshot> {
+    const { data, error } = await this.client.rpc(stationId ? 'my_station_stock_board' : 'my_stock_board',
+      stationId ? { p_station_id: stationId } : undefined);
     if (error) throw new Error(error.message);
     return mapStockBoard(data);
   }
 
-  async listFinanceBoard(): Promise<FinanceSnapshot> {
-    const { data, error } = await this.client.rpc('my_finance_board');
+  async listFinanceBoard(stationId?: string): Promise<FinanceSnapshot> {
+    const { data, error } = await this.client.rpc(stationId ? 'my_station_finance_board' : 'my_finance_board',
+      stationId ? { p_station_id: stationId } : undefined);
     if (error) throw new Error(error.message);
     return mapFinanceBoard(data);
   }
 
-  async listProfitability(start: string, end: string): Promise<ProfitabilityReport> {
-    const { data, error } = await this.client.rpc('my_profitability', {
-      p_start: start, p_end: end,
+  async listProfitability(start: string, end: string, stationId?: string): Promise<ProfitabilityReport> {
+    const { data, error } = await this.client.rpc(stationId ? 'my_station_profitability' : 'my_profitability', {
+      p_start: start, p_end: end, ...(stationId ? { p_station_id: stationId } : {}),
     });
     if (error) throw new Error(error.message);
-    return mapProfitability(data);
+    if (stationId && (!data || typeof data !== 'object' || (data as Record<string, unknown>).stationId !== stationId)) {
+      throw new Error('Rapport reçu pour une autre station.');
+    }
+    const result = mapProfitability(data);
+    if (stationId && (result.periodStart !== start || result.periodEnd !== end)) throw new Error('Période du rapport incorrecte.');
+    return result;
   }
 
-  async listClients(): Promise<Client[]> {
-    const result = await this.client.rpc('my_company_clients');
-    const data = rpcData(result, 'my_company_clients');
+  async listStationMetrics(stationId: string, start: string, end: string): Promise<StationMetrics> {
+    const { data, error } = await this.client.rpc('my_station_metrics', {
+      p_station_id: stationId, p_start: start, p_end: end,
+    });
+    if (error) throw new Error(error.message);
+    return mapStationMetrics(data, stationId, start, end);
+  }
+
+  async listClients(stationId?: string): Promise<Client[]> {
+    const name = stationId ? 'my_station_clients' : 'my_company_clients';
+    const result = await this.client.rpc(name, stationId ? { p_station_id: stationId } : undefined);
+    const data = rpcData(result, name);
     return mapClientRows(Array.isArray(data) ? data : []);
   }
 
-  async listWashBoard(): Promise<WashBoardSnapshot> {
+  async listAssignableUsers(stationId: string): Promise<AppUser[]> {
+    const data = rpcData(await this.client.rpc('my_station_assignable_users', { p_station_id: stationId }), 'my_station_assignable_users');
+    if (!Array.isArray(data)) throw new Error('Liste des employés affectables invalide.');
+    return data.map((entry) => {
+      if (!entry || typeof entry !== 'object' || typeof entry.id !== 'string' || typeof entry.name !== 'string') {
+        throw new Error('Employé affectable invalide.');
+      }
+      return {
+        id: entry.id, name: entry.name, role: dbRoleToUi(entry.roleKey),
+        companyId: null, stationId, stationIds: [stationId],
+        email: '', phone: '', active: true, commissionRateOverride: null, createdAt: '',
+      };
+    });
+  }
+
+  async listWashBoard(stationId?: string): Promise<WashBoardSnapshot> {
+    const boardName = stationId ? 'my_station_wash_board' : 'my_wash_board';
+    const postsName = stationId ? 'my_station_wash_posts' : 'my_wash_posts';
+    const args = stationId ? { p_station_id: stationId } : undefined;
     const [boardResult, postsResult] = await Promise.all([
-      this.client.rpc('my_wash_board'),
-      this.client.rpc('my_wash_posts'),
+      this.client.rpc(boardName, args), this.client.rpc(postsName, args),
     ]);
-    return mapWashBoard(rpcData(boardResult, 'my_wash_board'), rpcData(postsResult, 'my_wash_posts'));
+    return mapWashBoard(rpcData(boardResult, boardName), rpcData(postsResult, postsName));
   }
 
   async listPlans(): Promise<Plan[]> {
@@ -399,22 +482,33 @@ export class SupabaseDataAdapter implements DataAdapter {
     };
   }
 
-  async listCatalog(): Promise<CatalogSnapshot> {
+  async listCatalog(stationId?: string): Promise<CatalogSnapshot> {
+    let categories = this.client.from('vehicle_categories')
+      .select('id,station_id,name,active,sort_order').eq('active', true);
+    let services = this.client.from('services')
+      .select('id,station_id,name,description,active,sort_order').eq('active', true);
+    let prices = this.client.from('service_prices')
+      .select('station_id,service_id,vehicle_category_id,price_minor,currency_code');
+    // La limite doit s'appliquer après le filtre, sinon une autre station peut
+    // occuper toute la page. La RLS reste l'autorité pour l'accès.
+    if (stationId) {
+      categories = categories.eq('station_id', stationId);
+      services = services.eq('station_id', stationId);
+      prices = prices.eq('station_id', stationId);
+    }
     const [categoryResult, serviceResult, priceResult] = await Promise.all([
-      this.client.from('vehicle_categories')
-        .select('id,station_id,name,active,sort_order')
-        .eq('active', true).order('sort_order', { ascending: true }).limit(500),
-      this.client.from('services')
-        .select('id,station_id,name,description,active,sort_order')
-        .eq('active', true).order('sort_order', { ascending: true }).limit(500),
-      this.client.from('service_prices')
-        .select('station_id,service_id,vehicle_category_id,price_minor,currency_code')
-        .limit(5000),
+      categories.order('sort_order', { ascending: true }).limit(500),
+      services.order('sort_order', { ascending: true }).limit(500), prices.limit(5000),
     ]);
-    return mapCatalogRows(
+    const mapped = mapCatalogRows(
       rows(categoryResult.data, 'vehicle_categories', categoryResult.error),
       rows(serviceResult.data, 'services', serviceResult.error),
       rows(priceResult.data, 'service_prices', priceResult.error)
     );
+    return stationId ? {
+      categories: mapped.categories.filter((row) => row.stationId === stationId),
+      services: mapped.services.filter((row) => row.stationId === stationId),
+      prices: mapped.prices.filter((row) => row.stationId === stationId),
+    } : mapped;
   }
 }

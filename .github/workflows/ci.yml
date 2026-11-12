@@ -18,17 +18,35 @@ jobs:
         run: npm ci
       - name: TypeScript
         run: npm run typecheck
+      - name: Vérification des fonctions Edge avec Deno
+        run: npx --yes deno@2.9.6 check --no-config supabase/functions/whatsapp-dispatch/index.ts supabase/functions/whatsapp-webhook/index.ts
       - name: Garde-fous statiques
         run: npm run lint
-      - name: Contrôles fonctionnels (local)
-        run: npm run check
-      - name: Contrôles fonctionnels (supabase)
-        run: WG_DATA_SOURCE=supabase npm run check
       - name: Tests unitaires Vitest
         run: npm run test:unit
+      - name: Concurrence PostgreSQL 17 isolé
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d /tmp/washguard-pg-XXXXXX)"
+          trap 'if [[ -f "$tmp/data/postmaster.pid" ]]; then "$pgroot/bin/pg_ctl" -D "$tmp/data" -m immediate -w stop; fi; rm -rf "$tmp"' EXIT
+          npm install --prefix "$tmp/deps" --no-save --no-audit --no-fund @embedded-postgres/linux-x64@17.11.0-beta.19
+          pgroot="$tmp/deps/node_modules/@embedded-postgres/linux-x64/native"
+          export LD_LIBRARY_PATH="$pgroot/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          "$pgroot/bin/initdb" -D "$tmp/data" -U postgres -A trust --no-locale --encoding=UTF8
+          "$pgroot/bin/pg_ctl" -D "$tmp/data" -l "$tmp/postgres.log" -o "-k $tmp -h '' -p 55433" -w start
+          WG_ATOMIC_TEST_SOCKET="$tmp" PGPORT=55433 npm run test:postgres:concurrency
       - name: Build production
         run: npm run build
       - name: Navigateur Chromium
         run: npx playwright install --with-deps chromium
-      - name: 15 parcours Playwright
+      - name: Parcours Playwright (données locales)
         run: npm run test:e2e
+      - name: Parcours Playwright (Supabase simulé, sans service distant)
+        run: npm run test:e2e:connected
+      - name: Contrôles fonctionnels (local)
+        id: local_checks
+        run: npm run check
+      - name: Contrôles fonctionnels (supabase)
+        if: ${{ always() && steps.local_checks.outcome != 'skipped' }}
+        run: WG_DATA_SOURCE=supabase npm run check

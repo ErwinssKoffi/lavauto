@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  FiAlertTriangle, FiArrowRight, FiBox, FiCheck, FiChevronDown,
-  FiChevronUp, FiPlus, FiRefreshCw, FiSettings, FiX,
+  FiAlertTriangle, FiChevronDown, FiChevronUp, FiPlus, FiSettings, FiX,
 } from 'react-icons/fi';
 import { useStore } from '../lib/store';
 
 export default function StockAlertBanner() {
-  const { state, adjustProductStock } = useStore();
+  const { state, adjustProductStock, isLocalStockDemo } = useStore();
   const [expanded, setExpanded] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
@@ -32,7 +31,7 @@ export default function StockAlertBanner() {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-bold text-amber-300">
-                Alerte Stock Critique en temps réel
+                Alerte stock critique
               </span>
               {ruptures.length > 0 && (
                 <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] font-bold text-red-300">
@@ -134,22 +133,24 @@ export default function StockAlertBanner() {
                     </div>
                   </div>
 
-                  {/* Quick restock button for simulation/convenience */}
-                  <div className="mt-3 flex items-center justify-between border-t border-slate-800/80 pt-2 text-[11px]">
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-800/80 pt-2 text-[11px]">
                     <Link
                       to="/app/parametres#stock"
                       className="wg-link flex items-center gap-1 text-[11px]"
                     >
-                      <FiSettings size={12} /> Modifier seuil
+                      <FiSettings size={12} /> {isLocalStockDemo ? 'Modifier seuil' : 'Voir le seuil'}
                     </Link>
-                    <button
-                      type="button"
-                      onClick={() => adjustProductStock(item.productId, item.qtyOnHand + 5)}
-                      className="flex items-center gap-1 rounded bg-sky-500/20 px-2 py-0.5 font-semibold text-sky-300 hover:bg-sky-500/30"
-                      title="Ajouter 5 unités pour réapprovisionner"
-                    >
-                      <FiPlus size={11} /> +5 {unit} (Réappro.)
-                    </button>
+                    {isLocalStockDemo && (
+                      <button
+                        type="button"
+                        onClick={() => adjustProductStock(item.productId, item.qtyOnHand + 5)}
+                        className="flex items-center gap-1 rounded bg-sky-500/20 px-2 py-0.5 font-semibold text-sky-300 hover:bg-sky-500/30"
+                        title="Simuler un réapprovisionnement dans ce navigateur"
+                        aria-label={`Simuler un réapprovisionnement de 5 ${unit} pour ${item.name}`}
+                      >
+                        <FiPlus size={11} aria-hidden="true" /> 5 {unit} (simulation locale)
+                      </button>
+                    )}
                   </div>
                 </div>
               );

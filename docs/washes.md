@@ -1,5 +1,13 @@
 # Prompt 05 — Cœur métier lavages
 
+> **Ajout non déployé en production :** la fiche de lavage propose un reçu imprimable et téléchargeable en PDF, y compris en mode local. La migration `053` et les fonctions Meta locales préparent un avis WhatsApp à `ready` et une demande manuelle avec consentement distinct ; aucun message réel n’a été envoyé. Voir [whatsapp-receipts.md](whatsapp-receipts.md).
+>
+> **Migration `052` appliquée sur `lavauto`, frontend de cette branche non déployé en production :** `052_atomic_wash_creation.sql` ajoute `create_wash_atomic`, appelée par le nouveau frontend pour créer ensemble une fiche et son paiement initial éventuel. Elle réserve une clé par entreprise et compare utilisateur, station et condensat de la commande ; un rejeu identique retrouve la fiche, une collision est refusée. Un refus du paiement annule aussi la fiche et ses écritures associées. Les anciennes RPC restent accessibles et ne deviennent pas atomiques. La recette métier distante reste à faire ; les tests SQL isolés et la reprise après réponse incertaine sont détaillés dans [testing.md](testing.md).
+>
+> En cas d’incertitude, reprendre la même commande dans le même onglet, compte et station. Si le stockage a disparu, est illisible ou si la clé entre en collision avec une ancienne fiche, vérifier manuellement avant toute nouvelle saisie. Cette branche conserve aussi la clé d’un paiement ultérieur jusqu’à confirmation par relecture ; une fiche hors des 200 dernières peut empêcher cette confirmation. Le plafond de remise caissier reste un contrôle local, non garanti par la base connectée.
+
+Les sections suivantes décrivent la livraison historique P05 et ses résultats, antérieurs à `052`.
+
 **Date :** 11/11/2026 · **Projet Supabase :** `lavauto` (`cgxrqorwmmcyqescatzs`, `eu-central-1`, PostgreSQL 17.11) · **Branche :** `arena/868cde36-lavauto` · **Statut :** livré (P05) ; la finance P06 est livrée séparément dans [finance.md](finance.md). **Arrêt avant le Prompt 07.**
 
 Validation explicite reçue via `p05_complet` : exécuter uniquement le Prompt 05 (DB/RPC, file d'attente, postes, affectations multiples, 7 statuts, contrôle qualité, historique véhicule, frontend, mapping FR→EN, tests et documentation). Aucun compte Auth, e-mail de test, secret/API key, commit ou PR créé.

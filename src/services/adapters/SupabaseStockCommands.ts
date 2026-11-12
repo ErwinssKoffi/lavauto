@@ -1,3 +1,4 @@
+import { validateSupplier, validateProduct, validateOrder, validateReceipt, validateInventory, validateConsumption, validateCertification } from '../../lib/validation';
 import type { StockCommands } from './DataAdapter';
 import type {
   CostCertificationPayload, CreatePurchaseOrderPayload,
@@ -20,6 +21,7 @@ export class SupabaseStockCommands implements StockCommands {
   }
 
   async saveSupplier(p: SupplierPayload): Promise<string> {
+    validateSupplier(p);
     const data = await this.rpc('save_supplier', {
       p_station_id: p.stationId,
       p_name: p.name.trim(),
@@ -33,13 +35,14 @@ export class SupabaseStockCommands implements StockCommands {
   }
 
   async saveProduct(p: ProductPayload): Promise<string> {
+    validateProduct(p);
     const data = await this.rpc('save_product', {
       p_station_id: p.stationId,
       p_name: p.name.trim(),
       p_sku: (p.sku ?? '').trim(),
       p_category: (p.category ?? '').trim(),
       p_unit: (p.unit ?? '').trim() || 'unité',
-      p_reorder_level: Math.max(0, Math.round(p.reorderLevel ?? 0)),
+      p_reorder_level: p.reorderLevel ?? 0,
       p_active: p.active ?? true,
       p_id: p.id ?? null,
     });
@@ -47,13 +50,14 @@ export class SupabaseStockCommands implements StockCommands {
   }
 
   async createPurchaseOrder(p: CreatePurchaseOrderPayload): Promise<string> {
+    validateOrder(p);
     const data = await this.rpc('create_purchase_order', {
       p_station_id: p.stationId,
       p_number: p.number.trim(),
       p_lines: p.lines.map((l) => ({
         product_id: l.productId,
-        qty_ordered: Math.round(l.qtyOrdered),
-        unit_cost_minor: Math.round(l.unitCostMinor),
+        qty_ordered: l.qtyOrdered,
+        unit_cost_minor: l.unitCostMinor,
       })),
       p_supplier_id: p.supplierId ?? null,
       p_ordered_at: p.orderedAt.slice(0, 10),
@@ -64,13 +68,14 @@ export class SupabaseStockCommands implements StockCommands {
   }
 
   async receivePurchaseLines(p: ReceivePurchasePayload): Promise<void> {
+    validateReceipt(p);
     await this.rpc('receive_purchase_lines', {
       p_order_id: p.orderId,
       p_lines: p.lines.map((l) => ({
         product_id: l.productId,
-        qty: Math.round(l.qty),
+        qty: l.qty,
         ...(l.unitCostMinor === null || l.unitCostMinor === undefined
-          ? {} : { unit_cost_minor: Math.round(l.unitCostMinor) }),
+          ? {} : { unit_cost_minor: l.unitCostMinor }),
       })),
       p_receipt_key: p.receiptKey,
     });
@@ -82,10 +87,11 @@ export class SupabaseStockCommands implements StockCommands {
   }
 
   async recordInventoryCount(p: InventoryCountPayload): Promise<void> {
+    validateInventory(p);
     await this.rpc('record_inventory_count', {
       p_session_id: p.sessionId,
       p_product_id: p.productId,
-      p_counted_qty: Math.round(p.countedQty),
+      p_counted_qty: p.countedQty,
       p_reason: p.reason ?? '',
     });
   }
@@ -95,6 +101,7 @@ export class SupabaseStockCommands implements StockCommands {
   }
 
   async saveServiceConsumption(p: ServiceConsumptionPayload): Promise<string> {
+    validateConsumption(p);
     const data = await this.rpc('save_service_consumption', {
       p_service_id: p.serviceId,
       p_product_id: p.productId,
@@ -116,6 +123,7 @@ export class SupabaseStockCommands implements StockCommands {
   }
 
   async certifyCosts(p: CostCertificationPayload): Promise<void> {
+    validateCertification(p);
     await this.rpc('certify_profitability_period', {
       p_start: p.start.slice(0, 10),
       p_end: p.end.slice(0, 10),

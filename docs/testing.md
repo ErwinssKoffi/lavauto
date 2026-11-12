@@ -1,61 +1,68 @@
 # LAVAUTO — Tests
 
-**Date :** 12/11/2026 · **Statut :** P10 livré.
+**Date :** 12/11/2026 · Branche `arena/ae12061a-lavauto`. Les migrations `051_station_logo.sql` puis `052_atomic_wash_creation.sql` ont été appliquées sur le projet Supabase `lavauto` via le connecteur et contrôlées structurellement. La recette métier avec Auth et Storage réels n’a pas été effectuée ; le frontend de cette branche n’a pas été déployé en production. Un aperçu Vercel est créé automatiquement pour la PR ; il ne constitue pas une recette. Les migrations `053`–`055`, le dispatch, le webhook et l’ordonnanceur WhatsApp restent locaux ; aucun message réel n’a été envoyé.
 
-## 1. Matrice
+## Application et contrôles distants du 12/11/2026
 
-| Niveau | Commande | Portée |
+L’utilisateur a confirmé la cible `lavauto` (`cgxrqorwmmcyqescatzs`) et déclaré sa sauvegarde vérifiée ; cette sauvegarde n’a pas été contrôlée indépendamment. Le connecteur a appliqué **uniquement** `051`, puis `052`. Le journal est passé de 49 à **51 migrations**. Chaque entrée contient un seul élément SQL dont la taille et le SHA-256 concordent avec le fichier local :
+
+| Fichier local | Version et nom enregistrés | Octets | SHA-256 |
+| --- | --- | ---: | --- |
+| `051_station_logo.sql` | `20261112130423_station_logo` | 7 227 | `3a63d9ba372702dabc52719d4791731fae37ca1f225aaf75bab0e2c020a7f422` |
+| `052_atomic_wash_creation.sql` | `20261112130520_atomic_wash_creation` | 10 609 | `d3adbebb2dc6b3896308e215888d85d0680c530a65050b39611cea7b61deb41e` |
+
+- **Logo :** colonne, contrainte, trigger, projection de `my_context()` et trois policies restrictives présents ; `save_station_logo` exécutable par `authenticated`, pas par `anon`. Le bucket `station-assets` est privé, limité à 5 Mio et aux formats PNG/JPEG/WebP.
+- **Création :** `wash_creation_requests` existe, est sous RLS et possède une contrainte unique `(company_id, idempotency_key)` ; `anon` et `authenticated` n’ont aucun des sept privilèges de table vérifiés. `create_wash_atomic` et `record_wash_payment_by_key` sont exécutables par `authenticated`, pas par `anon` ; `ensure_payment_method` ne l’est par aucun de ces deux rôles. Les prérequis de fonctions et la contrainte d’unicité des moyens sont présents. La projection SQL distingue `wave`, `orange_money` et `mtn_momo` ; les définitions distantes des boards l’utilisent et les commandes de paiement et de dépense appellent le helper de moyen.
+- La base présente **71 tables publiques, toutes avec RLS activée**, et deux vues ; les services DB, Auth, Storage et REST sont déclarés sains. Une lecture partielle a compté zéro utilisateur Auth, entreprise, station, lavage, paiement, réservation de création et objet `station-assets` : cela ne démontre pas que toute la base est vide.
+- Ces vérifications sont des lectures de catalogue, de privilèges et de projections SQL, **pas** une recette avec Auth, Storage et opérations métier réels. Aucun compte de test, e-mail ou fixture distante n’a été créé pendant cette application. La CLI a été installée et initialisée localement, mais ni authentifiée ni liée ; aucun frontend de cette branche n’a alors été déployé.
+
+## 1. Vérifications locales de la branche
+
+| Niveau | Commande | Résultat |
 | --- | --- | --- |
-| TypeScript | `npm run typecheck` | `src`, configs Vite/Vitest/Playwright, `tests`, `e2e`. |
-| Garde-fous statiques | `npm run lint` | **25 / 25**. |
-| Contrôles fonctionnels | `npm run check` | **238 OK / 0 KO** ; section `[14]` : réseau, 7 documents, Vitest, CI, rollback, lazy loading, optimisation image, 15 parcours JSDOM P10. |
-| Contrôles mode serveur | `WG_DATA_SOURCE=supabase npm run check` | **239 OK / 0 KO**. |
-| Règles pures | `npm run test:unit` | **16 tests Vitest**. |
-| Build | `npm run build` | Vite, lazy loading, CSS, bundle. |
-| E2E navigateur | `npm run test:e2e` | **15 / 15** specs Playwright / Chromium. |
-| Liste E2E | `npm run test:e2e:list` | Découverte des 15 specs sans navigateur. |
-| SQL distant | `supabase/tests/p10_rollback.sql` | 30 contrôles `BEGIN … ROLLBACK`, 0 fixture. |
+| TypeScript | `npm run typecheck` | Réussi. |
+| Garde-fous statiques | `npm run lint` | 26 / 26. |
+| Contrôles fonctionnels | `npm run check` | 242 OK / 0 KO en mode local. |
+| Contrôles mode serveur simulé | `WG_DATA_SOURCE=supabase npm run check` | 243 OK / 0 KO, sans service distant. |
+| Vitest | `npm run test:unit` | 148 / 148, dont les tests Auth, fournisseur simulé, commandes WhatsApp, reçu/PDF et SQL isolé. |
+| Types Edge | `npx --yes deno@2.9.6 check --no-config supabase/functions/whatsapp-dispatch/index.ts supabase/functions/whatsapp-webhook/index.ts` | Réussi, sans appel distant ; ajouté à la CI. |
+| SQL concurrent | `npm run test:postgres:concurrency` avec PostgreSQL 17.11 temporaire vierge | 30 / 30 contrôles atomiques, 51 / 51 WhatsApp, 49 / 49 station et finance ; douze courses. La vérification antérieure sur PostgreSQL 18.6 concernait seulement les migrations jusqu’à `053`. |
+| Build | `npm run build` | Réussi ; avertissement Vite sur un chunk > 500 kB. |
+| Playwright local | `npm run test:e2e` | 22 / 22 dans Chromium, dont reçu et PDF. |
+| Playwright connecté simulé | `npm run test:e2e:connected` | 22 / 22 après adaptation des fixtures station ; toutes les requêtes Supabase sont interceptées. |
 
-## 2. Tests SQL distants
+Les anciens échecs de `check` provenaient de contrôles réclamant encore une ancienne vitrine ixartz et des témoignages, ainsi que d’attentes de tarifs devenues obsolètes. Ils ont été remplacés par des assertions sur **la vitrine actuelle** : navigation réelle, données fictives identifiées, absence de témoignages inventés, plans serveur distincts des plans locaux et absence de repli sur erreur. Les deux contrôles P07 concernant l’ajout de produits fictifs passent aussi après correction du comportement. Les contrôles n’ont pas simplement été désactivés. Une assertion Playwright réclamant l’ancien libellé du CTA a également été mise à jour et teste désormais sa destination et son clic.
 
-| Phase | Fichier | Résultat |
-| --- | --- | --- |
-| P05 | `p05_rollback.sql` | 17/17 |
-| P06 | `p06_rollback.sql` | 32/32 |
-| P07 | `p07_rollback.sql` | 22/22 |
-| P08 | `p08_rollback.sql` | 35/35 |
-| P09 | `p09_rollback.sql` | 30/30 |
-| P10 | `p10_rollback.sql` | 30/30 |
+Les deux suites Playwright reconstruisent `dist/` avec des configurations différentes : les exécuter **séquentiellement**, tout comme les deux `check` lorsque d’autres builds/tests modifient le même environnement. Les tests ici ont utilisé un Chromium headless temporaire non versionné ; la CI installe Chromium avec Playwright. La CI est configurée pour exécuter les deux suites, les deux `check` et un PostgreSQL 17 temporaire ; vérifier son statut sur le commit de la PR. `npm run test:e2e:list` et `npx playwright test -c playwright.logo.config.ts --list` listent les parcours. Ne jamais utiliser les overrides Playwright pour cibler la production.
 
-Le test P10 couvre : 49 migrations, 70 tables, 5 index, 4 RPC, bucket privé, 5 policies objets, 5 policies buckets, 5 gardes `RESTRICTIVE`, 0 ligne Storage visible par `anon` malgré le grant `SELECT` historique, refus d’écriture `anon` et de bucket `authenticated` en `42501`, SELECT du bucket autorisé pour `authenticated`, pagination A/B, limite 100, offset négatif, période inversée `23514`, idempotence `true` puis `false`, clé invalide `23514`, RPC non autorisée `23514`, écriture directe `42501`, chemin Storage serveur, isolation A/B et déclencheurs quota conservés. Les règles pures couvrent en plus le nom WebP et la limite 512 px de l’optimisation d’image. Après `ROLLBACK`, l’introspection confirme 0 compte, 0 entreprise, 0 lavage, 0 objet Storage, 0 ligne d’idempotence, 0 journal plateforme.
+## 2. Création atomique : couverture et limites
 
-## 3. EXPLAIN ANALYZE
+- `supabase/tests/atomic_wash_rollback.sql` teste **30 contrôles**, notamment refus de paiement/caisse fermée et rollback des écritures associées, surpaiement, droits d’affectation et de paiement, isolation d’entreprise/station/utilisateur, même clé et même contenu, collision de contenu ou d’ancienne clé, prix figé, annulation, canaux et privilèges. Les fixtures du script sont annulées par `ROLLBACK`.
+- `tests/unit/station-logo-db.test.ts` applique les **54 migrations numérotées locales** (`001`–`055`, sans `048`) dans PGlite avec Auth/Storage simulés : logo **16/16**, P10 **30/30**, P05 **17/17**, P06 **32/32**, atomique **30/30**, WhatsApp **51/51** et périmètre station/finance **49/49**, puis vérifie le rollback. Les anciens scripts sont exécutés avant `053` pour conserver leurs attentes historiques de schéma. Ces résultats ne prouvent pas l’état d’une base Supabase distante.
+- `scripts/test-atomic-wash-concurrency.cjs` exige un socket Unix sous `/tmp` et refuse tout cluster non vierge. Il crée une base et des rôles de test, applique les migrations, exécute les 30 contrôles atomiques puis vérifie trois courses : même clé/contenu → une fiche, un paiement, un mouvement ; contenu différent → refus `23505` ; rollback de la première transaction → une seule réussite de la seconde. Il applique ensuite `053`, exécute les 51 contrôles WhatsApp et teste six courses : deux workers pour un seul claim, deux clics manuels pour une seule demande, retrait d’accord concurrent et restitution concurrente empêchant chacun le claim, livraison tardive annulant une relance encore en attente, et changement du numéro concurrent refusant l’accord pour l’ancien numéro sans créer de preuve. Après `054`–`055`, il exécute 49 contrôles station/finance et trois courses supplémentaires : clé de paiement identique, deux paiements concurrents dépassant le solde, et clé de dépense identique. Il supprime ensuite sa base et ses rôles. La CI initialise et arrête son propre cluster PostgreSQL 17 ; ce test n’est pas destiné à un cluster existant ou distant.
+- `tests/unit/wash-atomic-adapter.test.ts` couvre le contrat RPC unique, les canaux, la distinction refus/résultat incertain, les collisions, la reprise et la validation du stockage. Les tests de store contrôlent aussi les quantités et montants entiers avant écriture.
+- `e2e-connected/operations.spec.ts` simule paiement refusé, réponse perdue après commit puis rechargement, refus après résultat incertain, double clic, échec de relecture après succès et migration absente. La fixture intercepte les appels HTTP : le SQL et les accès réels ne sont pas exécutés par ces tests. La reprise contient la commande dans `sessionStorage`, dans le même onglet, pour le même utilisateur et la même station ; elle ne résiste pas à l’effacement du stockage ou au changement d’appareil. Une commande illisible bloque une nouvelle création plutôt que d’être effacée.
+- Les anciennes RPC restent accessibles aux anciens clients : elles ne deviennent pas atomiques. Une collision avec une ancienne fiche doit être vérifiée manuellement. La branche conserve également la clé d’un paiement ultérieur dans le même onglet jusqu’à une relecture confirmant cette clé ; si la fiche ne figure plus parmi les 200 dernières, la relecture ne peut pas confirmer la tentative et la clé reste conservée. Vérifier les paiements côté serveur avant toute intervention manuelle.
 
-Après `ANALYZE` (`34eba461-6c02-43d9-9f57-ba05508a5a70`), trois plans ont été relevés avec `enable_seqscan=off` :
+## 3. Autres parcours et limites
 
-| Requête | Plan | Request id |
-| --- | --- | --- |
-| Page lavages | `Index Scan using ix_p10_washes_page` | `ecf17085-d185-477d-95e8-466ab1ac596e` |
-| Page paiements | `Index Scan using ix_p10_payments_page` | `c45728e6-59a0-4cbf-9f87-044b87096e6c` |
-| Journal plateforme | `Index Scan using ix_p10_platform_audit_page` | `e3df9e1f-987f-48dd-8b65-6a61c5149b14` |
+- **Stations et finance (`station_scope_rollback.sql`)** : isolation entre entreprises et stations, métriques sur plus de 200 fiches, consolidation et certification à périmètre figé, collisions et refus, caisse, paiements et dépenses. Les certifications historiques sans périmètre ne sont pas attribuées. Les changements de station en navigation et les régressions d’autorisations doivent aussi être vérifiés avec de vrais comptes sur un environnement de recette.
+- **Création client/véhicule** : la reprise évite de recréer un client lorsque son identifiant a été reçu dans le composant, mais ne rend pas les deux créations atomiques et ne résout pas une réponse perdue à la création du client.
+- **Reçu (`tests/unit/wash-receipt.test.ts`, `e2e/receipt.spec.ts`)** : prix figés, remise, paiements annulés, incohérences, station correcte, accents et pagination. Chromium vérifie l’aperçu, l’isolation à l’impression et un vrai PDF téléchargé ; les tests lisent aussi son contenu avec `pdfjs-dist`. Le document n’est pas une facture fiscale.
+- **WhatsApp (`whatsapp_wash_rollback.sql`, `whatsapp-provider.test.ts`, `whatsapp-commands.test.ts`, `e2e-connected/whatsapp*.spec.ts`)** : accord séparé de la fidélité, comparaison du numéro confirmé, changement de numéro/retrait, transitions, droits, isolation, idempotence, webhook signé et filtré, ordre/dédoublonnage des statuts, échecs certains et incertains, réponse perdue ou invalide, relecture incohérente et désactivation en l’absence de configuration. Les fonctions sont testées avec des requêtes Meta et RPC simulées ; Playwright intercepte Supabase et ne lance aucune Edge Function. Aucun message réel ou webhook réel n’est vérifié.
+- **Local (`e2e/critical-journeys.spec.ts`)** : ouverture avec fond, paiement initial et paiements partiels, qualité puis livraison, prix figé, comptage et clôture, données conservées après rechargement ; validations et invitations. La fixture initialise l’état une seule fois et réinjecte la session de test à chaque document. `VITE_WG_TEST_AUTH=1` ne prouve pas une connexion Auth réelle. Les invitations locales restent en mémoire ; aucun e-mail n’est envoyé.
+- **Rapprochement** : les tests unitaires distinguent station, canaux et date de remboursement. Le parcours connecté simulé vérifie qu’une estimation limitée aux fiches chargées n’est pas présentée comme le relevé, que le comptage entier est saisi par l’opérateur et remis à zéro lors d’un changement de période, puis que l’attendu figé est relu du serveur simulé.
+- **Stock** : les tests couvrent les raccourcis exclusivement locaux, l’absence de produits fictifs sur un board serveur vide et le refus des onze écritures en mode mixte ou sans port RPC.
+- **Vitrine et abonnement** : chargement connecté sans prix local transitoire, échec ou table vide sans tarif fictif, plans et limites du serveur simulé, CTA, et avertissement sur les exemples fictifs. Les informations de formule en cours et les demandes dans l’écran Abonnement restent locales et ne sont pas transmises au serveur.
+- **Backend simulé** : `e2e-connected` utilise les adaptateurs Supabase mais intercepte un hôte `.invalid`. Il ne vérifie ni API/permissions réelles, ni RLS et grants du service, ni Edge Function, ni Auth ou e-mail réels. Les tests PostgreSQL isolés simulent eux aussi les rôles, Auth et Storage et ne reproduisent pas toute la plateforme.
+- **Avant usage réel** : sur une recette autorisée et isolée, vérifier la cible, sa sauvegarde et son historique ; si `051` ou `052` y manquent, planifier leur application dans l’ordre sans rejouer une entrée existante. Elles sont déjà enregistrées sur `lavauto` et ne doivent pas y être réappliquées. L’application de `053`–`055` nécessite une autorisation et une réconciliation de l’historique. Exécuter les scripts SQL de rollback avec les prérequis et rôles appropriés ; tester avec de vrais comptes autorisés et non autorisés la création, les refus, la réponse perdue, la concurrence, les canaux, les dépenses, la caisse et le logo. Contrôler RLS/grants, Auth/Storage et le nettoyage des fixtures. Déployer le frontend seulement après validation et autorisation. Aucun test ni e-mail de recette ne doit viser la production ; un rollback SQL ne peut pas annuler un e-mail envoyé.
 
-La base étant vide en dehors des transactions annulées, les temps sont sub-millisecondes ; l’objet du contrôle est l’utilisation des index, pas un benchmark de charge.
+**Correction locale de caisse :** un paiement espèces initial crée désormais un mouvement lié à la caisse ouverte. Aucun rattrapage automatique n’est appliqué aux anciennes données ; vérifier les anciennes fiches, journaux et relevés concernés.
 
-## 4. Playwright et JSDOM
+**Dépendances :** `npm audit` signale 5 vulnérabilités modérées, dont 2 en production (`react-router` / `react-router-dom`), sans haute ni critique. La correction proposée implique React Router 7 et n’a pas été appliquée sans analyse de compatibilité. `pdfjs-dist` est réservé aux tests et nécessite Node 22.13 ou supérieur (validation sous Node 22.22.3).
 
-`e2e/erp.spec.ts` contient **15 parcours** : vitrine, connexion, inscription, tableau de bord, mise en route, lavages, prestations, clients, employés, caisse, dépenses, rapports, consolidation, qualité, back-office super admin. L’état est injecté par `page.addInitScript` avec `VITE_WG_TEST_AUTH=1`, sans compte Auth ni réseau Supabase.
+## 4. Résultats distants historiques
 
-Le téléchargement officiel `npx playwright install chromium` reste bloqué dans le sandbox Arena (`cdn.playwright.dev` hors allow-list). Un binaire Chromium headless empaqueté, récupéré depuis `registry.npmjs.org` et **non versionné**, a toutefois permis d’exécuter réellement les 15 specs via `PLAYWRIGHT_CHROMIUM_PATH` : **15 passed (13,7 s)**. Le binaire de secours est utilisé uniquement pour la recette locale ; la CI utilise l’installation officielle.
+Ces résultats, documentés lors des phases précédentes, sont **antérieurs à 051 et 052** et ne prouvent pas leur déploiement : P05 **17/17**, P06 **32/32**, P07 **22/22**, P08 **35/35**, P09 **30/30**, P10 **30/30** en `ROLLBACK`. La recette P10 documentait 49 migrations, 70 tables, le bucket privé, les gardes Storage, la pagination et l’isolation A/B ; les `EXPLAIN ANALYZE` historiques ne constituent pas un benchmark de charge.
 
-- `npm run test:e2e:list` valide la découverte des 15 specs ;
-- `npm run test:e2e` exécute les 15 specs dans un vrai Chromium ;
-- `npm run check` rejoue les 15 parcours équivalents en JSDOM ;
-- `.github/workflows/ci.yml` installe Chromium et exécute `npm run test:e2e`.
-
-## 5. Non-régression
-
-Aucun test ne crée de compte Auth persistant, d’e-mail, de secret, de clé API, de bucket public, de fournisseur d’envoi ou de fixture métier. Aucun `npm audit fix --force`, aucun navigateur réel exécuté dans le sandbox, aucun déploiement Vercel effectif. Les migrations `001`–`044` ne sont jamais réappliquées.
-
-Vérifications finales (local et **CI PR #3 `quality` pass, PR fusionnée dans `main`**) : `npm run typecheck` 0 erreur ; `npm run lint` 25/25 ; `npm run check` 238 OK / 0 KO · local ; `WG_DATA_SOURCE=supabase npm run check` 239 OK / 0 KO · supabase ; `npm run test:unit` 16/16 ; `npm run test:e2e:list` 15 specs ; `npm run test:e2e` **15 / 15** ; `npm run build` 509 modules avec 7 chunks paresseux et `index-D-EI3sxK.js` 1 179,85 kB / gzip 314,10 kB (avertissement > 500 kB sur le bundle Recharts) ; `git diff --check` propre ; preview `0.0.0.0:5173` : `/` et `/app/qualite` 200, hôte `.e2b.app` 200, `evil.example.com` 403.
-
-Voir [security.md](security.md) et [deployment.md](deployment.md).
+Voir [security.md](security.md), [washes.md](washes.md), [finance.md](finance.md) et [deployment.md](deployment.md).

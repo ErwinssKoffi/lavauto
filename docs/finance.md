@@ -1,6 +1,16 @@
 # Prompt 06 — Caisse, paiements, finance et rentabilité honnête
 
-**Statut P06 : livré, puis étendu par le Prompt 07.** Le projet Supabase `cgxrqorwmmcyqescatzs` portait **29 migrations** (`001` → `029`) à la livraison P06 ; il en porte désormais **33** avec `030`–`033`. `024`–`033` ont été appliquées et vérifiées une seule fois ; elles ne doivent jamais être réappliquées. Aucun compte Auth, e-mail, invitation, secret, clé API, commit ou PR n'a été créé pour ces phases.
+> **Reçu client local à cette branche :** aperçu, impression et PDF reprennent prix figés, remise totale, paiements actifs/annulés et solde enregistré, avec avertissement en cas d’incohérence. Il s’agit d’un instantané non fiscal, pas d’une pièce comptable certifiée. La remise de promotion n’est pas déduite deux fois. Voir [whatsapp-receipts.md](whatsapp-receipts.md).
+>
+> **Migration `052` appliquée sur `lavauto`, frontend de cette branche non déployé en production :** la nouvelle création connectée et son paiement initial passent par une transaction unique. Les moyens `wave`, `orange_money` et `mtn_momo` sont conservés séparément dans les paiements, dépenses et projections des tableaux de bord ; ils ne génèrent pas de mouvement de caisse espèces. Les migrations `054`–`055` restent locales : elles ajoutent le périmètre station, la certification figée, la validation et des protections pour les paiements et dépenses. Les tests SQL isolés vérifient les paiements, dépenses et rapprochements ; la recette métier distante reste à faire. Aucun fournisseur de paiement n’est connecté automatiquement.
+>
+> Dans l’écran Caisse connecté, avant validation, `channelExpected()` est une **estimation sur les fiches chargées** (200 maximum), filtrée par station et canal, avec remboursements datés dans la période. L’opérateur doit saisir un comptage entier : il n’est pas prérempli avec cette estimation. Lors du scellement, le serveur recalcule l’attendu à partir de ses paiements et remboursements ; l’écran relit ensuite le relevé figé et son écart. Un changement de période efface le comptage saisi. Voir [testing.md](testing.md). Les anciens paiements et rapprochements existants ne sont pas réécrits par `052`.
+>
+> Une réponse perdue pour un paiement **ultérieur** reste un risque distinct : vérifier la fiche et ses paiements avant de réessayer. Les règles de caisse et barèmes modifiés dans Paramètres restent locaux et ne configurent pas les RPC serveur.
+
+Les sections suivantes décrivent les résultats historiques P06/P07 et ne prouvent pas le déploiement de `052`.
+
+**Statut historique P06 : livré, puis étendu par le Prompt 07.** Le projet Supabase `cgxrqorwmmcyqescatzs` portait **29 migrations** (`001` → `029`) à la livraison P06 et en portait **33** après `030`–`033`. `024`–`033` ont été appliquées et vérifiées une seule fois ; elles ne doivent jamais être réappliquées. Aucun compte Auth, e-mail, invitation, secret, clé API, commit ou PR n'a été créé pour ces phases.
 
 ## 1. Ce que la base garantit
 

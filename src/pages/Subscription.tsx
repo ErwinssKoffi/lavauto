@@ -2,7 +2,6 @@ import React, { useEffect } from 'react';
 import { FiCheck, FiCheckCircle, FiClock, FiFileText } from 'react-icons/fi';
 import { useStore } from '../lib/store';
 import { monthStartISO } from '../lib/analytics';
-import { planById } from '../lib/plans';
 import { formatDate, formatFCFA } from '../lib/format';
 import { buildReport } from '../lib/metrics';
 import { Alert, Badge, Card, PageHeader, Progress } from '../components/ui';
@@ -17,8 +16,15 @@ export default function Subscription() {
     if (dataSource === 'supabase' && (!authReady || !identity)) return;
     void refreshSubscriptionUsage(periodStart).catch(() => { /* erreur notifiée par le store */ });
   }, [dataSource, authReady, identity?.userId, periodStart, refreshSubscriptionUsage]);
-  const sub = state.subscription;
-  const current = planById(sub?.planId);
+  const connected = dataSource === 'supabase';
+  // L'abonnement lui-même est encore conservé localement : ne pas réutiliser
+  // celui d'une autre entreprise après un changement de session.
+  const sub = state.subscription?.companyId === state.company?.id ? state.subscription : null;
+  // Le cache global démarre avec des formules de démonstration. Utiliser
+  // uniquement les plans exposés par le store, vides tant que la lecture
+  // connectée n'a pas réussi, y compris pour la formule et la demande courantes.
+  const current = plans.find((plan) => plan.id === sub?.planId);
+  const pendingPlan = plans.find((plan) => plan.id === sub?.pendingPlanId);
   const plansUnavailable = plans.length === 0;
   const month = buildReport(state, 'mois');
   const usageReady = subscriptionUsage.periodStart === periodStart && (
@@ -28,15 +34,9 @@ export default function Subscription() {
     || subscriptionUsage.rows.length > 0
   );
   const usage = usageReady ? subscriptionUsage : null;
-  const limit = usage && (usage.limits.stations !== null || usage.limits.employees !== null || usage.limits.washesPerMonth !== null)
-    ? {
-      stations: usage.limits.stations ?? current?.limits.stations ?? 1,
-      employees: usage.limits.employees ?? current?.limits.employees ?? 3,
-      washesPerMonth: usage.limits.washesPerMonth ?? current?.limits.washesPerMonth ?? 100,
-    }
-    : current?.limits ?? (plansUnavailable
-      ? null
-      : { stations: 1, employees: 3, washesPerMonth: 100 });
+  // En connecté, seul le relevé d'usage serveur fait autorité : ni le cache
+  // local, ni des valeurs par défaut ne remplacent une limite absente.
+  const limit = usage?.limits ?? (!connected ? current?.limits : null);
   const stations = usage?.usage.stations ?? (state.station ? 1 : 0);
   const employees = usage?.usage.employees ?? state.users.filter((u) => u.active).length;
   const washesThisMonth = usage?.usage.washes ?? month.washes.length;
@@ -44,8 +44,9 @@ export default function Subscription() {
   return (
     <div>
       <PageHeader title="Abonnement" subtitle="Formule en cours, consommation par rapport aux limites, comparaison des formules et demande de changement."
-        actions={<Badge tone={sub?.status === 'essai' ? 'warn' : 'success'}>{sub?.status === 'essai' ? 'Essai en cours' : sub?.status === 'suspendue' ? 'Suspendu' : 'Formule active'}</Badge>} />
+        actions={<Badge tone={connected || !sub ? 'neutral' : sub.status === 'essai' ? 'warn' : 'success'}>{connected ? 'Statut non confirmé' : !sub ? 'Statut indisponible' : sub.status === 'essai' ? 'Essai en cours' : sub.status === 'suspendue' ? 'Suspendu' : 'Formule active'}</Badge>} />
 
+      {connected && <div className="mb-5"><Alert kind="info">La formule en cours et les demandes affichées proviennent de ce navigateur et ne sont pas confirmées ni transmises au serveur. Les compteurs et limites ci-dessous proviennent du relevé serveur lorsqu’il est disponible.</Alert></div>}
       <div className="grid gap-5 lg:grid-cols-3">
         <Card className="lg:col-span-1">
           <p className="wg-muted text-xs font-bold uppercase tracking-wide">Formule en cours</p>
@@ -56,9 +57,9 @@ export default function Subscription() {
             {sub?.trialEndsAt && <div className="flex justify-between"><span className="wg-muted">Fin de l’essai</span><span className="font-medium">{formatDate(sub.trialEndsAt)}</span></div>}
             <div className="flex justify-between"><span className="wg-muted">Statut</span><Badge tone="accent">{sub?.status ?? '—'}</Badge></div>
           </div>
-          {sub?.pendingPlanId && <div className="mt-4"><Alert kind="info">Demande de passage à « {planById(sub.pendingPlanId)?.name} » enregistrée, en attente de traitement.</Alert></div>}
+          {sub?.pendingPlanId && <div className="mt-4"><Alert kind="info">Demande locale de passage à « {pendingPlan?.name ?? 'formule indisponible'} », non transmise au serveur.</Alert></div>}
           <div className="mt-5 border-t pt-4" style={{ borderColor: 'var(--wg-border)' }}>
-            <p className="wg-muted text-[11px] leading-relaxed">Ces tarifs sont lus depuis la table des formules : la vitrine et la facturation partagent la même source.</p>
+            <p className="wg-muted text-[11px] leading-relaxed">{connected ? 'Les tarifs affichés proviennent des formules lues dans la base.' : 'Les tarifs affichés sont ceux de la démonstration locale.'}</p>
           </div>
         </Card>
 
@@ -71,14 +72,16 @@ export default function Subscription() {
               <LimitRow icon={<FiClock />} label="Lavages ce mois-ci" value={washesThisMonth} max={limit.washesPerMonth} />
             </div>
           ) : (
-            <Alert kind="danger">Limites de formule indisponibles : la base n’a pas pu être lue. {plansError ?? ''}</Alert>
+            <Alert kind="info">Compteurs et limites indisponibles pour le moment.</Alert>
           )}
-          <p className="wg-muted mt-4 text-xs">Les compteurs sont calculés à partir des données réellement enregistrées ; les limites sont relues côté serveur, jamais envoyées par le navigateur.</p>
+          <p className="wg-muted mt-4 text-xs">{connected ? 'Le relevé de consommation et les limites sont relus côté serveur, jamais envoyés par le navigateur.' : 'Les compteurs et limites sont calculés à partir des données locales.'}</p>
         </Card>
       </div>
 
       <h2 className="mb-3 mt-8 text-sm font-bold">Comparaison des formules</h2>
-      {plansUnavailable && <div className="mb-4"><Alert kind="danger">Aucune formule disponible : {plansError ?? 'lecture de la base impossible.'}</Alert></div>}
+      {plansUnavailable && (plansError
+        ? <div className="mb-4"><Alert kind="danger">Aucune formule disponible : {plansError}</Alert></div>
+        : <p role="status" className="wg-muted mb-4 text-sm">Chargement des formules…</p>)}
       <div className="grid gap-4 lg:grid-cols-3">
         {plans.map((p) => {
           const isCurrent = p.id === sub?.planId;
@@ -90,24 +93,24 @@ export default function Subscription() {
               <ul className="mt-4 space-y-2 text-xs">
                 {p.features.map((f) => <li key={f} className="flex items-start gap-2"><FiCheck className="mt-0.5 shrink-0 text-sky-400" /> {f}</li>)}
               </ul>
-              <button className={`wg-btn mt-5 w-full ${isCurrent ? 'wg-btn-ghost' : 'wg-btn-primary'}`} disabled={isCurrent || pending}
+              <button className={`wg-btn mt-5 w-full ${isCurrent ? 'wg-btn-ghost' : 'wg-btn-primary'}`} disabled={!sub || isCurrent || pending}
                 onClick={() => requestPlanChange(p.id)}>
-                {isCurrent ? 'Formule en cours' : pending ? 'Demande en attente' : 'Demander ce changement'}
+                {isCurrent ? 'Formule en cours' : pending ? 'Demande locale en attente' : 'Noter ce changement localement'}
               </button>
             </Card>
           );
         })}
       </div>
-      <p className="wg-muted mt-4 text-xs">Une demande de changement est journalisée ; elle ne modifie pas immédiatement la facturation. Les tarifs 0 / 15 000 / 35 000 FCFA sont des hypothèses commerciales administrables depuis le back-office super admin.</p>
+      <p className="wg-muted mt-4 text-xs">Une demande de changement est une note conservée dans ce navigateur : elle n’est pas envoyée au serveur et ne modifie pas la facturation.</p>
     </div>
   );
 }
 
-function LimitRow({ icon, label, value, max }: { icon: React.ReactNode; label: string; value: number; max: number }) {
+function LimitRow({ icon, label, value, max }: { icon: React.ReactNode; label: string; value: number; max: number | null }) {
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between text-xs"><span className="flex items-center gap-2 font-medium"><span className="text-sky-400">{icon}</span>{label}</span><span className="wg-muted">{value.toLocaleString('fr-FR')} / {max.toLocaleString('fr-FR')}</span></div>
-      <Progress value={value} max={max} tone={value >= max ? 'warn' : 'accent'} />
+      <div className="mb-2 flex items-center justify-between text-xs"><span className="flex items-center gap-2 font-medium"><span className="text-sky-400">{icon}</span>{label}</span><span className="wg-muted">{value.toLocaleString('fr-FR')} / {max === null ? '∞ (aucune limite définie)' : max.toLocaleString('fr-FR')}</span></div>
+      {max !== null && <Progress value={value} max={max} tone={value >= max ? 'warn' : 'accent'} />}
     </div>
   );
 }

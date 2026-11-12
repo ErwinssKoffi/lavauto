@@ -1,11 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { FiPlus, FiSearch, FiUsers, FiX } from 'react-icons/fi';
 import { useStore } from '../lib/store';
 import { formatDate, formatFCFA } from '../lib/format';
 import { CRM_CHANNELS } from '../lib/crm';
+import { validateCustomer, validatePlate } from '../lib/validation';
 import type { CrmChannel } from '../types';
+import { WhatsappConsentPanel } from '../components/WhatsappPanels';
 import {
-  Badge, Card, EmptyState, Input, Modal, PageHeader, Select, useSafeAction,
+  Alert, Badge, Card, EmptyState, Input, Modal, PageHeader, Select, useSafeAction,
 } from '../components/ui';
 
 type Form = {
@@ -30,6 +32,10 @@ export default function Clients() {
   } = useStore();
   const safe = useSafeAction();
   const [open, setOpen] = useState(false);
+  const [createdCustomerId, setCreatedCustomerId] = useState<string | null>(null);
+  const createdRef = useRef<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const creatingRef = useRef(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [f, setF] = useState<Form>(emptyForm);
@@ -102,36 +108,45 @@ export default function Clients() {
       )}
 
       <Modal open={open} onClose={() => setOpen(false)} title="Nouveau client">
+        {createdCustomerId && <div className="mb-3"><Alert kind="warn">Le client est déjà enregistré. Si le véhicule n’a pas été confirmé, réessayez seulement son rattachement ou fermez et consultez la fiche ; ne recréez pas le client.</Alert></div>}
         <div className="space-y-3">
-          <Input label="Nom *" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
+          <Input label="Nom *" disabled={Boolean(createdCustomerId) || creating} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
           <div className="grid gap-3 sm:grid-cols-2">
-            <Input label="Téléphone" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} />
-            <Input label="E-mail" type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
-            <Input label="Plaque" value={f.plate} onChange={(e) => setF({ ...f, plate: e.target.value })} />
-            <Select label="Canal préféré" value={f.channel} onChange={(e) => setF({ ...f, channel: e.target.value as CrmChannel })}>{channelOptions}</Select>
+            <Input label="Téléphone" disabled={Boolean(createdCustomerId) || creating} value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} />
+            <Input label="E-mail" type="email" disabled={Boolean(createdCustomerId) || creating} value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
+            <Input label="Plaque" disabled={creating} value={f.plate} onChange={(e) => setF({ ...f, plate: e.target.value })} />
+            <Select label="Canal préféré" disabled={Boolean(createdCustomerId) || creating} value={f.channel} onChange={(e) => setF({ ...f, channel: e.target.value as CrmChannel })}>{channelOptions}</Select>
           </div>
-          <Input label="Notes" value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} />
+          <Input label="Notes" disabled={Boolean(createdCustomerId) || creating} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} />
           <div className="grid gap-3 sm:grid-cols-2">
-            <Select label="Flotte" value={f.fleetId} onChange={(e) => setF({ ...f, fleetId: e.target.value })}>
+            <Select label="Flotte" disabled={Boolean(createdCustomerId) || creating} value={f.fleetId} onChange={(e) => setF({ ...f, fleetId: e.target.value })}>
               <option value="">Client individuel</option>{state.fleets.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
             </Select>
-            <label className="flex items-center gap-2 self-end pb-2 text-xs"><input type="checkbox" checked={f.loyaltyOptIn} onChange={(e) => setF({ ...f, loyaltyOptIn: e.target.checked })} /> Inscrit au programme de fidélité</label>
+            <label className="flex items-center gap-2 self-end pb-2 text-xs"><input type="checkbox" disabled={Boolean(createdCustomerId) || creating} checked={f.loyaltyOptIn} onChange={(e) => setF({ ...f, loyaltyOptIn: e.target.checked })} /> Inscrit au programme de fidélité</label>
           </div>
         </div>
         <div className="mt-5 flex justify-end gap-2">
           <button className="wg-btn wg-btn-ghost" onClick={() => setOpen(false)}><FiX /> Annuler</button>
-          <button className="wg-btn wg-btn-primary" onClick={() => safe(async () => {
-            if (!f.name.trim()) return;
-            const id = await saveCustomerProfile({
-              stationId, name: f.name, phone: f.phone, email: f.email,
-              notes: f.notes, channel: f.channel, loyaltyOptIn: f.loyaltyOptIn,
-              fleetId: f.fleetId || null,
+          <button className="wg-btn wg-btn-primary" disabled={creating} onClick={() => {
+            if (creatingRef.current) return;
+            creatingRef.current = true; setCreating(true);
+            void safe(async () => {
+              try {
+                const profile = { stationId, name: f.name, phone: f.phone, email: f.email,
+                  notes: f.notes, channel: f.channel, loyaltyOptIn: f.loyaltyOptIn, fleetId: f.fleetId || null };
+                // Valider les deux saisies avant la première écriture.
+                validateCustomer(profile); validatePlate(f.plate);
+                let id = createdRef.current;
+                if (!id) {
+                  id = await saveCustomerProfile(profile);
+                  createdRef.current = id; setCreatedCustomerId(id);
+                }
+                if (f.plate.trim()) await saveCustomerVehicle({ stationId, customerId: id, plate: f.plate });
+                createdRef.current = null; setCreatedCustomerId(null);
+                setF(emptyForm()); setOpen(false); notify('success', 'Fiche créée. Ouvrez-la pour enregistrer séparément l’accord WhatsApp explicite.');
+              } finally { creatingRef.current = false; setCreating(false); }
             });
-            if (f.plate.trim()) {
-              await saveCustomerVehicle({ stationId, customerId: id, plate: f.plate });
-            }
-            setF(emptyForm()); setOpen(false); notify('success', 'Fiche client créée.');
-          })}>Créer la fiche</button>
+          }}>{creating ? 'Enregistrement…' : createdCustomerId ? 'Terminer le rattachement' : 'Créer la fiche'}</button>
         </div>
       </Modal>
 
@@ -150,6 +165,7 @@ export default function Clients() {
             <label className="flex items-center gap-2 self-end pb-2 text-xs"><input type="checkbox" checked={draft.loyaltyOptIn} onChange={(e) => setDraft({ ...draft, loyaltyOptIn: e.target.checked })} /> Fidélité activée</label>
           </div>
           <div className="mt-4 flex justify-end"><button className="wg-btn wg-btn-primary" onClick={() => safe(async () => {
+            validateCustomer({ stationId, name: draft.name, phone: draft.phone, email: draft.email }); validatePlate(draft.plate);
             await saveCustomerProfile({
               stationId, customerId: detail.id, name: draft.name, phone: draft.phone,
               email: draft.email, notes: draft.notes, channel: draft.channel,
@@ -164,10 +180,12 @@ export default function Clients() {
             notify('success', 'Fiche client enregistrée.');
           })}>Enregistrer la fiche</button></div>
 
+          <WhatsappConsentPanel key={`${detail.id}:${detail.phone}`} customerId={detail.id} phone={detail.phone} />
+
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
             <Card><p className="wg-muted text-[11px] uppercase">Cartes de fidélité</p><p className="mt-1 text-lg font-bold">{cards.length}</p><p className="wg-muted text-xs">{cards.reduce((s, c) => s + c.pointsBalance, 0)} point(s)</p></Card>
             <Card><p className="wg-muted text-[11px] uppercase">Forfaits</p><p className="mt-1 text-lg font-bold">{packages.filter((p) => p.status === 'active').length}</p><p className="wg-muted text-xs">{packages.reduce((s, p) => s + p.washesRemaining, 0)} lavage(s) restant(s)</p></Card>
-            <Card><p className="wg-muted text-[11px] uppercase">Notifications</p><p className="mt-1 text-lg font-bold">{notifications.filter((n) => n.status === 'pending').length}</p><p className="wg-muted text-xs">en attente, aucun envoi</p></Card>
+            <Card><p className="wg-muted text-[11px] uppercase">File CRM historique</p><p className="mt-1 text-lg font-bold">{notifications.filter((n) => n.status === 'pending').length}</p><p className="wg-muted text-xs">en attente, aucun envoi ; hors avis lavage prêt</p></Card>
           </div>
 
           <h3 className="mt-6 text-sm font-bold">Historique des lavages</h3>

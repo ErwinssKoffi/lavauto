@@ -24,6 +24,8 @@
     "vitest.config.ts",
     "playwright.config.ts",
     "tests",
-    "e2e"
+    "e2e",
+    "playwright.logo.config.ts",
+    "e2e-connected"
   ]
 }

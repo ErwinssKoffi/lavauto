@@ -3,21 +3,18 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend,
 } from 'recharts';
-import { FiTrendingUp, FiActivity, FiDollarSign, FiCheckCircle } from 'react-icons/fi';
+import { FiTrendingUp } from 'react-icons/fi';
 import { formatFCFA } from '../lib/format';
-import { getLast7DaysChartData, type DayChartPoint } from '../lib/metrics';
-import { useStore } from '../lib/store';
+import type { DayChartPoint } from '../lib/metrics';
 import { Badge, Card } from './ui';
 
-export default function Revenue7DaysLineChart() {
-  const { state } = useStore();
-  const data = getLast7DaysChartData(state);
+export default function Revenue7DaysLineChart({ data }: { data: DayChartPoint[] }) {
 
   const totalRevenue = data.reduce((s, d) => s + d.revenue, 0);
-  const totalCollected = data.reduce((s, d) => s + d.collected, 0);
+  const hasCollections = data.every((d) => d.collected !== null);
+  const totalCollected = hasCollections ? data.reduce((s, d) => s + (d.collected ?? 0), 0) : null;
   const totalWashes = data.reduce((s, d) => s + d.washesCount, 0);
   const dailyAverage = Math.round(totalRevenue / 7);
-  const collectionRate = totalRevenue > 0 ? Math.round((totalCollected / totalRevenue) * 100) : 100;
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -45,19 +42,13 @@ export default function Revenue7DaysLineChart() {
               </span>
               <span className="font-bold">{formatFCFA(point.revenue)}</span>
             </div>
-            <div className="flex items-center justify-between gap-4">
+            {point.collected !== null && <div className="flex items-center justify-between gap-4">
               <span className="flex items-center gap-1.5 text-emerald-400">
                 <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                Encaissé :
+                Encaissements nets :
               </span>
               <span className="font-bold">{formatFCFA(point.collected)}</span>
-            </div>
-            {point.revenue - point.collected > 0 && (
-              <div className="flex items-center justify-between gap-4 text-amber-400 text-[11px] pt-1 border-t" style={{ borderColor: 'rgba(148, 163, 184, 0.15)' }}>
-                <span>Reste dû :</span>
-                <span className="font-semibold">{formatFCFA(point.revenue - point.collected)}</span>
-              </div>
-            )}
+            </div>}
           </div>
         </div>
       );
@@ -101,9 +92,7 @@ export default function Revenue7DaysLineChart() {
             <span className="font-bold text-slate-200">{formatFCFA(dailyAverage)}</span>
           </div>
 
-          <Badge tone={collectionRate >= 90 ? 'success' : 'warn'}>
-            Recouvrement : {collectionRate}%
-          </Badge>
+          {totalCollected !== null && <Badge>Encaissements nets : {formatFCFA(totalCollected)}</Badge>}
         </div>
       </div>
 
@@ -128,7 +117,7 @@ export default function Revenue7DaysLineChart() {
               tickLine={false}
               axisLine={{ stroke: '#334155' }}
               tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`}
-              domain={[0, 'auto']}
+              domain={['auto', 'auto']}
             />
             <Tooltip content={<CustomTooltip />} />
             <Legend
@@ -147,7 +136,7 @@ export default function Revenue7DaysLineChart() {
               activeDot={{ r: 7, stroke: '#38bdf8', strokeWidth: 3, fill: '#ffffff' }}
               isAnimationActive={false}
             />
-            <Line
+            {hasCollections && <Line
               type="monotone"
               dataKey="collected"
               name="Montant encaissé"
@@ -157,14 +146,14 @@ export default function Revenue7DaysLineChart() {
               dot={{ r: 3.5, fill: '#059669', stroke: '#34d399', strokeWidth: 1.5 }}
               activeDot={{ r: 6, stroke: '#34d399', strokeWidth: 2, fill: '#ffffff' }}
               isAnimationActive={false}
-            />
+            />}
           </LineChart>
         </ResponsiveContainer>
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t pt-2.5 text-[11px] wg-muted" style={{ borderColor: 'var(--wg-border)' }}>
         <span>Volume cumulé : <strong>{totalWashes} lavage(s)</strong> sur la période de 7 jours.</span>
-        <span>Mise à jour en temps réel à chaque encaissement.</span>
+        <span>Paiements et annulations comptabilisés à leur date respective.</span>
       </div>
     </Card>
   );

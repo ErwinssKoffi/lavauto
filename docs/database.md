@@ -1,8 +1,10 @@
 # LAVAUTO — Base de données & architecture du domaine (Prompts 03–09)
 
-**Date :** 12/11/2026 · **Projet Supabase :** `lavauto` (`cgxrqorwmmcyqescatzs`, `eu-central-1`, PostgreSQL 17.11) · **Branche :** `arena/868cde36-lavauto` · **Statut :** schéma P03, Auth / RBAC P04, cœur lavages P05, finance P06, stock P07, CRM P08, analytics / administration SaaS P09 et QA / déploiement P10 appliqués.
+> Le journal ci-dessous décrit les phases précédentes. `051_station_logo.sql` et `052_atomic_wash_creation.sql` ont été appliquées sur `lavauto` via le connecteur, sous `20261112130423_station_logo` et `20261112130520_atomic_wash_creation` ; leurs contenus correspondent aux fichiers locaux. `051` ajoute le chemin privé du logo ; `052` ajoute la création atomique et la distinction des canaux mobiles. Le dépôt contient maintenant **54 migrations locales numérotées**, sans `048` : `053` (WhatsApp), `054` (périmètre station et métriques) et `055` (validation et finance) n’ont pas été appliquées à distance. Voir [whatsapp-receipts.md](whatsapp-receipts.md) et [testing.md](testing.md).
 
-> Ce document décrit le schéma **réellement appliqué**, pas une proposition. Le projet `BarberShop` (`fpapxbfsiiwgpvsefsec`) n'a pas été consulté en écriture ni modifié. Aucune clé `service_role`, aucun secret et aucune donnée métier de démonstration n'ont été introduits.
+**Date :** 12/11/2026 · **Projet Supabase :** `lavauto` (`cgxrqorwmmcyqescatzs`, `eu-central-1`, PostgreSQL 17.11) · **Branche historique P10 :** `arena/868cde36-lavauto` · **Statut historique :** schéma P03, Auth / RBAC P04, cœur lavages P05, finance P06, stock P07, CRM P08, analytics / administration SaaS P09 et QA / déploiement P10 appliqués.
+
+> Les sections de phases décrivent le schéma historique réellement appliqué à leur date ; les vérifications de `051` et `052` sont documentées séparément dans [testing.md](testing.md). Le projet `BarberShop` (`fpapxbfsiiwgpvsefsec`) n'a pas été consulté en écriture ni modifié. Aucune clé `service_role`, aucun secret et aucune donnée métier de démonstration n'ont été introduits.
 
 ---
 
@@ -19,18 +21,18 @@ Le Prompt 03 pose les fondations persistantes de l'ERP SaaS multi-entreprises, *
 | Montants | Entiers `*_minor` en unité mineure de la devise. `XOF` (FCFA, 0 décimale) est la devise initiale ; `currencies` prépare XAF, GHS, NGN, KES. |
 | Historique | Prix figé dans `wash_items`, statuts dans `wash_status_history`, paiements, mouvements de caisse et de stock **append-only** ; `REVOKE UPDATE/DELETE` + triggers d'immuabilité. |
 | Transactions | 8 fonctions métier `SECURITY DEFINER` contrôlent permission, état, périmètre, idempotence et cohérence dans une seule transaction ; 11 fonctions Auth/RBAC supplémentaires ajoutées au Prompt 04. |
-| Versionnement | 49 migrations SQL additives dans `supabase/migrations/`, appliquées dans l'ordre au projet `lavauto` (10 P03 + 10 P04 + 3 P05 + 6 P06 + 4 P07 + 5 P08 + 6 P09 + 5 P10). Le fichier `048` a été retiré sans jamais être appliqué. |
+| Versionnement | 49 migrations historiques P03–P10 ont été suivies par `051` et `052` sur `lavauto`, soit 51 entrées distantes. Le fichier `048` a été retiré sans jamais être appliqué. Les versions distantes horodatées diffèrent des noms locaux : ne pas les rejouer. |
 | Réversibilité | `VITE_DATA_SOURCE=local` restaure immédiatement le comportement frontend précédent ; les migrations restent en place. |
 
 ### Ce qui n'est **pas** dans le Prompt 03
 
-Le Prompt 04 a ensuite branché Supabase Auth, les invitations, les permissions serveur et les triggers d'audit : voir [docs/auth-rbac.md](auth-rbac.md). Le Prompt 05 a branché le cycle lavages sur des RPC `SECURITY DEFINER` (migrations `021`/`022`/`023`, écritures directes révoquées) : voir [docs/washes.md](washes.md). Le Prompt 06 a branché caisse, paiements, dépenses, rapprochements par canal, commissions figées et rapport `my_profitability()` : voir [finance.md](finance.md). Le Prompt 07 a ajouté les coûts de stock et la certification du résultat net ; voir [stock.md](stock.md). Le Prompt 08 a ajouté fiches enrichies, fidélité, forfaits, promotions, flottes et une file de notifications sans fournisseur ; voir [crm.md](crm.md). P09 a livré les vues analytiques, les quotas serveur et le back-office administrable ; voir [analytics.md](analytics.md). Restent volontairement reportés : CI/CD, Storage, E2E navigateur et optimisation (P10).
+Le Prompt 04 a ensuite branché Supabase Auth, les invitations, les permissions serveur et les triggers d'audit : voir [docs/auth-rbac.md](auth-rbac.md). Le Prompt 05 a branché le cycle lavages sur des RPC `SECURITY DEFINER` (migrations `021`/`022`/`023`, écritures directes révoquées) : voir [docs/washes.md](washes.md). Le Prompt 06 a branché caisse, paiements, dépenses, rapprochements par canal, commissions figées et rapport `my_profitability()` : voir [finance.md](finance.md). Le Prompt 07 a ajouté les coûts de stock et la certification du résultat net ; voir [stock.md](stock.md). Le Prompt 08 a ajouté fiches enrichies, fidélité, forfaits, promotions, flottes et une file de notifications sans fournisseur ; voir [crm.md](crm.md). P09 a livré les vues analytiques, les quotas serveur et le back-office administrable ; voir [analytics.md](analytics.md). P10 a ensuite ajouté CI/CD, Storage, E2E navigateur et optimisation.
 
 ---
 
 ## 2. Migrations appliquées
 
-`list_migrations` sur `cgxrqorwmmcyqescatzs` renvoie exactement :
+Le relevé historique `list_migrations` sur `cgxrqorwmmcyqescatzs` indiquait notamment :
 
 | Version | Nom | Contenu |
 | --- | --- | --- |

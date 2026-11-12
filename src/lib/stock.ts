@@ -273,34 +273,36 @@ const INITIAL_STOCK_QTYS: Record<string, number> = {
   'VIT-ECLA-05': 14, // 14 >= 6  -> NORMAL
 };
 
-/** Normalise un état local ou serveur : aucune collection n'est undefined. */
+/** À appeler uniquement après vérification du mode de démonstration local. */
+export function seedLocalDemoStock(state: AppState): AppState {
+  if (!state.station || (state.products ?? []).length > 0) return state;
+  const stationId = state.station.id;
+  const products = DEFAULT_CARWASH_PRODUCTS.map((def, idx) => ({
+    ...def,
+    id: `prod-init-${idx + 1}-${stationId.slice(-4)}`,
+    stationId,
+  }));
+  const stockLevels = products.map((p) => {
+    const initialQty = INITIAL_STOCK_QTYS[p.sku] ?? 0;
+    return {
+      productId: p.id,
+      stationId: p.stationId,
+      name: p.name,
+      unit: p.unit,
+      reorderLevel: p.reorderLevel,
+      qtyOnHand: initialQty,
+      averageCostMinor: p.averageCostMinor,
+      valueMinor: initialQty * p.averageCostMinor,
+    };
+  });
+  return withStockDefaults({ ...state, products, stockLevels });
+}
+
+/** Normalise un état local ou serveur sans inventer de produits ni de stock. */
 export function withStockDefaults(state: AppState): AppState {
   const collections = emptyStockCollections();
-  let products = state.products ?? collections.products;
-  let stockLevels = state.stockLevels ?? collections.stockLevels;
-
-  // Initialisation automatique des consommables de lavage si la station existe et n'a aucun produit
-  if (state.station && products.length === 0) {
-    const stationId = state.station.id;
-    products = DEFAULT_CARWASH_PRODUCTS.map((def, idx) => ({
-      ...def,
-      id: `prod-init-${idx + 1}-${stationId.slice(-4)}`,
-      stationId,
-    }));
-    stockLevels = products.map((p) => {
-      const initialQty = INITIAL_STOCK_QTYS[p.sku] ?? 0;
-      return {
-        productId: p.id,
-        stationId: p.stationId,
-        name: p.name,
-        unit: p.unit,
-        reorderLevel: p.reorderLevel,
-        qtyOnHand: initialQty,
-        averageCostMinor: p.averageCostMinor,
-        valueMinor: initialQty * p.averageCostMinor,
-      };
-    });
-  }
+  const products = state.products ?? collections.products;
+  const stockLevels = state.stockLevels ?? collections.stockLevels;
 
   const next: AppState = {
     ...state,

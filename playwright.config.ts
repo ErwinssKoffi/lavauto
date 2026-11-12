@@ -40,7 +40,10 @@ export default defineConfig({
   webServer: {
     command: webServerCommand,
     url: baseURL,
-    reuseExistingServer: !process.env.CI,
+    // Par défaut, refuser un serveur déjà présent plutôt que d'exécuter des
+    // mutations sur une instance dont la source de données est inconnue.
+    // Réutilisation réservée à un serveur de test local explicitement choisi.
+    reuseExistingServer: !process.env.CI && process.env.PLAYWRIGHT_REUSE_EXISTING_SERVER === '1',
     timeout: 120_000,
   },
 });

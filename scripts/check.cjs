@@ -30,7 +30,7 @@ const now = new Date().toISOString();
 const base = () => ({
   company: { id:'co1', name:'Clean Auto SARL', city:'Abidjan', phone:'+225 0700000000', createdAt:now, suspended:false },
   station: { id:'st1', companyId:'co1', name:'Clean Auto Cocody', address:'Rue des Jardins, Cocody', city:'Abidjan', phone:'+225 0700000000',
-    currency:'FCFA', logoUrl:null, hours:['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'].map((d,i)=>({day:d,open:'08:00',close:'18:00',closed:i===6})),
+    currency:'FCFA', logoPath:null, hours:['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'].map((d,i)=>({day:d,open:'08:00',close:'18:00',closed:i===6})),
     paymentMethods:['especes','mobile_money','carte','virement'], cashRequiresOpen:true, maxCashierDiscount:2000,
     commissionRate:10, monthlyTarget:500000, activated:true, activatedAt:now },
   users: [
@@ -103,8 +103,20 @@ const buildWith = (stdin, define=DEFINE) => esbuild.build({ stdin, bundle:true, 
 const build = (stdin) => buildWith(stdin);
 
 let pass = 0, fail = 0;
-const check = (name, cond, detail='') => { if(cond){pass++; console.log('  \u2713 '+name);} else {fail++; console.log('  \u2717 '+name+(detail?' \u2192 '+detail:''));} };
+const githubError = (message) => {
+  if (process.env.GITHUB_ACTIONS !== 'true') return;
+  const escaped = String(message).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+  console.log(`::error file=scripts/check.cjs,title=Contrôle fonctionnel::${escaped}`);
+};
+const check = (name, cond, detail='') => {
+  if (cond) { pass++; console.log('  \u2713 '+name); }
+  else { fail++; const message = name+(detail?' \u2192 '+detail:''); console.log('  \u2717 '+message); githubError(message); }
+};
 const wait = (ms=200) => new Promise(r=>setTimeout(r,ms));
+const waitUntil = async (predicate, timeout=5000) => {
+  const deadline = Date.now() + timeout;
+  while (!predicate() && Date.now() < deadline) await wait(25);
+};
 
 function makeDom(url, state) {
   const dom = new JSDOM('<!doctype html><html lang="fr" class="dark"><head></head><body><div id="root"></div></body></html>',
@@ -115,9 +127,18 @@ function makeDom(url, state) {
   w.__WG_TEST_SESSION__ = { session: state?.session ?? null };
   w.localStorage.setItem('washguard.theme','dark');
   w.matchMedia = () => ({matches:false,addListener(){},removeListener(){},addEventListener(){},removeEventListener(){}});
+  // Recharts utilise ResizeObserver, absent de JSDOM : donner une taille
+  // déterministe au conteneur plutôt que faire planter l'arbre React.
+  w.ResizeObserver = class {
+    constructor(callback) { this.callback = callback; }
+    observe(target) { this.callback([{ target, contentRect: { width: 800, height: 400 } }], this); }
+    unobserve() {}
+    disconnect() {}
+  };
   w.confirm = () => true;
   Object.assign(global, { window:w, document:w.document, localStorage:w.localStorage,
     HTMLElement:w.HTMLElement, HTMLInputElement:w.HTMLInputElement, Node:w.Node, Event:w.Event, MouseEvent:w.MouseEvent,
+    ResizeObserver:w.ResizeObserver,
     getComputedStyle:w.getComputedStyle.bind(w), requestAnimationFrame:(cb)=>setTimeout(cb,0), cancelAnimationFrame:clearTimeout,
     Blob:w.Blob, URL:w.URL });
   Object.defineProperty(global,'navigator',{value:w.navigator,configurable:true});
@@ -229,7 +250,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
           call('especes',()=>w({amount:500,method:'especes'}));
           call('mobile',()=>w({amount:500,method:'mobile_money'}));
           call('reste',()=>w({amount:99999,method:'mobile_money'}));
-          call('depense',()=>s.addExpense({amount:100,category:'Autre',reason:'x',supplier:'',date:'2026-11-11',method:'especes'}));
+          call('depense',()=>s.addExpense({amount:100,category:'Autre',reason:'Entretien',supplier:'',date:'2026-11-11',method:'especes'}));
         }
         if(mode==='rules'){
           call('payAnnule',()=>s.addPayment('w2',100,'mobile_money'));
@@ -292,7 +313,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
   const app = await build({ contents:`import './src/main.tsx';`, resolveDir:ROOT, sourcefile:'entry.ts', loader:'ts' });
   const acode = app.outputFiles[0].text;
   const ROUTES = [
-    ['/','Boilerplate Code for Your Next.js Project with Tailwind CSS','anon'], ['/connexion','Bonjour','anon'], ['/inscription','Votre entreprise et sa station','anon'],
+    ['/','Pilotez vos lavages, vos stocks et vos équipes.','anon'], ['/connexion','Bonjour','anon'], ['/inscription','Votre entreprise et sa station','anon'],
     ['/app/tableau-de-bord','Tableau de bord'], ['/app/mise-en-route','Mise en route'], ['/app/lavages','Lavages'],
     ['/app/prestations','Grille tarifaire'], ['/app/clients','Clients'], ['/app/employes','Employés'],
     ['/app/caisse','Historique des caisses'], ['/app/depenses','Dépenses'], ['/app/rapports','Rapports'],
@@ -310,6 +331,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     if (variant==='support') fixture = {...base(), session:{...base().session, role:'super_admin', name:'Super admin SaaS', companyId:null, stationId:null}};
     const { dom, w } = makeDom(route, fixture);
     const errs = await mount(acode, w);
+    await waitUntil(() => w.document.body.textContent.includes(expected));
     const t = w.document.body.textContent.replace(/\s+/g,' ');
     check(route.padEnd(24), t.includes(expected) && errs.length===0, 'err='+errs.length+' '+(errs[0]||'').slice(0,160));
     dom.window.close();
@@ -380,18 +402,27 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
   check('plus aucun fichier CRA / template', !fs.existsSync(path.join(ROOT,'src/App.jsx')) && !fs.existsSync(path.join(ROOT,'public/index.html')) && !fs.existsSync(path.join(ROOT,'jsconfig.json')));
   check('pas de prix de prestation prédéfini dans le store', !/prices:\s*\{[^}]*\d{3,}/.test(read('src/lib/store.tsx')));
   check('documentation présente', fs.existsSync(path.join(ROOT,'docs/onboarding.md')) && fs.existsSync(path.join(ROOT,'docs/audit.md')));
-  check('landing ixartz : texte, navigation et attribution MIT',
-    landing.includes('Boilerplate Code for Your Next.js Project with Tailwind CSS') &&
-    landing.includes('ixartz/Next-js-Boilerplate') && landing.includes('Licence MIT') &&
-    fs.existsSync(path.join(ROOT,'public/assets/images/LICENSE.txt')));
-  check('landing ixartz : toutes les actions branchées aux routes WashGuard',
-    ['to="/"','to="/connexion"','to="/inscription"','to="/app/tableau-de-bord"',
-      'href="#a-propos"','href="#partenaires"','href="#tarifs"',
-      'https://github.com/ixartz/Next-js-Boilerplate'].every((s) => landing.includes(s)) &&
-    fs.existsSync(path.join(ROOT,'docs/landing.md')));
-  check('landing ixartz : tarifs depuis plans, aucun prix local en repli',
-    landing.includes('formatFCFA(plan.priceMonthly)') && landing.includes('plansError') &&
-    landing.includes('Formules et tarifs indisponibles') && landing.includes('Aucun prix local'));
+  // La vitrine présente dans la base de cette branche est WashGuard, pas la
+  // version ixartz historique. Conserver des assertions sur son vrai contenu,
+  // son illustration explicitement fictive et ses destinations effectives.
+  check('vitrine WashGuard : titre, sections produit et aperçu identifié comme fictif',
+    landing.includes('Pilotez vos lavages, vos stocks et vos équipes.') &&
+    ['id="fonctionnalites"','id="caisse-stock"','id="tarifs"','id="faq"']
+      .every((token) => landing.includes(token)) &&
+    landing.includes('données fictives') && !landing.includes('Système en direct'));
+  check('vitrine WashGuard : routes réelles et ancres existantes', (() => {
+    const anchors = [...landing.matchAll(/href="#([a-z-]+)"/g)].map((match) => match[1]);
+    const appSrc = read('src/App.tsx');
+    return ['fonctionnalites','caisse-stock','tarifs','faq'].every((id) => anchors.includes(id)) &&
+      anchors.every((id) => landing.includes(`id="${id}"`)) &&
+      ['to="/"','to="/connexion"','to="/inscription"'].every((token) => landing.includes(token)) &&
+      ['path="/connexion"','path="/inscription"'].every((token) => appSrc.includes(token)) &&
+      fs.existsSync(path.join(ROOT,'docs/landing.md'));
+  })());
+  check('vitrine : tarifs depuis plans, aucun prix local en repli',
+    landing.includes('plans.map((plan)') && landing.includes('formatFCFA(plan.priceMonthly)') &&
+    landing.includes('plansError') && landing.includes('Formules et tarifs indisponibles') &&
+    landing.includes('Aucun prix local') && !/priceMonthly:\s*\d/.test(landing));
   check('landing ixartz : 9 illustrations et licence MIT copiées',
     fs.readdirSync(path.join(ROOT,'public/assets/images')).filter((f) => /\.(png|svg)$/.test(f)).length === 9 &&
     read('public/assets/images/LICENSE.txt').includes('Copyright (c) 2026 Remi W.'));
@@ -425,8 +456,9 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     navSrc.includes("to: '/app/stock'") && navSrc.includes("to: '/app/consommations'") &&
     navSrc.includes("to: '/app/fidelisation'") && navSrc.includes("to: '/app/flottes'") &&
     navSrc.includes("to: '/app/consolidation'") && navSrc.includes("to: '/app/qualite'"));
-  check('P10 : 6 dépendances, 13 devDependencies, Recharts v2 et outils QA',
-    Object.keys(pkg.dependencies).length === 6 && Object.keys(pkg.devDependencies).length === 13 &&
+  check('P10 : dépendances et outils QA conservés ; jsPDF ajouté au reçu',
+    Object.keys(pkg.dependencies).length === 8 && Object.keys(pkg.devDependencies).length >= 13 &&
+    Boolean(pkg.dependencies.jspdf) && Boolean(pkg.dependencies.zod) && Boolean(pkg.devDependencies['pdfjs-dist']) &&
     String(pkg.dependencies.recharts).startsWith('^2.') &&
     String(pkg.dependencies['react-router-dom']).startsWith('^6.'));
   check('tokens : focus clavier, mouvement réduit, élévation, squelette',
@@ -531,9 +563,8 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
   // ── 7. Database & adaptateurs (Prompt 03) ─────────────────────────────────
   console.log('\n[7] Schéma, RLS et adaptateurs (Prompt 03)');
   const migrationsDir = path.join(ROOT, 'supabase/migrations');
-  // Seules les migrations numerotees 001..050 sont appliquees au projet
-  // Supabase. Les fichiers dates issus de la branche parallele restent
-  // historiques et ne sont pas comptes comme migrations livrees.
+  // Seules les migrations numerotees sont comptees. 051/052 sont deja
+  // appliquees sur lavauto ; 053 reste locale. Les fichiers dates sont historiques.
   const sqlFiles = fs.readdirSync(migrationsDir)
     .filter((f) => /^\d{3}_.*\.sql$/.test(f)).sort();
   const sql = sqlFiles.map((f) => read('supabase/migrations/' + f)).join('\n');
@@ -542,8 +573,8 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
   const s009 = read('supabase/migrations/009_rls.sql');
   const s010 = read('supabase/migrations/010_functions_triggers.sql');
 
-  check('49 migrations numérotées 001 → 050, correctif 048 non appliqué',
-    sqlFiles.length === 49 && sqlFiles[0].startsWith('001_') && sqlFiles[19].startsWith('020_') &&
+  check('54 migrations locales numérotées 001 → 055, correctif 048 absent',
+    sqlFiles.length === 54 && sqlFiles[0].startsWith('001_') && sqlFiles[19].startsWith('020_') &&
     sqlFiles[20].startsWith('021_') && sqlFiles[21].startsWith('022_') && sqlFiles[22].startsWith('023_') &&
     sqlFiles[23].startsWith('024_') && sqlFiles[24].startsWith('025_') && sqlFiles[25].startsWith('026_') &&
     sqlFiles[26].startsWith('027_') && sqlFiles[27].startsWith('028_') && sqlFiles[28].startsWith('029_') &&
@@ -556,8 +587,27 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     sqlFiles[41].startsWith('042_') && sqlFiles[42].startsWith('043_') &&
     sqlFiles[43].startsWith('044_') && sqlFiles[44].startsWith('045_') &&
     sqlFiles[45].startsWith('046_') && sqlFiles[46].startsWith('047_') &&
-    sqlFiles[47].startsWith('049_') && sqlFiles[48].startsWith('050_') &&
-    !sqlFiles.some((f) => f.startsWith('048_')));
+    sqlFiles[47].startsWith('049_') && sqlFiles[48].startsWith('050_') && sqlFiles[49].startsWith('051_') &&
+    sqlFiles[50].startsWith('052_') && sqlFiles[51].startsWith('053_') &&
+    sqlFiles[52].startsWith('054_') && sqlFiles[53].startsWith('055_') && !sqlFiles.some((f) => f.startsWith('048_')));
+  check('053 WhatsApp : consentement distinct, file séparée, journal immuable et worker privé', (() => {
+    const wa = read('supabase/migrations/053_whatsapp_wash_notifications.sql');
+    return wa.includes('whatsapp_consent_granted boolean NOT NULL DEFAULT false') &&
+      wa.includes('trg_customer_whatsapp_phone') && wa.includes('trg_wash_whatsapp_status') &&
+      wa.includes("status IN ('pending','sending','unknown')") &&
+      wa.includes('REVOKE ALL ON public.whatsapp_consent_events') &&
+      wa.includes("GRANT EXECUTE ON FUNCTION %s TO service_role") &&
+      read('supabase/tests/whatsapp_wash_rollback.sql').trim().endsWith('ROLLBACK;');
+  })());
+  check('Reçu et fournisseur : PDF local, webhook HMAC, aucune clé Meta dans le frontend', (() => {
+    const worker = read('supabase/functions/_shared/whatsapp.ts');
+    const receipt = read('src/lib/receiptPdf.ts');
+    return receipt.includes('createReceiptPdf') && receipt.includes('DejaVuSans.ttf') &&
+      worker.includes('crypto.subtle.verify') && worker.includes('WHATSAPP_SEND_ENABLED') &&
+      worker.includes('biz_opaque_callback_data') &&
+      !read('src/components/WhatsappPanels.tsx').includes('META_ACCESS_TOKEN') &&
+      !read('src/services/adapters/SupabaseWhatsappCommands.ts').includes('META_ACCESS_TOKEN');
+  })());
   check('003_catalog : index unique corrigé, plus de UNIQUE(expression)',
     read('supabase/migrations/003_catalog.sql').includes('CREATE UNIQUE INDEX uq_expense_categories_name') &&
     !/UNIQUE\s*\(\s*station_id\s*,\s*lower\(/i.test(sql));
@@ -719,7 +769,18 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
   {
     const { dom, w } = makeDom('/', { ...base(), session: null });
     const errs = await mount(acode, w);
-    const text = w.document.body.textContent.replace(/\s+/g, ' ');
+    // Attendre les tarifs et la navigation plutôt qu'un délai fixe : un runner
+    // chargé peut rendre la vitrine après les 220 ms de mount().
+    const expectedPrice = MODE === 'supabase' ? '16 000 FCFA' : '15 000 FCFA';
+    await waitUntil(() => (w.document.querySelector('#tarifs')?.textContent ?? '').includes(expectedPrice) &&
+      Boolean(w.document.querySelector('a[href="/inscription"]')) && Boolean(w.document.querySelector('a[href="/connexion"]')));
+    const pricing = w.document.querySelector('#tarifs');
+    const text = (pricing?.textContent ?? '').replace(/\s+/g, ' ');
+    const anchors = [...w.document.querySelectorAll('a[href^="#"]')];
+    check('vitrine rendue : ancres présentes, inscription et connexion utilisables',
+      anchors.length >= 4 && anchors.every((link) => w.document.getElementById(link.getAttribute('href').slice(1))) &&
+      Boolean(w.document.querySelector('a[href="/inscription"]')) &&
+      Boolean(w.document.querySelector('a[href="/connexion"]')) && errs.length === 0);
     if (MODE === 'supabase') {
       check('vitrine en mode supabase : tarifs de la base, pas du repli local',
         text.includes('16 000 FCFA') && !text.includes('15 000 FCFA') && errs.length === 0,
@@ -732,10 +793,18 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
   }
   if (MODE === 'supabase') {
     const savedFetch = globalThis.fetch;
-    globalThis.fetch = async () => { throw new Error('base indisponible pour le test'); };
+    // 503 simulé avec Retry-After: 0 : le client peut effectuer ses retries
+    // sans que le test lise encore l'état de chargement après 220 ms.
+    globalThis.fetch = async () => new Response(JSON.stringify({ message: 'base indisponible pour le test' }), {
+      status: 503, headers: { 'content-type': 'application/json', 'retry-after': '0' },
+    });
     const { dom, w } = makeDom('/', { ...base(), session: null });
     await mount(acode, w);
-    const text = w.document.body.textContent.replace(/\s+/g, ' ');
+    await waitUntil(() => {
+      const text = w.document.querySelector('#tarifs')?.textContent ?? '';
+      return text.includes('Formules et tarifs indisponibles') || text.includes('Aucun prix local');
+    });
+    const text = (w.document.querySelector('#tarifs')?.textContent ?? '').replace(/\s+/g, ' ');
     check('base indisponible : aucun prix local présenté comme tarif de la base',
       !text.includes('16 000 FCFA') && !text.includes('15 000 FCFA') &&
       (text.includes('Formules et tarifs indisponibles') || text.includes('Aucun prix local')),
@@ -1001,6 +1070,16 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     s023.includes("washguard.quality_approved") && s023.includes('my_company_clients') &&
     s023.includes("'stationId', p.station_id") && s023.includes('p_station_id uuid DEFAULT NULL') &&
     s023.includes('REVOKE ALL ON FUNCTION') && s023.includes('Motif de reprise requis'));
+  check('migration 052 : création et paiement dans une RPC, réservation privée et test SQL', (() => {
+    const migration = read('supabase/migrations/052_atomic_wash_creation.sql');
+    const testSql = read('supabase/tests/atomic_wash_rollback.sql');
+    return migration.includes('create_wash_atomic') && migration.includes('wash_creation_requests') &&
+      migration.includes('ON CONFLICT (company_id, idempotency_key) DO NOTHING') &&
+      migration.includes("public.has_permission('payments.create')") &&
+      migration.includes('public.can_access_station') &&
+      migration.includes('REVOKE ALL ON TABLE public.wash_creation_requests') &&
+      testSql.startsWith('--') && testSql.includes('BEGIN;') && testSql.trim().endsWith('ROLLBACK;');
+  })());
   check('frontend : 7 statuts EN, plus aucun ancien statut FR écrit dans le store',
     read('src/types.ts').includes("| 'pending' | 'assigned'") &&
     read('src/lib/washLifecycle.ts').includes('normalizeWashes') &&
@@ -1010,10 +1089,11 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     read('src/services/adapters/DataAdapter.ts').includes('washCommands') &&
     read('src/services/adapters/DataAdapter.ts').includes('listWashBoard') &&
     read('src/services/adapters/DataAdapter.ts').includes('listClients') &&
-    read('src/services/adapters/SupabaseDataAdapter.ts').includes('create_wash_full') &&
+    read('src/services/adapters/SupabaseDataAdapter.ts').includes('create_wash_atomic') &&
     read('src/services/adapters/SupabaseDataAdapter.ts').includes('my_company_clients') &&
     read('src/pages/Washes.tsx').includes('p.stationId === stationId') &&
-    !read('src/services/adapters/SupabaseDataAdapter.ts').includes('companyId:') &&
+    !read('src/services/adapters/SupabaseDataAdapter.ts').includes('company_id') &&
+    read('src/services/adapters/SupabaseDataAdapter.ts').includes('companyId: null') &&
     new A.LocalDataAdapter(() => base()).washCommands === null &&
     (await new A.LocalDataAdapter(() => base()).listWashBoard()).washes.length === 1 &&
     (await new A.LocalDataAdapter(() => base()).listClients()).length === 1);
@@ -1054,7 +1134,8 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
         then(resolve){ return Promise.resolve({ data: [], error: null }).then(resolve); } }; return q; },
       async rpc(name, args) {
         rpcCalls.push({ name, args: args ?? {} });
-        if (name === 'create_wash_full') return { data: 'wash-rpc-1', error: null };
+        if (name === 'create_wash_atomic') return { data: 'wash-rpc-1', error: null };
+        if (name === 'record_wash_payment_by_key') return { data: 'payment-rpc-1', error: null };
         if (name === 'my_vehicle_history') return { data: boardRows, error: null };
         return { data: [], error: null };
       },
@@ -1073,10 +1154,13 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     const history = await commands.vehicleHistory('1234 AB 01');
     const allArgs = JSON.stringify(rpcCalls);
     check('commandes RPC : cycle complet, idempotence, aucun company_id ni secret',
-      id === 'wash-rpc-1' && rpcCalls[0].name === 'create_wash_full' &&
+      id === 'wash-rpc-1' && rpcCalls[0].name === 'create_wash_atomic' &&
       rpcCalls[0].args.p_payload.idempotency_key === 'ui-key-1' &&
       rpcCalls[0].args.p_payload.employee_ids.length === 2 &&
-      rpcCalls.some((c) => c.name === 'record_wash_payment_by_key') &&
+      rpcCalls[0].args.p_payload.initial_payment.amount_minor === 3000 &&
+      rpcCalls[0].args.p_payload.initial_payment.method_key === 'cash' &&
+      rpcCalls.filter((c) => c.name === 'record_wash_payment_by_key').length === 1 &&
+      !rpcCalls.some((c) => c.name === 'create_wash_full') &&
       rpcCalls.some((c) => c.name === 'record_wash_quality_check') &&
       rpcCalls.some((c) => c.name === 'transition_wash_status') &&
       rpcCalls.some((c) => c.name === 'assign_wash') &&
@@ -1302,7 +1386,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
       .map((f) => read(f)).join('\n') + read('src/lib/metrics.ts');
     return !ui.includes('Résultat simplifié') && !ui.includes('result: collected - expenses') &&
       ui.includes('partialBalance') && ui.includes('costsMissing') &&
-      ui.includes('PAS un bénéfice') && read('src/pages/Reports.tsx').includes('my_profitability()') &&
+      ui.includes('PAS un bénéfice') && read('src/services/adapters/SupabaseDataAdapter.ts').includes('my_station_profitability') &&
       read('src/pages/Cash.tsx').includes('my_finance_board') === false;
   })());
 
@@ -1516,7 +1600,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
       read('src/services/adapters/DataAdapter.ts').includes('listStockBoard') &&
       read('src/services/adapters/DataAdapter.ts').includes('stockCommands') &&
       read('src/services/adapters/LocalDataAdapter.ts').includes('stockBoardFromState') &&
-      read('src/services/adapters/SupabaseDataAdapter.ts').includes("rpc('my_stock_board')");
+      read('src/services/adapters/SupabaseDataAdapter.ts').includes("'my_station_stock_board' : 'my_stock_board'");
   })());
 
   {
@@ -1768,7 +1852,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
       read('src/services/adapters/DataAdapter.ts').includes('listCrmBoard') &&
       read('src/services/adapters/DataAdapter.ts').includes('crmCommands') &&
       read('src/services/adapters/LocalDataAdapter.ts').includes('crmBoardFromState') &&
-      read('src/services/adapters/SupabaseDataAdapter.ts').includes("rpc('my_crm_board')"));
+      read('src/services/adapters/SupabaseDataAdapter.ts').includes("'my_station_crm_board' : 'my_crm_board'"));
   }
 
   {
@@ -1950,7 +2034,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     return adapterSrc.includes('listAnalyticsBoard') && adapterSrc.includes('listSubscriptionUsage') &&
       adapterSrc.includes('listPlatformBoard') && adapterSrc.includes('analyticsCommands') &&
       localSrc.includes('analyticsCommands = null') && localSrc.includes('listPlatformBoard') &&
-      supaSrc.includes("rpc('my_analytics_board'") && supaSrc.includes("rpc('my_subscription_usage'") &&
+      supaSrc.includes("rpc('my_accessible_analytics_board'") && supaSrc.includes("rpc('my_subscription_usage'") &&
       supaSrc.includes("rpc('my_platform_board')") &&
       commands.includes('this.client.rpc(name, args)') &&
       commands.includes("this.call('admin_save_plan'") &&
@@ -2016,7 +2100,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
       from() { throw new Error('Aucune lecture directe de table P09 attendue'); },
       async rpc(name) {
         calls.push(name);
-        if (name === 'my_analytics_board') {
+        if (name === 'my_accessible_analytics_board') {
           return { data: AN.analyticsBoardFromState(base(), p09Start, p09End, p09Previous.start, p09Previous.end), error: null };
         }
         if (name === 'my_subscription_usage') {
@@ -2033,7 +2117,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     await adapter9.listSubscriptionUsage(p09Start);
     await adapter9.listPlatformBoard();
     check('SupabaseDataAdapter P09 : 3 boards par RPC, aucun filtre de tenant',
-      calls.length === 3 && calls[0] === 'my_analytics_board' &&
+      calls.length === 3 && calls[0] === 'my_accessible_analytics_board' &&
       calls[1] === 'my_subscription_usage' && calls[2] === 'my_platform_board');
   }
 
@@ -2063,6 +2147,8 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
   {
     const { dom, w } = makeDom('/app/tableau-de-bord', base());
     const errs = await mount(acode, w);
+    await waitUntil(() => w.document.body.textContent.includes('Tendance du mois') &&
+      Boolean(w.document.querySelector('a[href="/app/consolidation"]')));
     const t = w.document.body.textContent.replace(/\s+/g, ' ');
     check('DOM P09 : dashboard station, graphique et lien de consolidation',
       t.includes('Tendance du mois') && Boolean(w.document.querySelector('a[href="/app/consolidation"]')) &&
@@ -2074,6 +2160,8 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
   {
     const { dom, w } = makeDom('/app/consolidation', base());
     const errs = await mount(acode, w);
+    await waitUntil(() => w.document.body.textContent.includes('Comparaison des périodes') &&
+      w.document.querySelectorAll('svg').length >= 1);
     const t = w.document.body.textContent.replace(/\s+/g, ' ');
     check('DOM P09 : consolidation, comparaison et graphiques Recharts',
       t.includes('Consolidation multi-stations') && t.includes('Comparaison des périodes') &&
@@ -2086,6 +2174,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     const supportState = { ...base(), session: { ...base().session, role: 'super_admin', name: 'Super admin SaaS', companyId: null, stationId: null } };
     const { dom, w } = makeDom('/app/plateforme', supportState);
     const errs = await mount(acode, w);
+    await waitUntil(() => w.document.body.textContent.includes('Journal de la plateforme'));
     const t = w.document.body.textContent.replace(/\s+/g, ' ');
     check('DOM P09 : back-office super admin, quotas, formules et journaux',
       t.includes('Espace plateforme') && t.includes('Formules et limites administrables') &&
@@ -2135,7 +2224,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     read('src/lib/qa.ts').includes("'my_washes_page'") &&
     read('src/lib/qa.ts').includes('optimizeStationLogo') &&
     read('src/lib/image.ts').includes('LOGO_MAX_EDGE = 512') &&
-    read('src/lib/qa.ts').includes('from(BUCKET).upload'));
+    read('src/lib/qa.ts').includes('from(BUCKET)') && read('src/lib/qa.ts').includes('bucket.upload'));
 
   const p10Docs = [
     'docs/installation.md', 'docs/architecture.md', 'docs/database.md',
@@ -2150,7 +2239,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
   const e2eTests = read('e2e/erp.spec.ts').split(/\btest\(/).length - 1;
   check('P10 : au moins 15 tests unitaires Vitest et 15 specs Playwright',
     has('vitest.config.ts') && has('playwright.config.ts') &&
-    unitTests >= 15 && e2eTests === 15 &&
+    unitTests >= 15 && e2eTests >= 15 &&
     read('supabase/tests/p10_rollback.sql').includes('RLS RESTRICTIVE'));
 
   check('P10 : CI et déploiement Vercel par secrets, aucun secret versionné', (() => {
@@ -2206,7 +2295,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     session: { ...base().session, role: 'super_admin', name: 'Super admin SaaS', companyId: null, stationId: null },
   };
   const p10Flows = [
-    ['Vitrine publique', '/', 'Boilerplate Code for Your Next.js Project with Tailwind CSS', null],
+    ['Vitrine publique', '/', 'Pilotez vos lavages, vos stocks et vos équipes.', null],
     ['Connexion', '/connexion', 'Bonjour', null],
     ['Inscription deux temps', '/inscription', 'Votre entreprise et sa station', null],
     ['Tableau de bord', '/app/tableau-de-bord', 'Tableau de bord', base()],
@@ -2225,6 +2314,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
   const runFlow = async (route, expected, state) => {
     const { dom, w } = makeDom(route, state);
     const errs = await mount(acode, w);
+    await waitUntil(() => w.document.body.textContent.includes(expected));
     const text = w.document.body.textContent.replace(/\s+/g, ' ');
     const ok = text.includes(expected) && errs.length === 0;
     dom.window.close();
@@ -2240,4 +2330,4 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
 
   console.log(`\n══ RÉSULTAT : ${pass} OK / ${fail} KO · mode ${MODE} ══`);
   process.exit(fail?1:0);
-})().catch(e=>{ console.error('CHECK FAIL', e); process.exit(1); });
+})().catch(e=>{ console.error('CHECK FAIL', e); githubError(`CHECK FAIL: ${e?.stack ?? e}`); process.exit(1); });

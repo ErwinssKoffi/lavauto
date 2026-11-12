@@ -17,7 +17,7 @@ import StockAlertBanner from './StockAlertBanner';
 const SIDEBAR_KEY = 'washguard.sidebar.collapsed';
 
 export default function AppShell() {
-  const { state, theme, toggleTheme, signOut, missing } = useStore();
+  const { state, identity, selectStation, theme, toggleTheme, signOut, missing } = useStore();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [alertsOpen, setAlertsOpen] = useState(false);
@@ -194,6 +194,15 @@ export default function AppShell() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {identity && identity.stations.length > 1 && state.session?.stationId && (
+              <label className="flex min-w-0 items-center gap-2 text-xs">
+                <span className="wg-muted hidden xl:inline">Station</span>
+                <select aria-label="Station active" className="wg-input !w-auto max-w-[10rem] !py-1.5 sm:max-w-[14rem]"
+                  value={state.session.stationId} onChange={(event) => selectStation(event.target.value)}>
+                  {identity.stations.map((station) => <option key={station.id} value={station.id}>{station.name}</option>)}
+                </select>
+              </label>
+            )}
             <button type="button" onClick={() => setPaletteOpen(true)} className="wg-btn wg-btn-ghost !px-2.5" aria-label="Rechercher un écran" title="Recherche rapide (Ctrl + K)">
               <FiSearch size={16} />
               <span className="wg-kbd hidden xl:inline-flex">Ctrl K</span>
@@ -254,7 +263,7 @@ export default function AppShell() {
                       className="wg-link text-[11px]"
                       onClick={() => { setAlertsOpen(false); navigate('/app/parametres#stock'); }}
                     >
-                      Ajuster les seuils
+                      Voir les seuils
                     </button>
                     <button
                       type="button"
@@ -296,7 +305,7 @@ export default function AppShell() {
         </header>
 
         <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
-          <StockAlertBanner />
+          <StockAlertBanner key={`${state.session?.userId}:${state.session?.stationId}`} />
           {!state.station?.activated && role !== 'super_admin' && location.pathname !== '/app/mise-en-route' && (
             <div className="wg-card mb-5 flex flex-wrap items-center justify-between gap-3 !border-amber-500/30 px-4 py-3">
               <div className="flex items-center gap-2 text-xs">
@@ -316,7 +325,7 @@ export default function AppShell() {
               </div>
             </Card>
           ) : (
-            <div className="wg-fade-in" key={location.pathname}><Outlet /></div>
+            <div className="wg-fade-in" key={`${state.session?.userId}:${state.session?.companyId}:${state.session?.stationId}:${location.pathname}`}><Outlet /></div>
           )}
         </main>
       </div>
