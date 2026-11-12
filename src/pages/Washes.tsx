@@ -1,6 +1,9 @@
+import { readNumber } from '../lib/validation';
+import { readPendingPayment, type PendingPayment } from '../lib/paymentAttempt';
+import { idempotencyKey } from '../lib/network';
 import React, { useMemo, useRef, useState } from 'react';
 import {
-  FiCheckCircle, FiClipboard, FiCreditCard, FiDollarSign, FiPlus, FiSearch,
+  FiCheckCircle, FiClipboard, FiCreditCard, FiDollarSign, FiFileText, FiPlus, FiSearch,
   FiTruck, FiUsers, FiX,
 } from 'react-icons/fi';
 import { useStore } from '../lib/store';
@@ -11,6 +14,9 @@ import {
   type WashQualityResult, type WashStatus,
 } from '../types';
 import { nextWashStatuses, washStatusTone } from '../lib/washLifecycle';
+import { buildWashReceipt, type WashReceipt } from '../lib/receipt';
+import { WashReceiptModal } from '../components/WashReceipt';
+import { WhatsappWashPanel } from '../components/WhatsappPanels';
 import {
   Alert, Badge, Card, EmptyState, Input, LockedPanel, Modal, PageHeader,
   Select, useSafeAction,
@@ -25,7 +31,8 @@ const NEXT_LABELS: Partial<Record<WashStatus, string>> = {
 
 export default function Washes() {
   const {
-    state, dataSource, createWash, setWashStatus, addPayment, cancelPayment,
+    state, dataSource, createWash, pendingWash, pendingWashError, retryPendingWash,
+    setWashStatus, addPayment, cancelPayment,
     assignWash, recordQualityCheck, createWashPost, vehicleHistory, refreshWashes,
   } = useStore();
   const { can } = usePermissions();
@@ -64,11 +71,15 @@ export default function Washes() {
         actions={
           <div className="flex gap-2">
             <button className="wg-btn wg-btn-ghost" onClick={() => safe(() => refreshWashes())}>Actualiser</button>
-            <button className="wg-btn wg-btn-primary" disabled={!activated || !allow('washes.create')} onClick={() => setCreateOpen(true)}><FiPlus /> Nouvelle fiche</button>
+            <button className="wg-btn wg-btn-primary" disabled={!pendingWash && (!activated || !allow('washes.create'))} onClick={() => setCreateOpen(true)}><FiPlus /> {pendingWash ? 'Vérifier la création' : 'Nouvelle fiche'}</button>
           </div>
         }
       />
       {!activated && <div className="mb-5"><LockedPanel /></div>}
+      {pendingWash && (
+        <div className="mb-5"><Alert kind="warn">Une création n’a pas reçu de confirmation. Vérifiez-la avec la même clé avant de créer une autre fiche dans cet onglet.</Alert></div>
+      )}
+      {pendingWashError && <div className="mb-5"><Alert kind="danger">{pendingWashError}</Alert></div>}
 
       <Card className="mb-5">
         <div className="mb-3 flex items-center gap-2 text-sm font-bold"><FiClipboard /> File d’attente par statut</div>
@@ -96,7 +107,7 @@ export default function Washes() {
         )}
         <div className="grid gap-2 sm:grid-cols-[1fr_120px_auto]">
           <Input value={postName} onChange={(e) => setPostName(e.target.value)} placeholder="Nom du poste (ex. Piste 1)" />
-          <Input type="number" min="1" value={postCapacity} onChange={(e) => setPostCapacity(Math.max(1, Number(e.target.value)))} />
+          <Input type="number" min="1" value={postCapacity} onChange={(e) => setPostCapacity(readNumber(e.target.value))} />
           <button className="wg-btn wg-btn-ghost" disabled={!activated || !allow('washes.assign')}
             onClick={() => safe(async () => { await createWashPost(postName, postCapacity, stationId); setPostName(''); setPostCapacity(1); })}>
             <FiPlus /> Ajouter un poste
@@ -151,10 +162,12 @@ export default function Washes() {
 
       {createOpen && (
         <CreateWashModal methods={methods} onClose={() => setCreateOpen(false)}
-          onSubmit={(p) => safe(async () => { await createWash(p); setCreateOpen(false); })} />
+          onSubmit={(p) => safe(async () => { await createWash(p); setCreateOpen(false); })}
+          onRetry={() => safe(async () => { await retryPendingWash(); setCreateOpen(false); })} />
       )}
       {detail && (
         <WashDetail
+          key={`${state.station?.id ?? ''}:${detail.id}`}
           washId={detail.id} methods={methods}
           onClose={() => setDetailId(null)}
           onStatus={(s, reason) => safe(async () => { await setWashStatus(detail.id, s, reason); })}
@@ -169,16 +182,17 @@ export default function Washes() {
   );
 }
 
-function CreateWashModal({ methods, onClose, onSubmit }: {
+function CreateWashModal({ methods, onClose, onSubmit, onRetry }: {
   methods: PayMethod[];
   onClose: () => void;
   onSubmit: (p: Parameters<ReturnType<typeof useStore>['createWash']>[0]) => void | Promise<void>;
+  onRetry: () => Promise<void>;
 }) {
-  const { state } = useStore();
+  const { state, pendingWash, assignableUsers } = useStore();
   const stationId = state.station?.id ?? '';
   const cats = state.vehicleCategories.filter((c) => c.active);
   const svcs = state.services.filter((s) => s.active);
-  const employees = state.users.filter((u) => u.active);
+  const employees = assignableUsers;
   const posts = state.washPosts.filter((p) => p.active && (!stationId || !p.stationId || p.stationId === stationId));
   const [categoryId, setCategoryId] = useState(cats[0]?.id ?? '');
   const [plate, setPlate] = useState('');
@@ -191,10 +205,43 @@ function CreateWashModal({ methods, onClose, onSubmit }: {
   const [payAmount, setPayAmount] = useState(0);
   const [payMethod, setPayMethod] = useState<PayMethod>(methods[0] ?? 'especes');
   const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
 
-  const items = svcs.filter((s) => (qty[s.id] ?? 0) > 0).map((s) => ({ serviceId: s.id, qty: qty[s.id] }));
+  const run = async (action: () => void | Promise<void>) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    try { await action(); } finally { busyRef.current = false; setBusy(false); }
+  };
+  const close = () => { if (!busyRef.current) onClose(); };
+
+  // Aucun champ modifiable ni nouvelle clé tant que la première réponse est
+  // incertaine. La commande d'origine est rejouée telle quelle, même après un
+  // rechargement ou une modification ultérieure du catalogue.
+  if (pendingWash) {
+    const { payload } = pendingWash;
+    return (
+      <Modal open onClose={close} title="Nouvelle fiche de lavage">
+        <Alert kind="warn">Résultat incertain : la fiche et son éventuel paiement ont peut-être été enregistrés. Ne créez pas une nouvelle fiche pour cette opération.</Alert>
+        <div className="mt-4 space-y-1 text-sm">
+          <p>Plaque : <strong>{payload.plate || 'Non renseignée'}</strong></p>
+          <p>Encaissement initial : <strong>{payload.payment ? `${formatFCFA(payload.payment.amount)} · ${PAY_METHOD_LABELS[payload.payment.method]}` : 'Aucun'}</strong></p>
+          <p className="wg-muted text-xs">Tentative du {formatDateTime(pendingWash.startedAt)}. La reprise est conservée dans cet onglet ; ne l’effacez pas et ne changez pas d’appareil avant vérification.</p>
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <button className="wg-btn wg-btn-ghost" disabled={busy} onClick={close}>Fermer</button>
+          <button className="wg-btn wg-btn-primary" disabled={busy} onClick={() => { void run(onRetry); }}>
+            {busy ? 'Vérification…' : 'Vérifier / réessayer la même opération'}
+          </button>
+        </div>
+      </Modal>
+    );
+  }
+
+  const items = svcs.filter((s) => Object.prototype.hasOwnProperty.call(qty, s.id)).map((s) => ({ serviceId: s.id, qty: qty[s.id] }));
   const gross = svcs.reduce((sum, s) => sum + (s.prices[categoryId] ?? 0) * (qty[s.id] ?? 0), 0);
-  const total = Math.max(0, gross - Math.max(0, discount));
+  const total = gross - discount;
   const maxDiscount = state.session?.role === 'caissier' ? state.station?.maxCashierDiscount ?? 0 : Infinity;
 
   const submit = () => {
@@ -202,18 +249,22 @@ function CreateWashModal({ methods, onClose, onSubmit }: {
     if (!categoryId) return setError('Choisissez une catégorie de véhicule.');
     if (employeeIds.length === 0) return setError('Choisissez au moins un employé.');
     if (items.length === 0) return setError('Sélectionnez au moins une prestation.');
+    if (items.some((item) => !Number.isSafeInteger(item.qty) || item.qty < 1)) return setError('Les quantités doivent être des nombres entiers positifs.');
+    if (!Number.isSafeInteger(discount) || discount < 0) return setError('La remise doit être un montant entier positif ou nul.');
+    if (discount > gross) return setError('La remise ne peut pas dépasser le total des prestations.');
     if (discount > maxDiscount) return setError(`Remise maximale autorisée : ${maxDiscount === Infinity ? 'illimitée' : `${maxDiscount} FCFA`}.`);
+    if (!Number.isSafeInteger(payAmount) || payAmount < 0) return setError('Le montant encaissé doit être un entier positif ou nul.');
     if (payAmount > total) return setError('L’encaissement dépasse le total de la fiche.');
-    if (payAmount < 0) return setError('Montant invalide.');
-    onSubmit({
+    void run(() => onSubmit({
       categoryId, plate, employeeId: employeeIds[0], employeeIds, postId: postId || null,
       clientId: clientId || null, clientName, items, discount,
       payment: payAmount > 0 ? { amount: payAmount, method: payMethod } : null,
-    });
+    }));
   };
 
   return (
-    <Modal open onClose={onClose} title="Nouvelle fiche de lavage" wide>
+    <Modal open onClose={close} title="Nouvelle fiche de lavage" wide>
+      <fieldset disabled={busy} className="min-w-0">
       <div className="grid gap-5 lg:grid-cols-2">
         <div className="space-y-3">
           <Select label="Catégorie de véhicule *" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
@@ -251,22 +302,22 @@ function CreateWashModal({ methods, onClose, onSubmit }: {
             {svcs.length === 0 && <p className="wg-muted p-3 text-xs">Aucune prestation active.</p>}
             {svcs.map((s) => (
               <div key={s.id} className="flex items-center gap-2 rounded-lg px-2 py-2 text-xs" style={{ background: 'var(--wg-surface-2)' }}>
-                <input type="checkbox" className="accent-sky-500" checked={(qty[s.id] ?? 0) > 0}
-                  onChange={(e) => setQty((q) => ({ ...q, [s.id]: e.target.checked ? 1 : 0 }))} />
+                <input type="checkbox" className="accent-sky-500" aria-label={`Sélectionner ${s.name}`} checked={Object.prototype.hasOwnProperty.call(qty, s.id)}
+                  onChange={(e) => setQty((q) => { const next = { ...q }; if (e.target.checked) next[s.id] = 1; else delete next[s.id]; return next; })} />
                 <span className="min-w-0 flex-1 truncate font-medium">{s.name}</span>
                 <span className="wg-muted shrink-0">{s.prices[categoryId] ? formatFCFA(s.prices[categoryId]) : 'Prix manquant'}</span>
-                {(qty[s.id] ?? 0) > 0 && (
-                  <input type="number" min="1" className="wg-input !w-14 !px-2 !py-1" value={qty[s.id]}
-                    onChange={(e) => setQty((q) => ({ ...q, [s.id]: Math.max(1, Number(e.target.value)) }))} />
+                {Object.prototype.hasOwnProperty.call(qty, s.id) && (
+                  <input type="number" min="1" className="wg-input !w-14 !px-2 !py-1" value={Number.isNaN(qty[s.id]) ? '' : qty[s.id]}
+                    onChange={(e) => setQty((q) => ({ ...q, [s.id]: readNumber(e.target.value) }))} />
                 )}
               </div>
             ))}
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <Input label="Remise (FCFA)" type="number" min="0" value={discount} onChange={(e) => setDiscount(Number(e.target.value))} hint={maxDiscount !== Infinity ? `Max caissier : ${maxDiscount} FCFA` : undefined} />
+            <Input label="Remise (FCFA)" type="number" min="0" value={discount} onChange={(e) => setDiscount(readNumber(e.target.value))} hint={maxDiscount !== Infinity ? `Max caissier : ${maxDiscount} FCFA` : undefined} />
             <div className="rounded-xl border p-3" style={{ borderColor: 'var(--wg-border)' }}>
               <p className="wg-muted text-[11px]">Total estimé de la fiche</p>
-              <p className="mt-1 text-lg font-bold">{formatFCFA(total)}</p>
+              <p className="mt-1 text-lg font-bold">{Number.isFinite(total) && total >= 0 ? formatFCFA(total) : '—'}</p>
             </div>
           </div>
         </div>
@@ -275,19 +326,20 @@ function CreateWashModal({ methods, onClose, onSubmit }: {
       <div className="mt-5 rounded-xl border p-4" style={{ borderColor: 'var(--wg-border)' }}>
         <p className="mb-3 flex items-center gap-2 text-sm font-bold"><FiCreditCard /> Encaissement à la création (facultatif)</p>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Input label="Montant encaissé (FCFA)" type="number" min="0" max={total} value={payAmount} onChange={(e) => setPayAmount(Number(e.target.value))} hint="0 = encaissement plus tard, total ou partiel." />
+          <Input label="Montant encaissé (FCFA)" type="number" min="0" max={Number.isFinite(total) && total >= 0 ? total : undefined} value={payAmount} onChange={(e) => setPayAmount(readNumber(e.target.value))} hint="0 = encaissement plus tard, total ou partiel." />
           <Select label="Moyen de paiement" value={payMethod} onChange={(e) => setPayMethod(e.target.value as PayMethod)}>
             {methods.map((m) => <option key={m} value={m}>{PAY_METHOD_LABELS[m]}</option>)}
           </Select>
         </div>
-        <p className="wg-muted mt-2 text-[11px]">Un encaissement en espèces exige une caisse ouverte (règle désactivable dans Paramètres). Le Mobile Money peut être enregistré à tout moment.</p>
+        <p className="wg-muted mt-2 text-[11px]">Un encaissement en espèces exige une caisse ouverte en mode connecté. Le Mobile Money peut être enregistré à tout moment.</p>
       </div>
+      </fieldset>
 
-      <Alert kind="info">Les prix sont figés sur la fiche par le serveur : modifier un tarif dans Prestations ne changera jamais ce lavage.</Alert>
+      <Alert kind="info">Les prix sont figés sur la fiche : modifier un tarif dans Prestations ne changera jamais ce lavage.</Alert>
       {error && <div className="mt-3"><Alert kind="danger">{error}</Alert></div>}
       <div className="mt-5 flex justify-end gap-2">
-        <button className="wg-btn wg-btn-ghost" onClick={onClose}><FiX /> Annuler</button>
-        <button className="wg-btn wg-btn-primary" onClick={submit}><FiCheckCircle /> Enregistrer la fiche</button>
+        <button className="wg-btn wg-btn-ghost" disabled={busy} onClick={close}><FiX /> Annuler</button>
+        <button className="wg-btn wg-btn-primary" disabled={busy} onClick={submit}><FiCheckCircle /> {busy ? 'Enregistrement…' : 'Enregistrer la fiche'}</button>
       </div>
     </Modal>
   );
@@ -304,11 +356,12 @@ function WashDetail({ washId, methods, onClose, onStatus, onAssign, onQuality, o
   onRefund: (paymentId: string, reason: string) => void | Promise<void>;
   onVehicleHistory: (plate: string) => Promise<Wash[]>;
 }) {
-  const { state, dataSource } = useStore();
+  const { state, dataSource, identity, assignableUsers } = useStore();
   const { can } = usePermissions();
   const safe = useSafeAction();
   const allow = (permission: string) => dataSource === 'local' || can(permission);
   const w = state.washes.find((x) => x.id === washId)!;
+  const [receipt, setReceipt] = useState<WashReceipt | null>(null);
   const [amount, setAmount] = useState(Math.max(0, w.total - w.paid));
   const [method, setMethod] = useState<PayMethod>(methods[0] ?? 'especes');
   const [cancelMode, setCancelMode] = useState(false);
@@ -320,25 +373,41 @@ function WashDetail({ washId, methods, onClose, onStatus, onAssign, onQuality, o
   const [refundId, setRefundId] = useState<string | null>(null);
   const [refundReason, setRefundReason] = useState('');
   const [historyRows, setHistoryRows] = useState<Wash[] | null>(null);
-  const payKey = useRef<string | null>(null);
   const stationId = state.station?.id ?? '';
-  const employees = state.users.filter((u) => u.active);
+  const userId = identity?.userId ?? '';
+  const readPayment = (): { pending: PendingPayment | null; error: string | null } => {
+    if (dataSource !== 'supabase' || !userId || !stationId) return { pending: null, error: null };
+    try { return { pending: readPendingPayment(userId, stationId, washId), error: null }; }
+    catch (error) { return { pending: null, error: error instanceof Error ? error.message : 'Tentative illisible.' }; }
+  };
+  const [paymentAttempt, setPaymentAttempt] = useState(readPayment);
+  const [payBusy, setPayBusy] = useState(false);
+  const payBusyRef = useRef(false);
+  const employees = assignableUsers;
   const posts = state.washPosts.filter((p) => p.active && (!stationId || !p.stationId || p.stationId === stationId));
   const postName = posts.find((p) => p.id === w.postId)?.name ?? 'Aucun poste';
   const assignedNames = w.assignedUserIds
-    .map((id) => state.users.find((u) => u.id === id)?.name ?? id).join(', ') || '—';
+    .map((id) => assignableUsers.find((u) => u.id === id)?.name ?? state.users.find((u) => u.id === id)?.name ?? id).join(', ') || '—';
   const next = nextWashStatuses(w.status);
 
   const pay = () => {
-    const key = payKey.current ?? `pay-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    payKey.current = key;
+    if (payBusyRef.current || paymentAttempt.error) return;
+    const previous = paymentAttempt.pending;
+    const key = previous?.key ?? idempotencyKey('pay');
+    payBusyRef.current = true;
+    setPayBusy(true);
     return safe(async () => {
-      try { await onPay(amount, method, key); payKey.current = null; }
-      catch (e) { payKey.current = null; throw e; }
+      try {
+        await onPay(previous?.amount ?? amount, previous?.method ?? method, key);
+      } finally {
+        setPaymentAttempt(readPayment());
+        payBusyRef.current = false;
+        setPayBusy(false);
+      }
     });
   };
 
-  return (
+  return (<>
     <Modal open onClose={onClose} title={`Fiche ${w.number}`} wide>
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone={washStatusTone(w.status)}>{WASH_STATUS_LABELS[w.status]}</Badge>
@@ -347,6 +416,12 @@ function WashDetail({ washId, methods, onClose, onStatus, onAssign, onQuality, o
         <Badge>{w.assignedUserIds.length} affecté(s) : {assignedNames}</Badge>
         <Badge>Poste : {postName}</Badge>
         {w.clientName && <Badge>Client : {w.clientName}</Badge>}
+      </div>
+
+      <div className="mt-4">
+        <button className="wg-btn wg-btn-ghost" onClick={() => setReceipt(buildWashReceipt(
+          w, state.company, state.station, identity?.stations ?? [], state.paymentCancellations ?? [],
+        ))}><FiFileText /> Reçu client</button>
       </div>
 
       <div className="mt-5 wg-scroll-x rounded-xl border" style={{ borderColor: 'var(--wg-border)' }}>
@@ -367,6 +442,8 @@ function WashDetail({ washId, methods, onClose, onStatus, onAssign, onQuality, o
         <Card className="!p-3"><p className="wg-muted text-[11px]">Encaissé</p><p className="mt-1 font-bold">{formatFCFA(w.paid)}</p></Card>
         <Card className="!p-3"><p className="wg-muted text-[11px]">Reste à payer</p><p className="mt-1 font-bold">{formatFCFA(Math.max(0, w.total - w.paid))}</p></Card>
       </div>
+
+      <WhatsappWashPanel key={`${w.id}:${w.status}`} wash={w} />
 
       <div className="mt-5">
         <p className="mb-2 text-xs font-bold">Historique des statuts</p>
@@ -417,13 +494,15 @@ function WashDetail({ washId, methods, onClose, onStatus, onAssign, onQuality, o
         </div>
       )}
 
-      {w.total - w.paid > 0 && w.status !== 'cancelled' && (
+      {((w.total - w.paid > 0 && w.status !== 'cancelled') || paymentAttempt.pending || paymentAttempt.error) && (
         <div className="mt-4 rounded-xl border p-4" style={{ borderColor: 'var(--wg-border)' }}>
           <p className="mb-3 flex items-center gap-2 text-sm font-bold"><FiDollarSign /> Encaisser le reste</p>
+          {paymentAttempt.error && <div className="mb-3"><Alert kind="danger">{paymentAttempt.error}</Alert></div>}
+          {paymentAttempt.pending && <div className="mb-3"><Alert kind="warn">Résultat incertain ou lecture non confirmée : vérifiez cet encaissement avec sa clé d’origine avant d’en créer un autre. La tentative est conservée dans cet onglet.</Alert></div>}
           <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-            <Input type="number" min="1" max={w.total - w.paid} value={amount} onChange={(e) => setAmount(Number(e.target.value))} />
-            <Select value={method} onChange={(e) => setMethod(e.target.value as PayMethod)}>{methods.map((m) => <option key={m} value={m}>{PAY_METHOD_LABELS[m]}</option>)}</Select>
-            <button className="wg-btn wg-btn-primary" onClick={pay}>Encaisser</button>
+            <Input label="Montant à encaisser (FCFA)" type="number" min="1" max={w.total - w.paid} disabled={payBusy || Boolean(paymentAttempt.pending)} value={paymentAttempt.pending?.amount ?? amount} onChange={(e) => setAmount(readNumber(e.target.value))} />
+            <Select label="Moyen de paiement" disabled={payBusy || Boolean(paymentAttempt.pending)} value={paymentAttempt.pending?.method ?? method} onChange={(e) => setMethod(e.target.value as PayMethod)}>{methods.map((m) => <option key={m} value={m}>{PAY_METHOD_LABELS[m]}</option>)}</Select>
+            <button className="wg-btn wg-btn-primary" disabled={payBusy || Boolean(paymentAttempt.error)} onClick={pay}>{payBusy ? 'Vérification…' : paymentAttempt.pending ? 'Vérifier le paiement' : 'Encaisser'}</button>
           </div>
         </div>
       )}
@@ -513,5 +592,6 @@ function WashDetail({ washId, methods, onClose, onStatus, onAssign, onQuality, o
       {w.cancelledReason && <p className="wg-muted mt-2 text-xs">Motif : {w.cancelledReason}</p>}
       {w.deliveredAt && <p className="wg-muted mt-1 text-xs">Livré le {formatDateTime(w.deliveredAt)} — distinct de « prêt ».</p>}
     </Modal>
-  );
+    {receipt && <WashReceiptModal receipt={receipt} onClose={() => setReceipt(null)} />}
+  </>);
 }

@@ -23,12 +23,28 @@ describe('Prompt 10 — réseau et idempotence', () => {
     expect(calls).toBe(2);
   });
 
+  it('indique le nombre réel de tentatives après épuisement du retry', async () => {
+    try {
+      await withRetry(async () => { throw new Error('fetch failed'); }, { retries: 2, baseDelayMs: 1 });
+      throw new Error('une erreur réseau était attendue');
+    } catch (error) {
+      expect(error).toBeInstanceOf(NetworkError);
+      expect((error as NetworkError).attempts).toBe(3);
+    }
+  });
+
   it('ne rejoue jamais une erreur de permission', async () => {
     let calls = 0;
-    await expect(withRetry(async () => {
-      calls += 1;
-      throw new Error('42501 permission refusée');
-    }, { retries: 2, baseDelayMs: 1 })).rejects.toBeInstanceOf(NetworkError);
+    let failure: unknown;
+    try {
+      await withRetry(async () => {
+        calls += 1;
+        throw new Error('42501 permission refusée');
+      }, { retries: 2, baseDelayMs: 1 });
+    } catch (error) { failure = error; }
+    expect(failure).toBeInstanceOf(NetworkError);
+    expect((failure as NetworkError).attempts).toBe(1);
+    expect((failure as NetworkError).message).toContain('1 tentative');
     expect(calls).toBe(1);
   });
 });

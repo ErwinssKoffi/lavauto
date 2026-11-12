@@ -10,7 +10,7 @@ const base = () => ({
   company: { id: 'co1', name: 'Clean Auto SARL', city: 'Abidjan', phone: '', createdAt: now, suspended: false },
   station: {
     id: 'st1', companyId: 'co1', name: 'Clean Auto Cocody', address: '', city: 'Abidjan', phone: '',
-    currency: 'FCFA', logoUrl: null, hours: [], paymentMethods: ['especes'], cashRequiresOpen: true,
+    currency: 'FCFA', logoPath: null, hours: [], paymentMethods: ['especes'], cashRequiresOpen: true,
     maxCashierDiscount: 2000, commissionRate: 10, monthlyTarget: 500000, activated: true, activatedAt: now,
   },
   users: [], vehicleCategories: [], services: [], clients: [],

@@ -4,7 +4,7 @@ import {
   FiAlertTriangle, FiArrowRight, FiAward, FiBarChart2, FiBox, FiCheck,
   FiChevronDown, FiClock, FiCreditCard, FiDollarSign, FiDroplet,
   FiFileText, FiLayers, FiLock, FiPhone, FiPieChart, FiPlay,
-  FiPlus, FiRefreshCw, FiShield, FiSmartphone, FiStar, FiTruck, FiUsers,
+  FiPlus, FiRefreshCw, FiShield, FiSmartphone, FiTruck, FiUsers,
 } from 'react-icons/fi';
 import { useStore } from '../lib/store';
 import { formatFCFA } from '../lib/format';
@@ -17,86 +17,34 @@ interface FaqItem {
 const FAQS: FaqItem[] = [
   {
     q: "WashGuard fonctionne-t-il avec les coupures d'électricité ou d'internet ?",
-    a: "Oui. WashGuard fonctionne sur smartphone et tablette même en cas d'instabilité réseau grâce à son architecture moderne. Dès que la connexion revient, les opérations sont resynchronisées automatiquement sans aucune perte de données.",
+    a: "En mode connecté, les opérations nécessitent une connexion. Si une réponse est interrompue, vérifiez le résultat avant toute nouvelle saisie ; la synchronisation hors ligne n’est pas garantie.",
   },
   {
     q: 'Comment s’effectue le rapprochement Wave, Orange Money et MTN MoMo ?',
-    a: 'Chaque paiement Mobile Money est enregistré avec sa référence de transaction. Dans le module de caisse, les espèces physiques et les comptes Mobile Money sont isolés dans des relevés distincts : vous ne confondez plus le liquide présent dans le tiroir avec les soldes numériques.',
+    a: 'Les paiements sont enregistrés par moyen de paiement ; les espèces alimentent la caisse et les canaux numériques restent distincts. Le rapprochement est saisi dans l’application, sans connexion automatique aux opérateurs.',
   },
   {
-    q: 'Comment fonctionne le système d’alertes de stock en temps réel ?',
-    a: 'Vous définissez dans les paramètres un seuil critique pour chaque produit (par exemple 10 Litres pour le savon/shampoing, 5 Litres pour la cire lustrante). Dès qu’une consommation fait descendre le stock en dessous de ce seuil, une alerte visuelle immédiate s’affiche sur le tableau de bord et dans la barre de notification.',
+    q: 'Comment fonctionne le système d’alertes de stock ?',
+    a: 'Les niveaux et les seuils disponibles sont affichés dans le module stock et signalés dans l’interface. Les simulations et l’édition locale des seuils sont réservées à la démonstration locale ; en mode connecté, les données sont relues depuis le serveur.',
   },
   {
     q: 'Les prix des prestations peuvent-ils être modifiés par les caissiers ?',
-    a: 'Non. Pour éliminer tout risque de fraude ou de surfacturation occulte, les prix unitaires de chaque prestation sont gelés au moment de la création du ticket. Les remises caissier sont strictement plafonnées selon la limite fixée par le propriétaire.',
+    a: 'Le catalogue est réservé aux comptes autorisés. Le serveur relit les tarifs et les fige sur la fiche ; le plafond de remise du caissier est contrôlé dans l’interface, mais pas encore par la base connectée.',
   },
   {
     q: 'Puis-je gérer plusieurs stations de lavage avec le même compte ?',
-    a: 'Absolument. La formule Réseau permet au propriétaire de superviser jusqu’à 5 stations en direct : chiffre d’affaires consolidé, rentabilité par site, comparaison des volumes de lavage et fiches de commissions des laveurs.',
+    a: 'La supervision multi-stations dépend des limites de votre formule et des permissions de votre compte. Les limites des formules disponibles sont indiquées dans la section tarifs.',
   },
   {
-    q: 'Comment tester WashGuard sans engagement ?',
-    a: 'Vous bénéficiez d’un essai gratuit de 14 jours, sans carte bancaire requise. Vous pouvez également cliquer sur « Découvrir la démo » pour tester immédiatement l’interface avec des données réalistes.',
+    q: 'Comment commencer avec WashGuard ?',
+    a: 'Consultez les formules disponibles puis créez votre compte. La disponibilité et les limites de l’essai dépendent des formules affichées.',
   },
 ];
 
 export default function Landing() {
-  const { plans } = useStore();
+  const { plans, plansError } = useStore();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'lavages' | 'caisse' | 'stock' | 'commissions'>('caisse');
-  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
-
-  // Tarifs par défaut conformes au playbook (15 000 FCFA standard, 35 000 FCFA réseau)
-  const displayPlans = plans.length > 0 ? plans : [
-    {
-      id: 'essai',
-      name: 'Essai Gratuit',
-      priceMonthly: 0,
-      trial: true,
-      limits: { stations: 1, employees: 3, washesPerMonth: 100 },
-      features: [
-        '1 station incluse',
-        'Jusqu’à 3 comptes collaborateurs',
-        '100 lavages / mois',
-        'Encaissement Espèces & Mobile Money',
-        'Support technique par email & WhatsApp',
-      ],
-    },
-    {
-      id: 'standard',
-      name: 'Formule Standard',
-      priceMonthly: 15000,
-      trial: false,
-      limits: { stations: 1, employees: 10, washesPerMonth: 1000 },
-      features: [
-        '1 station opérationnelle',
-        'Jusqu’à 10 employés (gérant, caissiers, laveurs)',
-        '1 000 lavages / mois',
-        'Rapprochement de caisse & écart théorique',
-        'Alertes stock en temps réel (savon, cire)',
-        'Calcul automatique des commissions laveurs',
-        'Export CSV et rapports de rentabilité',
-      ],
-    },
-    {
-      id: 'reseau',
-      name: 'Formule Réseau',
-      priceMonthly: 35000,
-      trial: false,
-      limits: { stations: 5, employees: 50, washesPerMonth: 10000 },
-      features: [
-        'Jusqu’à 5 stations de lavage',
-        '50 comptes collaborateurs',
-        'Lavages illimités',
-        'Tableau de bord consolidé multi-stations',
-        'Gestion des flottes d’entreprises & facturation',
-        'Cartes de fidélité clients & programmes à points',
-        'Audit logs complets & assistance prioritaire 7j/7',
-      ],
-    },
-  ];
-
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 antialiased selection:bg-sky-500 selection:text-white">
       {/* ── Top Announcement Banner ────────────────────────────────────────── */}
@@ -104,7 +52,7 @@ export default function Landing() {
         <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-500/20 px-2.5 py-0.5 font-bold text-sky-300">
           Nouveau
         </span>{' '}
-        Système d'alertes stock en temps réel & Rapprochement Wave / Orange Money inclus · Devises FCFA (XOF).
+        Suivi des stocks et rapprochement par moyen de paiement · Devise FCFA (XOF).
       </div>
 
       {/* ── Main Navigation ──────────────────────────────────────────────── */}
@@ -128,7 +76,6 @@ export default function Landing() {
             <a href="#fonctionnalites" className="transition hover:text-white">Fonctionnalités</a>
             <a href="#caisse-stock" className="transition hover:text-white">Caisse & Stock</a>
             <a href="#tarifs" className="transition hover:text-white">Tarifs</a>
-            <a href="#temoignages" className="transition hover:text-white">Témoignages</a>
             <a href="#faq" className="transition hover:text-white">FAQ</a>
           </nav>
 
@@ -143,7 +90,7 @@ export default function Landing() {
               to="/inscription"
               className="inline-flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-sky-500/20 transition hover:bg-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:ring-offset-2 focus:ring-offset-slate-950"
             >
-              Essai gratuit
+              Inscription
               <FiArrowRight size={15} />
             </Link>
           </div>
@@ -163,16 +110,16 @@ export default function Landing() {
             </div>
 
             <h1 className="mt-6 text-4xl font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl">
-              Fini le coulage de caisse.{' '}
+              Suivez votre caisse.{' '}
               <span className="bg-gradient-to-r from-sky-400 via-blue-400 to-indigo-300 bg-clip-text text-transparent">
                 Pilotez vos lavages, vos stocks et vos équipes.
               </span>
             </h1>
 
             <p className="mx-auto mt-6 max-w-3xl text-lg leading-relaxed text-slate-300 sm:text-xl">
-              WashGuard digitalise chaque étape de votre station : ticket de lavage, encaissements
-              sécurisés (Wave, Orange Money, MTN MoMo, Espèces), calcul automatique des commissions des laveurs,
-              et <span className="font-semibold text-white">alertes stock en temps réel</span> pour ne plus jamais manquer de savon ou de cire.
+              WashGuard vous aide à suivre votre station : fiches de lavage, enregistrement des encaissements
+              (Wave, Orange Money, MTN MoMo, Espèces), calcul des commissions des laveurs,
+              et <span className="font-semibold text-white">alertes stock</span> pour repérer les produits sous leur seuil.
             </p>
 
             <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
@@ -180,7 +127,7 @@ export default function Landing() {
                 to="/inscription"
                 className="inline-flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 px-6 py-3.5 text-base font-bold text-white shadow-xl shadow-sky-500/25 transition hover:from-sky-400 hover:to-blue-500"
               >
-                Démarrer mon essai de 14 jours
+                Créer mon compte
                 <FiArrowRight size={18} />
               </Link>
               <Link
@@ -188,7 +135,7 @@ export default function Landing() {
                 className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/80 px-6 py-3.5 text-base font-semibold text-slate-200 backdrop-blur transition hover:bg-slate-800 hover:text-white"
               >
                 <FiPlay size={16} className="text-sky-400" />
-                Tester la démo instantanée
+                Se connecter
               </Link>
             </div>
 
@@ -214,7 +161,7 @@ export default function Landing() {
                 <span className="h-3 w-3 rounded-full bg-amber-500/80" />
                 <span className="h-3 w-3 rounded-full bg-emerald-500/80" />
                 <span className="ml-2 font-mono text-xs text-slate-400">
-                  app.washguard.ci / Station Étoile Auto — Cocody Angré
+                  Aperçu d’une station — données fictives
                 </span>
               </div>
               <div className="flex items-center gap-2 text-xs font-medium text-emerald-400">
@@ -222,7 +169,7 @@ export default function Landing() {
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
                 </span>
-                Système en direct
+                Illustration
               </div>
             </div>
 
@@ -243,7 +190,7 @@ export default function Landing() {
                 <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
                   <p className="text-xs font-semibold text-slate-400 uppercase">Contrôle de Caisse</p>
                   <p className="mt-1.5 text-2xl font-black text-emerald-400">0 FCFA d'écart</p>
-                  <p className="mt-1 text-xs text-slate-400">Espèces physiques + Wave + MoMo</p>
+                  <p className="mt-1 text-xs text-slate-400">Comptage espèces (exemple fictif)</p>
                 </div>
                 <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
                   <div className="flex items-center justify-between">
@@ -260,7 +207,7 @@ export default function Landing() {
                 <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4 lg:col-span-2">
                   <div className="mb-3 flex items-center justify-between">
                     <h3 className="text-sm font-bold text-white">Postes de lavage en activité</h3>
-                    <span className="text-xs text-sky-400">Mise à jour instantanée</span>
+                    <span className="text-xs text-sky-400">Exemple fictif</span>
                   </div>
                   <div className="space-y-2.5">
                     <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-800/80 bg-slate-900/60 p-3 text-xs">
@@ -337,7 +284,7 @@ export default function Landing() {
                     </div>
                     <div className="pt-2 text-center">
                       <span className="inline-block rounded-lg bg-sky-500/20 px-3 py-1 font-semibold text-sky-300">
-                        Notification automatique au gérant
+                        Alerte affichée dans l’interface
                       </span>
                     </div>
                   </div>
@@ -352,7 +299,7 @@ export default function Landing() {
       <section className="border-y border-slate-800/80 bg-slate-900/50 py-8">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <p className="text-center text-xs font-semibold tracking-wider text-slate-400 uppercase">
-            Encaissez tous les moyens de paiement locaux sans friction
+            Enregistrez vos encaissements par moyen de paiement
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-8 sm:gap-14 text-sm font-bold text-slate-300">
             <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-2">
@@ -403,7 +350,7 @@ export default function Landing() {
               </span>
               <h3 className="mt-5 text-lg font-bold text-white">File d’attente & Prise en charge</h3>
               <p className="mt-2.5 text-sm leading-relaxed text-slate-400">
-                Numérotation automatique des tickets, immatriculation du véhicule, choix des prestations selon la catégorie (Berline, 4x4, Moto) et suivi en direct sur chaque poste.
+                Numérotation automatique des fiches, immatriculation facultative, choix des prestations selon la catégorie et suivi des statuts et des affectations.
               </p>
             </div>
 
@@ -412,9 +359,9 @@ export default function Landing() {
               <span className="grid h-12 w-12 place-items-center rounded-xl bg-emerald-500/10 text-emerald-400">
                 <FiLock size={24} />
               </span>
-              <h3 className="mt-5 text-lg font-bold text-white">Caisse Anti-Fraude & Rapprochement</h3>
+              <h3 className="mt-5 text-lg font-bold text-white">Caisse & Rapprochement</h3>
               <p className="mt-2.5 text-sm leading-relaxed text-slate-400">
-                Fond initial obligatoire, double journal étanche Espèces / Mobile Money, gel des prix unitaires et calcul instantané de l'écart théorique lors du comptage de clôture.
+                Fond de caisse, séparation des espèces et des canaux numériques, prix figés et calcul de l’écart au comptage de clôture.
               </p>
             </div>
 
@@ -423,9 +370,9 @@ export default function Landing() {
               <span className="grid h-12 w-12 place-items-center rounded-xl bg-amber-500/10 text-amber-400">
                 <FiBox size={24} />
               </span>
-              <h3 className="mt-5 text-lg font-bold text-white">Alertes Stock en Temps Réel</h3>
+              <h3 className="mt-5 text-lg font-bold text-white">Alertes de stock</h3>
               <p className="mt-2.5 text-sm leading-relaxed text-slate-400">
-                Définissez les seuils critiques pour vos consommables (savon, cire, dégraissant, microfibres). Recevez des alertes visuelles immédiates pour commander avant la rupture.
+                Consultez les niveaux et les seuils disponibles pour repérer les consommables à réapprovisionner.
               </p>
             </div>
 
@@ -436,7 +383,7 @@ export default function Landing() {
               </span>
               <h3 className="mt-5 text-lg font-bold text-white">Commissions des Laveurs</h3>
               <p className="mt-2.5 text-sm leading-relaxed text-slate-400">
-                Barème personnalisé par laveur ou par prestation. Relevés périodiques figés et validés par le gérant pour des fiches de paie transparentes et sans litiges.
+                Aperçu des commissions et relevés périodiques figés après validation par un responsable. Les réglages locaux ne configurent pas le serveur.
               </p>
             </div>
 
@@ -458,7 +405,7 @@ export default function Landing() {
               </span>
               <h3 className="mt-5 text-lg font-bold text-white">Multi-Stations & Rentabilité Nette</h3>
               <p className="mt-2.5 text-sm leading-relaxed text-slate-400">
-                Supervisez toutes vos stations depuis votre téléphone : chiffre d’affaires consolidé, comparaison des performances et rapport comptable distinguant charges et marges.
+                Comparez les stations accessibles, leur chiffre d’affaires et leurs performances. Le résultat net dépend d’une attestation des coûts.
               </p>
             </div>
           </div>
@@ -476,7 +423,7 @@ export default function Landing() {
               Découvrez la simplicité d'utilisation au quotidien
             </p>
             <p className="mx-auto mt-4 max-w-2xl text-slate-400">
-              Cliquez sur les différents onglets pour voir comment WashGuard sécurise chaque opération.
+              Cliquez sur les onglets pour découvrir des exemples illustratifs avec des données fictives.
             </p>
           </div>
 
@@ -501,7 +448,7 @@ export default function Landing() {
                 onClick={() => setActiveTab('lavages')}
                 className={`rounded-lg px-4 py-2 transition ${activeTab === 'lavages' ? 'bg-sky-500 text-white' : 'text-slate-400 hover:text-white'}`}
               >
-                3. File de Lavages & Ticket
+                3. File de Lavages & Fiche
               </button>
               <button
                 type="button"
@@ -518,10 +465,10 @@ export default function Landing() {
               <div className="grid items-center gap-8 lg:grid-cols-2">
                 <div>
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-bold text-emerald-400">
-                    <FiLock size={14} /> Sécurité financière absolue
+                    <FiLock size={14} /> Suivi de caisse
                   </span>
                   <h3 className="mt-4 text-2xl font-bold text-white">
-                    Zéro coulage : calcul automatique de l'écart au comptage
+                    Calcul de l’écart au comptage
                   </h3>
                   <p className="mt-3 text-sm leading-relaxed text-slate-300">
                     Chaque matin, le caissier ouvre la caisse avec son fond initial. Au cours de la journée,
@@ -530,7 +477,7 @@ export default function Landing() {
                   <ul className="mt-4 space-y-2.5 text-xs text-slate-300">
                     <li className="flex items-center gap-2">
                       <FiCheck className="text-emerald-400" />
-                      <span><strong>Solde théorique garanti</strong> = Fond + Espèces encaissées − Dépenses payées</span>
+                      <span><strong>Solde théorique</strong> = fond + mouvements de caisse espèces</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <FiCheck className="text-emerald-400" />
@@ -574,22 +521,22 @@ export default function Landing() {
               <div className="grid items-center gap-8 lg:grid-cols-2">
                 <div>
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 px-3 py-1 text-xs font-bold text-amber-400">
-                    <FiAlertTriangle size={14} /> Alertes stock en temps réel
+                    <FiAlertTriangle size={14} /> Alertes de stock
                   </span>
                   <h3 className="mt-4 text-2xl font-bold text-white">
-                    Ne tombez plus jamais en panne de savon ou de cire
+                    Repérez les produits sous leur seuil
                   </h3>
                   <p className="mt-3 text-sm leading-relaxed text-slate-300">
-                    Configurez le seuil critique dans les paramètres pour chaque consommable de lavage. Dès qu'un produit descend sous sa limite, le bandeau d'alerte et la cloche de notification vous préviennent en direct.
+                    Le bandeau signale les produits sous leur seuil à partir des données disponibles. En mode connecté, les données proviennent du serveur ; les simulations et l’édition locale des seuils sont réservées à la démonstration locale.
                   </p>
                   <ul className="mt-4 space-y-2.5 text-xs text-slate-300">
                     <li className="flex items-center gap-2">
                       <FiCheck className="text-amber-400" />
-                      <span>Suivi automatique des consommations par lavage effectué</span>
+                      <span>Suivi des consommations enregistrées par lavage</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <FiCheck className="text-amber-400" />
-                      <span>Seuil d'alerte paramétrable par produit (Litres, Bidons, Unités)</span>
+                      <span>Seuil d’alerte affiché par produit (litres, bidons, unités)</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <FiCheck className="text-amber-400" />
@@ -643,10 +590,10 @@ export default function Landing() {
                     <FiDroplet size={14} /> Fluidité opérationnelle
                   </span>
                   <h3 className="mt-4 text-2xl font-bold text-white">
-                    File d'attente digitale et contrôle qualité en 6 points
+                    File d'attente et suivi du contrôle qualité
                   </h3>
                   <p className="mt-3 text-sm leading-relaxed text-slate-300">
-                    Fini les confusions sur l'ordre de passage ou les réclamations clients. Chaque véhicule reçoit son ticket avec ses prestations choisies et son poste de lavage attitré.
+                    Chaque fiche regroupe les prestations choisies, les affectations et, si nécessaire, un poste. Le contrôle qualité précède la livraison.
                   </p>
                   <ul className="mt-4 space-y-2.5 text-xs text-slate-300">
                     <li className="flex items-center gap-2">
@@ -659,7 +606,7 @@ export default function Landing() {
                     </li>
                     <li className="flex items-center gap-2">
                       <FiCheck className="text-sky-400" />
-                      <span>Validation du contrôle qualité (jantes, vitres, intérieur) avant restitution</span>
+                      <span>Validation du contrôle qualité avant restitution</span>
                     </li>
                   </ul>
                   <div className="mt-6">
@@ -670,7 +617,7 @@ export default function Landing() {
                 </div>
                 <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-5 text-xs">
                   <div className="flex items-center justify-between border-b border-slate-800 pb-3 font-bold text-white">
-                    <span>Ticket de lavage #LAV-2026-042</span>
+                    <span>Exemple de fiche #LAV-2026-042</span>
                     <span className="text-sky-400">Poste 1 (Extérieur)</span>
                   </div>
                   <div className="mt-3 space-y-2">
@@ -701,19 +648,19 @@ export default function Landing() {
                     <FiUsers size={14} /> Motivation & Transparence
                   </span>
                   <h3 className="mt-4 text-2xl font-bold text-white">
-                    Commissions calculées automatiquement, zéro contestation
+                    Commissions calculées et relevés de période
                   </h3>
                   <p className="mt-3 text-sm leading-relaxed text-slate-300">
-                    Motivez votre personnel avec des commissions claires et instantanées. Définissez le pourcentage global ou individuel (ex: 20% ou 25%). Les laveurs savent exactement ce qu'ils gagnent chaque jour.
+                    Consultez un aperçu des commissions et préparez des relevés périodiques. En mode connecté, les relevés utilisent les données de barème du serveur ; les réglages locaux ne les modifient pas.
                   </p>
                   <ul className="mt-4 space-y-2.5 text-xs text-slate-300">
                     <li className="flex items-center gap-2">
                       <FiCheck className="text-indigo-400" />
-                      <span>Barème paramétrable par station ou par employé</span>
+                      <span>Barème de station ou contrat employé côté serveur</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <FiCheck className="text-indigo-400" />
-                      <span>Relevé de paie périodique figé et infalsifiable</span>
+                      <span>Relevé périodique figé après validation</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <FiCheck className="text-indigo-400" />
@@ -772,12 +719,20 @@ export default function Landing() {
               Des formules adaptées à chaque taille de station
             </p>
             <p className="mx-auto mt-4 max-w-2xl text-slate-400">
-              Des montants clairs en Francs CFA (XOF). Sans frais d'installation cachés. Sans engagement.
+              Les formules disponibles et leurs limites sont affichées en Francs CFA (XOF).
             </p>
           </div>
 
+          {plansError ? (
+            <div role="alert" className="mt-14 rounded-2xl border border-amber-500/30 bg-slate-900/60 p-6 text-center">
+              <p className="font-bold text-white">Formules et tarifs indisponibles</p>
+              <p className="mt-2 text-sm text-slate-400">Aucun prix local n’est présenté à la place des tarifs indisponibles. Veuillez réessayer plus tard.</p>
+            </div>
+          ) : plans.length === 0 ? (
+            <p role="status" className="mt-14 text-center text-sm text-slate-400">Chargement des formules…</p>
+          ) : (
           <div className="mt-14 grid gap-8 lg:grid-cols-3">
-            {displayPlans.map((plan) => {
+            {plans.map((plan) => {
               const isPopular = plan.id === 'standard';
               return (
                 <div
@@ -790,7 +745,7 @@ export default function Landing() {
                 >
                   {isPopular && (
                     <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-sky-500 to-blue-600 px-4 py-1 text-xs font-bold text-white shadow-md">
-                      Recommandé · Station Unique
+                      Formule Standard
                     </div>
                   )}
 
@@ -805,7 +760,7 @@ export default function Landing() {
                       )}
                     </div>
                     <p className="mt-2 text-xs text-slate-400">
-                      {plan.trial ? '14 jours d’essai sans carte bancaire' : 'Facturation mensuelle sans engagement'}
+                      {plan.trial ? 'Formule d’essai' : 'Facturation mensuelle'}
                     </p>
 
                     <div className="my-6 border-t border-slate-800" />
@@ -835,75 +790,14 @@ export default function Landing() {
                           : 'border border-slate-700 bg-slate-800 text-white hover:bg-slate-700'
                       }`}
                     >
-                      {plan.trial ? 'Démarrer l’essai gratuit' : `Choisir la formule ${plan.name}`}
+                      Créer un compte
                     </Link>
                   </div>
                 </div>
               );
             })}
           </div>
-
-          <p className="mt-8 text-center text-xs text-slate-400">
-            Besoin d’un déploiement sur plus de 10 stations ou d’un accompagnement sur mesure ?{' '}
-            <a href="https://wa.me/2250700000000" target="_blank" rel="noopener noreferrer" className="text-sky-400 underline">
-              Contactez notre équipe par WhatsApp
-            </a>.
-          </p>
-        </div>
-      </section>
-
-      {/* ── Testimonials ─────────────────────────────────────────────────── */}
-      <section id="temoignages" className="border-t border-slate-800/80 bg-slate-900/40 py-20 sm:py-28">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h2 className="text-xs font-bold tracking-widest text-sky-400 uppercase">
-              Témoignages Clients
-            </h2>
-            <p className="mt-3 text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-              Adopté par les gérants de station les plus exigeants
-            </p>
-          </div>
-
-          <div className="mt-14 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-6 text-sm">
-              <div className="flex gap-1 text-amber-400">
-                {[...Array(5)].map((_, i) => <FiStar key={i} className="fill-amber-400" size={14} />)}
-              </div>
-              <p className="mt-4 italic text-slate-300">
-                « Avant WashGuard, j’avais systématiquement des écarts de caisse de 10 000 à 15 000 FCFA par jour en fin de soirée. Avec le contrôle obligatoire et le calcul d'écart automatique, le coulage est tombé à zéro dès la première semaine. »
-              </p>
-              <div className="mt-6 border-t border-slate-800 pt-4">
-                <p className="font-bold text-white">M. Bakayoko Souleymane</p>
-                <p className="text-xs text-slate-400">Gérant de Prestige Auto Wash · Marcory Zone 4</p>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-6 text-sm">
-              <div className="flex gap-1 text-amber-400">
-                {[...Array(5)].map((_, i) => <FiStar key={i} className="fill-amber-400" size={14} />)}
-              </div>
-              <p className="mt-4 italic text-slate-300">
-                « Les alertes stock en temps réel nous ont sauvé plusieurs samedis ! Avant, on se rendait compte qu'il n'y avait plus de shampoing moussant en plein milieu de l'affluence. Maintenant, on reçoit l'alerte bien avant d'atteindre le seuil critique. »
-              </p>
-              <div className="mt-6 border-t border-slate-800 pt-4">
-                <p className="font-bold text-white">Mme Kouamé Affoué</p>
-                <p className="text-xs text-slate-400">Propriétaire de 3 stations · Cocody Angré & Riviera</p>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-6 text-sm">
-              <div className="flex gap-1 text-amber-400">
-                {[...Array(5)].map((_, i) => <FiStar key={i} className="fill-amber-400" size={14} />)}
-              </div>
-              <p className="mt-4 italic text-slate-300">
-                « Le calcul automatique des commissions des laveurs a transformé l'ambiance dans la station. Les gars voient leurs points et leurs sous en direct. Plus aucune dispute le samedi soir au moment du partage ! »
-              </p>
-              <div className="mt-6 border-t border-slate-800 pt-4">
-                <p className="font-bold text-white">M. Diabaté Lassina</p>
-                <p className="text-xs text-slate-400">Responsable d'exploitation · Yopougon Sable</p>
-              </div>
-            </div>
-          </div>
+          )}
         </div>
       </section>
 
@@ -957,21 +851,21 @@ export default function Landing() {
             Prêt à transformer la gestion de votre station de lavage ?
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-slate-300">
-            Rejoignez les stations qui ont éliminé les pertes de caisse et boosté leur rentabilité avec WashGuard.
+            Suivez vos lavages, vos encaissements et vos équipes au même endroit.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <Link
               to="/inscription"
               className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 px-7 py-3.5 text-base font-bold text-white shadow-xl shadow-sky-500/25 transition hover:from-sky-400 hover:to-blue-500"
             >
-              Créer mon espace gratuitement
+              Créer mon espace
               <FiArrowRight size={18} />
             </Link>
             <Link
               to="/connexion"
               className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-6 py-3.5 text-base font-semibold text-slate-200 transition hover:bg-slate-800 hover:text-white"
             >
-              Accéder à la démo
+              Se connecter
             </Link>
           </div>
         </div>
@@ -1001,8 +895,8 @@ export default function Landing() {
           </div>
 
           <div className="mt-8 flex flex-wrap items-center justify-between border-t border-slate-800/80 pt-6 text-[11px] text-slate-500">
-            <p>© {new Date().getFullYear()} WashGuard Technologies. Tous droits réservés. Abidjan, Côte d’Ivoire.</p>
-            <p>Devise réglementaire : Francs CFA (XOF) · Hébergement sécurisé Supabase & Cloud.</p>
+            <p>© {new Date().getFullYear()} WashGuard. Tous droits réservés.</p>
+            <p>Devise affichée : Francs CFA (XOF).</p>
           </div>
         </div>
       </footer>

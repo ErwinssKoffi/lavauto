@@ -1,3 +1,4 @@
+import { validateCustomer, validatePackage, validatePromotion, validateFleet, validateFleetContract, validateFleetReceivable, validateQuantity, validateDate, validatePlate } from '../../lib/validation';
 import type {
   AttachFleetVehiclePayload, CustomerProfilePayload, CustomerVehiclePayload,
   FleetContractPayload, FleetPayload, FleetReceivablePayload,
@@ -58,6 +59,7 @@ export class SupabaseCrmCommands implements CrmCommands {
   }
 
   async saveCustomerProfile(p: CustomerProfilePayload): Promise<string> {
+    validateCustomer(p);
     return this.callId('save_customer_profile', {
       p_station_id: p.stationId, p_name: p.name,
       p_phone: p.phone ?? '', p_email: p.email ?? '', p_notes: p.notes ?? '',
@@ -67,6 +69,7 @@ export class SupabaseCrmCommands implements CrmCommands {
   }
 
   async saveCustomerVehicle(p: CustomerVehiclePayload): Promise<string> {
+    validatePlate(p.plate);
     return this.callId('save_customer_vehicle', {
       p_station_id: p.stationId, p_customer_id: p.customerId, p_plate: p.plate,
       p_brand: p.brand ?? '', p_model: p.model ?? '', p_color: p.color ?? '',
@@ -75,6 +78,7 @@ export class SupabaseCrmCommands implements CrmCommands {
   }
 
   async createLoyaltyProgram(p: LoyaltyProgramPayload): Promise<string> {
+    validateQuantity(p.pointsPer1000Minor); validateQuantity(p.redemptionThreshold);
     return this.callId('create_loyalty_program', {
       p_station_id: p.stationId, p_name: p.name,
       p_points_per_1000_minor: p.pointsPer1000Minor,
@@ -110,6 +114,7 @@ export class SupabaseCrmCommands implements CrmCommands {
   }
 
   async savePackagePlan(p: PackagePlanPayload): Promise<string> {
+    validatePackage(p);
     return this.callId('save_package_plan', {
       p_station_id: p.stationId, p_name: p.name,
       p_price_minor: p.priceMinor, p_wash_count: p.washCount,
@@ -120,6 +125,7 @@ export class SupabaseCrmCommands implements CrmCommands {
   }
 
   async sellPackageToCustomer(p: PackageSalePayload): Promise<string> {
+    if (p.purchasedAt) validateDate(p.purchasedAt);
     return this.callId('sell_package_to_customer', {
       p_station_id: p.stationId, p_customer_id: p.customerId,
       p_package_id: p.packageId, p_purchased_at: p.purchasedAt ?? null,
@@ -140,6 +146,7 @@ export class SupabaseCrmCommands implements CrmCommands {
   }
 
   async savePromotion(p: PromotionPayload): Promise<string> {
+    validatePromotion(p);
     return this.callId('save_promotion', {
       p_station_id: p.stationId, p_name: p.name, p_code: p.code,
       p_kind: p.kind, p_value: p.value,
@@ -164,6 +171,7 @@ export class SupabaseCrmCommands implements CrmCommands {
   }
 
   async saveFleet(p: FleetPayload): Promise<string> {
+    validateFleet(p);
     return this.callId('save_fleet', {
       p_station_id: p.stationId, p_name: p.name,
       p_contact_name: p.contactName ?? '', p_phone: p.phone ?? '',
@@ -173,6 +181,7 @@ export class SupabaseCrmCommands implements CrmCommands {
   }
 
   async saveFleetContract(p: FleetContractPayload): Promise<string> {
+    validateFleetContract(p);
     return this.callId('save_fleet_contract', {
       p_station_id: p.stationId, p_fleet_id: p.fleetId, p_number: p.number,
       p_start_date: p.startDate ?? todayISO(),
@@ -191,6 +200,7 @@ export class SupabaseCrmCommands implements CrmCommands {
   }
 
   async recordFleetReceivable(p: FleetReceivablePayload): Promise<string> {
+    validateFleetReceivable(p);
     return this.callId('record_fleet_receivable', {
       p_station_id: p.stationId, p_fleet_id: p.fleetId,
       p_contract_id: p.contractId, p_amount_minor: p.amountMinor,

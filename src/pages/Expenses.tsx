@@ -1,3 +1,4 @@
+import { readNumber } from '../lib/validation';
 import React, { useState } from 'react';
 import { FiAlertCircle, FiPlus, FiX } from 'react-icons/fi';
 import { useStore } from '../lib/store';
@@ -62,7 +63,7 @@ export default function Expenses() {
 
       <Modal open={open} onClose={() => setOpen(false)} title="Nouvelle dépense">
         <div className="grid gap-3 sm:grid-cols-2">
-          <Input label="Montant (FCFA) *" type="number" min="1" value={f.amount} onChange={(e) => setF({ ...f, amount: Number(e.target.value) })} />
+          <Input label="Montant (FCFA) *" type="number" min="1" value={f.amount} onChange={(e) => setF({ ...f, amount: readNumber(e.target.value) })} />
           <Select label="Catégorie *" value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })}>{CATEGORIES.map((c) => <option key={c}>{c}</option>)}</Select>
           <Input label="Motif *" value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value })} placeholder="Ex. Achat de shampoing" />
           <Input label="Fournisseur" value={f.supplier} onChange={(e) => setF({ ...f, supplier: e.target.value })} />
@@ -73,7 +74,6 @@ export default function Expenses() {
         <div className="mt-5 flex justify-end gap-2">
           <button className="wg-btn wg-btn-ghost" onClick={() => setOpen(false)}><FiX /> Annuler</button>
           <button className="wg-btn wg-btn-primary" onClick={() => safe(async () => {
-            if (f.amount <= 0 || !f.reason.trim()) return;
             await addExpense({ amount: f.amount, category: f.category, reason: f.reason.trim(), supplier: f.supplier.trim(), date: f.date, method: f.method, idempotencyKey });
             setOpen(false); setF({ amount: 0, category: CATEGORIES[0], reason: '', supplier: '', date: todayISO(), method: 'especes' });
             setIdempotencyKey(newExpenseKey());

@@ -199,8 +199,12 @@ export function buildProfitability(state: AppState, start: Date, end: Date): Pro
   const allPayments = (state.washes ?? []).flatMap((w) => w.payments ?? [])
     .filter((p) => inRange(p.at, start, end));
   const cancellations = (state.paymentCancellations ?? []).filter((c) => inRange(c.at, start, end));
+  const cancellationIds = new Set((state.paymentCancellations ?? []).map((c) => c.paymentId));
+  const metadataCancellations = (state.washes ?? []).flatMap((w) => w.payments ?? [])
+    .filter((p) => p.cancelledAt && !cancellationIds.has(p.id) && inRange(p.cancelledAt, start, end));
   const collected = allPayments.reduce((sum, p) => sum + p.amount, 0)
-    - cancellations.reduce((sum, c) => sum + c.amount, 0);
+    - cancellations.reduce((sum, c) => sum + c.amount, 0)
+    - metadataCancellations.reduce((sum, p) => sum + p.amount, 0);
   const receivables = washes.reduce((sum, w) => sum + Math.max(w.total - w.paid, 0), 0);
   const recorded = (state.expenses ?? []).filter(
     (e) => e.status === 'enregistree' && inRange(e.date + 'T00:00:00', start, end)
@@ -319,23 +323,25 @@ export function mapProfitability(value: unknown): ProfitabilityReport {
   };
 }
 
-/** Attendu d'un canal sur une période : paiements nets du seul moyen choisi. */
+/** Aperçu calculé sur les fiches chargées ; le serveur recalcule au rapprochement. */
 export function channelExpected(
   state: AppState, methodId: string, start: string, end: string
 ): number {
   const from = new Date(start + 'T00:00:00');
-  const to = new Date(end + 'T23:59:59');
-  // Le mode local dérive ses canaux de `station.paymentMethods` : aucun faux
-  // identifiant de canal n'est créé pour autant.
-  const methods = new Set(
-    financeSnapshotFromState(state).paymentMethods
-      .filter((m) => m.id === methodId).map((m) => m.uiMethod)
-  );
-  const payments = (state.washes ?? []).flatMap((w) => w.payments ?? [])
-    .filter((p) => methods.has(p.method) && inRange(p.at, from, to));
-  const cancelledIds = new Set((state.paymentCancellations ?? [])
-    .filter((c) => inRange(c.at, from, to)).map((c) => c.paymentId));
-  return payments
-    .filter((p) => !cancelledIds.has(p.id))
-    .reduce((sum, p) => sum + p.amount, 0);
+  const to = new Date(end + 'T23:59:59.999');
+  // Isoler aussi la station : les propriétaires peuvent en voir plusieurs.
+  const method = financeSnapshotFromState(state).paymentMethods.find((m) => m.id === methodId);
+  if (!method) return 0;
+  const payments = (state.washes ?? [])
+    .filter((w) => w.stationId === method.stationId)
+    .flatMap((w) => w.payments ?? [])
+    .filter((p) => p.method === method.uiMethod);
+  const gross = payments.filter((p) => inRange(p.at, from, to)).reduce((sum, p) => sum + p.amount, 0);
+  const ids = new Set(payments.map((p) => p.id));
+  // Comme en SQL, un remboursement de la période est déduit même si le
+  // paiement d'origine date d'une période antérieure.
+  const refunds = (state.paymentCancellations ?? [])
+    .filter((c) => ids.has(c.paymentId) && inRange(c.at, from, to))
+    .reduce((sum, c) => sum + c.amount, 0);
+  return gross - refunds;
 }

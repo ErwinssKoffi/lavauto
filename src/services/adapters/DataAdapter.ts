@@ -1,9 +1,10 @@
 import type {
-  AppState, Client, PayMethod, Plan, ProfitabilityReport, Wash, WashPost,
+  AppState, AppUser, Client, PayMethod, Plan, ProfitabilityReport, Wash, WashPost,
   WashQualityResult, WashStatus,
 } from '../../types';
 import { isSupabaseConfigured, supabase } from '../../lib/supabase';
 import type { FinanceSnapshot } from '../../lib/finance';
+import type { StationMetrics } from '../../lib/stationMetrics';
 import type {
   CostCertificationPayload, CreatePurchaseOrderPayload, InventoryCountPayload,
   ProductPayload, ReceivePurchasePayload, ServiceConsumptionPayload,
@@ -122,7 +123,7 @@ export interface WashCommands {
   qualityCheck(id: string, result: WashQualityResult, notes: string): Promise<void>;
   addPayment(id: string, amount: number, method: PayMethod, idempotencyKey: string): Promise<void>;
   createPost(name: string, capacity: number, stationId?: string | null): Promise<void>;
-  vehicleHistory(plate: string): Promise<Wash[]>;
+  vehicleHistory(plate: string, stationId?: string): Promise<Wash[]>;
 }
 
 /** Écritures finance P06 : toutes via RPC SECURITY DEFINER, jamais en direct. */
@@ -233,25 +234,29 @@ export interface DataAdapter {
   /** Contexte du tenant, déduit du JWT côté serveur, sans identifiant client. */
   getBootstrap(): Promise<Bootstrap | null>;
   /** Catalogue et grille tarifaire visibles via RLS, sans filtre de tenant. */
-  listCatalog(): Promise<CatalogSnapshot>;
-  /** Clients du tenant, avec UUID serveur pour la création de fiche (P05). */
-  listClients(): Promise<Client[]>;
-  /** Fiches + postes visibles, projetés par `my_wash_board()` / `my_wash_posts()`. */
-  listWashBoard(): Promise<WashBoardSnapshot>;
+  listCatalog(stationId?: string): Promise<CatalogSnapshot>;
+  /** Clients accessibles de la station sélectionnée. */
+  listClients(stationId?: string): Promise<Client[]>;
+  /** Liste minimale des employés effectivement affectables dans la station. */
+  listAssignableUsers(stationId: string): Promise<AppUser[]>;
+  /** Fiches + postes de la station ; limite appliquée après son filtrage serveur. */
+  listWashBoard(stationId?: string): Promise<WashBoardSnapshot>;
+  /** Agrégats exhaustifs de période, distincts de la file limitée. */
+  listStationMetrics(stationId: string, start: string, end: string): Promise<StationMetrics>;
   /** null en local ; commandes RPC `SECURITY DEFINER` en mode supabase. */
   readonly washCommands: WashCommands | null;
   /** P06 : lecture finance agrégée par `my_finance_board()` en mode serveur. */
-  listFinanceBoard(): Promise<FinanceSnapshot>;
+  listFinanceBoard(stationId?: string): Promise<FinanceSnapshot>;
   /** P06 : rapport honnête « coûts manquants », RPC ou calcul local. */
-  listProfitability(start: string, end: string): Promise<ProfitabilityReport>;
+  listProfitability(start: string, end: string, stationId?: string): Promise<ProfitabilityReport>;
   /** null en local ; commandes finance RPC `SECURITY DEFINER` en mode supabase. */
   readonly financeCommands: FinanceCommands | null;
   /** P07 : board `my_stock_board()` en mode serveur, projection locale sinon. */
-  listStockBoard(): Promise<StockSnapshot>;
+  listStockBoard(stationId?: string): Promise<StockSnapshot>;
   /** null en local ; commandes stock/certification RPC en mode supabase. */
   readonly stockCommands: StockCommands | null;
   /** P08 : board `my_crm_board()` en mode serveur, projection locale sinon. */
-  listCrmBoard(): Promise<CrmSnapshot>;
+  listCrmBoard(stationId?: string): Promise<CrmSnapshot>;
   /** null en local ; 17 commandes CRM/notifications RPC en mode supabase. */
   readonly crmCommands: CrmCommands | null;
   /** P09 : board station/consolidé RPC en mode serveur, calcul local sinon. */

@@ -24,27 +24,57 @@ const monthStartISO = (): string => {
 };
 
 export default function Reports() {
-  const { state, dataSource, authReady, identity, refreshFinance, certifyCosts } = useStore();
+  const { state, dataSource, authReady, identity, refreshFinance, certifyCosts, stationMetrics, stationMetricsError, refreshStationMetrics } = useStore();
   const safe = useSafeAction();
   const [period, setPeriod] = useState<Period>('jour');
   const [certOpen, setCertOpen] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [cert, setCert] = useState({ start: monthStartISO(), end: todayISO(), attestation: '' });
   const r = buildReport(state, period);
   const { label, start, end } = periodRange(period);
   const from = dateISO(start);
   const to = dateISO(end);
   const server = state.profitability;
-  // En mode branché, le rapport RPC remplace le calcul local UNIQUEMENT si ses
-  // bornes correspondent à la période affichée ; jamais de mélange silencieux.
-  const p: ProfitabilityReport = server && server.periodStart === from && server.periodEnd === to
-    ? server : r.profitability;
-  const fromRpc = p === server;
-  const labelPartial = p.definitions.partialBalance ?? 'Solde partiel : encaissé − dépenses ; PAS un bénéfice net';
+  const connected = dataSource === 'supabase';
+  // Aucune substitution par une file limitée ou par une ancienne période.
+  const p: ProfitabilityReport | null = connected
+    ? (server && server.periodStart === from && server.periodEnd === to ? server : null)
+    : r.profitability;
+  const current = connected && stationMetrics && state.station && stationMetrics.stationId === state.station.id
+    && stationMetrics.periodStart === from && stationMetrics.periodEnd === to ? stationMetrics : null;
+  const detail = connected ? current : r;
+  const washCount = connected ? current?.trend.reduce((sum, day) => sum + day.washCount, 0) : r.washes.length;
+  const fromRpc = connected && p !== null;
 
   useEffect(() => {
-    if (dataSource !== 'supabase' || !authReady || !identity) return;
-    void refreshFinance(from, to).catch(() => { /* erreur déjà notifiée par le store */ });
-  }, [dataSource, authReady, identity?.userId, from, to, refreshFinance]);
+    if (!connected || !authReady || !identity || !state.station?.id) return;
+    let active = true;
+    setLoadError(null);
+    void Promise.all([refreshFinance(from, to), refreshStationMetrics(from, to)]).catch((error: unknown) => {
+      if (active) setLoadError(error instanceof Error ? error.message : 'Lecture du rapport impossible.');
+    });
+    return () => { active = false; };
+  }, [connected, authReady, identity?.userId, state.station?.id, from, to, refreshFinance, refreshStationMetrics]);
+
+  const reload = () => {
+    setLoadError(null);
+    void Promise.all([refreshFinance(from, to), refreshStationMetrics(from, to)]).catch((error: unknown) => {
+      setLoadError(error instanceof Error ? error.message : 'Lecture du rapport impossible.');
+    });
+  };
+
+  if (!p || !detail || washCount === undefined) {
+    const unavailable = !state.station?.id ? 'Aucune station accessible.'
+      : identity && !identity.permissions.includes('washes.view') ? 'La permission de consulter les lavages est requise pour les détails.'
+      : loadError || stationMetricsError;
+    return <div>
+      <PageHeader title="Rapports" subtitle={`Station : ${state.station?.name ?? '—'} · ${label}.`}
+        actions={<button className="wg-btn wg-btn-ghost" onClick={reload}><FiRefreshCw /> Actualiser</button>} />
+      <div className="mb-5"><Tabs value={period} onChange={setPeriod} options={PERIODS} /></div>
+      <Alert kind={unavailable ? 'danger' : 'info'}>{unavailable ? `Rapport indisponible : ${unavailable}` : 'Chargement du rapport exhaustif…'}</Alert>
+    </div>;
+  }
+  const labelPartial = p.definitions.partialBalance ?? 'Solde partiel : encaissé − dépenses ; PAS un bénéfice net';
 
   const indicatorRows: [string, string, string | number][] = [
     ['Chiffre d’affaires', 'Total des fiches non annulées', p.revenue],
@@ -65,31 +95,31 @@ export default function Reports() {
     const headers = ['Indicateur', 'Détail', 'Valeur'];
     const rows: (string | number)[][] = [
       ['Période', label, `${formatDate(from)} – ${formatDate(to)}`],
-      ['Source', fromRpc ? 'my_profitability()' : 'état local affiché', r.washes.length],
+      ['Source', fromRpc ? 'my_station_profitability() et my_station_metrics()' : 'état local affiché', washCount],
       ['Etat des coûts', p.costsMissing ? 'COUTS MANQUANTS' : 'complets', p.label],
       ...indicatorRows.map(([name, detail, value]) => [name, detail, value]),
       [],
       ['Prestation', 'Quantité', 'Chiffre d’affaires'],
-      ...r.topServices.map((s) => [s.name, s.count, s.revenue]),
+      ...detail.topServices.map((s) => [s.name, s.count, s.revenue]),
       [],
       ['Employé', 'Lavages', 'Chiffre d’affaires'],
-      ...r.byEmployee.map((e) => [e.name, e.count, e.revenue]),
+      ...detail.byEmployee.map((e) => [e.name, e.count, e.revenue]),
       [],
       ['Moyen de paiement', 'Nombre', 'Montant'],
-      ...r.byMethod.map((m) => [PAY_METHOD_LABELS[m.method], m.count, m.amount]),
+      ...detail.byMethod.map((m) => [PAY_METHOD_LABELS[m.method], m.count, m.amount]),
       [],
       ['Client', 'Lavages', 'Chiffre d’affaires'],
-      ...r.bestClients.map((c) => [c.name, c.count, c.revenue]),
+      ...detail.bestClients.map((c) => [c.name, c.count, c.revenue]),
     ];
     downloadCSV(`washguard-rapport-${period}-${formatDate(to).replace(/\//g, '-')}.csv`, headers, rows);
   };
 
   return (
     <div>
-      <PageHeader title="Rapports" subtitle={`Jour / semaine / mois : CA, encaissé, créances, coûts et solde partiel (${label}).`}
+      <PageHeader title="Rapports" subtitle={`Station ${state.station?.name ?? '—'} · jour / semaine / mois : CA, encaissé, créances, coûts et solde partiel (${label}).`}
         actions={<div className="flex gap-2">
-          {dataSource === 'supabase' && <button className="wg-btn wg-btn-ghost" onClick={() => { void refreshFinance(from, to).catch(() => {}); }}><FiRefreshCw /> Actualiser</button>}
-          <button className="wg-btn wg-btn-ghost" onClick={() => setCertOpen(true)}><FiFileText /> Certifier les coûts</button>
+          {dataSource === 'supabase' && <button className="wg-btn wg-btn-ghost" onClick={reload}><FiRefreshCw /> Actualiser</button>}
+          <button className="wg-btn wg-btn-ghost" onClick={() => setCertOpen(true)}><FiFileText /> {connected ? 'Certification entreprise' : 'Certifier les coûts'}</button>
           <button className="wg-btn wg-btn-primary" onClick={exportCSV}><FiDownload /> Exporter en CSV</button>
         </div>} />
       <div className="mb-5"><Tabs value={period} onChange={setPeriod} options={PERIODS} /></div>
@@ -101,9 +131,9 @@ export default function Reports() {
       </Alert>}</div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <StatCard label="Lavages" value={String(r.washes.length)} hint="Fiches non annulées" icon={<FiFileText />} />
+        <StatCard label="Lavages" value={String(washCount)} hint="Fiches non annulées" icon={<FiFileText />} />
         <StatCard label="Chiffre d’affaires" value={formatFCFA(p.revenue)} hint="Total des fiches" />
-        <StatCard label="Encaissements" value={formatFCFA(p.collected)} hint={`${r.byMethod.reduce((n, m) => n + m.count, 0)} paiement(s)`} />
+        <StatCard label="Encaissements" value={formatFCFA(p.collected)} hint={`${detail.byMethod.reduce((n, m) => n + m.count, 0)} paiement(s)`} />
         <StatCard label="Créances" value={formatFCFA(p.receivables)} hint="Reste dû par fiche" />
         <StatCard label="Solde partiel" value={formatFCFA(p.partialBalance)} hint="Encaissé − dépenses, PAS un bénéfice" accent="bg-amber-500/10 text-amber-400" />
       </div>
@@ -111,7 +141,7 @@ export default function Reports() {
       <Card className="mt-5">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-bold">Décomposition financière</h2>
-          <Badge tone={p.costsMissing ? 'warn' : 'success'}>{fromRpc ? 'RPC my_profitability()' : 'Calcul local'} · {p.certified ? 'coûts certifiés' : 'coûts manquants'}</Badge>
+          <Badge tone={p.costsMissing ? 'warn' : 'success'}>{fromRpc ? 'RPC station' : 'Calcul local'} · {p.certified ? 'coûts certifiés' : 'coûts manquants'}</Badge>
         </div>
         <div className="wg-scroll-x rounded-xl border" style={{ borderColor: 'var(--wg-border)' }}>
           <table>
@@ -133,19 +163,19 @@ export default function Reports() {
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
         <Card>
           <h2 className="mb-3 text-sm font-bold">Prestations les plus vendues</h2>
-          {r.topServices.length === 0 ? <EmptyLine /> : <SimpleTable head={['Prestation', 'Qté', 'CA']} rows={r.topServices.map((s) => [s.name, String(s.count), formatFCFA(s.revenue)])} />}
+          {detail.topServices.length === 0 ? <EmptyLine /> : <SimpleTable head={['Prestation', 'Qté', 'CA']} rows={detail.topServices.map((s) => [s.name, String(s.count), formatFCFA(s.revenue)])} />}
         </Card>
         <Card>
           <h2 className="mb-3 text-sm font-bold">Activité par employé</h2>
-          {r.byEmployee.length === 0 ? <EmptyLine /> : <SimpleTable head={['Employé', 'Lavages', 'CA']} rows={r.byEmployee.map((e) => [e.name, String(e.count), formatFCFA(e.revenue)])} />}
+          {detail.byEmployee.length === 0 ? <EmptyLine /> : <SimpleTable head={['Employé', 'Lavages', 'CA']} rows={detail.byEmployee.map((e) => [e.name, String(e.count), formatFCFA(e.revenue)])} />}
         </Card>
         <Card>
           <h2 className="mb-3 text-sm font-bold">Répartition par moyen de paiement</h2>
-          {r.byMethod.length === 0 ? <EmptyLine /> : <SimpleTable head={['Moyen', 'Paiements', 'Montant']} rows={r.byMethod.map((m) => [PAY_METHOD_LABELS[m.method], String(m.count), formatFCFA(m.amount)])} />}
+          {detail.byMethod.length === 0 ? <EmptyLine /> : <SimpleTable head={['Moyen', 'Paiements', 'Montant']} rows={detail.byMethod.map((m) => [PAY_METHOD_LABELS[m.method], String(m.count), formatFCFA(m.amount)])} />}
         </Card>
         <Card>
           <h2 className="mb-3 text-sm font-bold">Meilleurs clients</h2>
-          {r.bestClients.length === 0 ? <EmptyLine /> : <SimpleTable head={['Client', 'Lavages', 'CA']} rows={r.bestClients.map((c) => [c.name, String(c.count), formatFCFA(c.revenue)])} />}
+          {detail.bestClients.length === 0 ? <EmptyLine /> : <SimpleTable head={['Client', 'Lavages', 'CA']} rows={detail.bestClients.map((c) => [c.name, String(c.count), formatFCFA(c.revenue)])} />}
         </Card>
       </div>
 
@@ -159,7 +189,8 @@ export default function Reports() {
         )}
       </Card>
 
-      <Modal open={certOpen} onClose={() => setCertOpen(false)} title="Certifier les coûts de la période">
+      <Modal open={certOpen} onClose={() => setCertOpen(false)} title={connected ? "Certifier les coûts de l’entreprise" : "Certifier les coûts de la période"}>
+        {connected && <div className="mb-3"><Alert kind="warn">La certification exige l’accès à toutes les stations de l’entreprise et fige leur liste. Elle certifie la consolidation ; le résultat d’une station n’est certifié que si elle est l’unique station couverte. Les attestations anciennes sans périmètre restent non attribuables.</Alert></div>}
         <div className="grid gap-3 sm:grid-cols-2">
           <Input label="Début *" type="date" value={cert.start} onChange={(e) => setCert({ ...cert, start: e.target.value })} />
           <Input label="Fin *" type="date" value={cert.end} onChange={(e) => setCert({ ...cert, end: e.target.value })} />
@@ -170,7 +201,7 @@ export default function Reports() {
         <div className="mt-5 flex justify-end gap-2"><button className="wg-btn wg-btn-ghost" onClick={() => setCertOpen(false)}>Annuler</button>
           <button className="wg-btn wg-btn-primary" onClick={() => safe(async () => {
             await certifyCosts(cert);
-            await refreshFinance(cert.start, cert.end);
+            await refreshFinance(from, to);
             setCert({ ...cert, attestation: '' });
             setCertOpen(false);
           })}>Certifier</button></div>

@@ -50,6 +50,7 @@ export function identityFromState(state: AppState, sessionOverride?: Session | n
     name: state.station.name,
     city: state.station.city,
     activated: state.station.activated,
+    logoPath: state.station.logoPath ?? null,
   }] : [];
   return {
     userId: session.userId,
@@ -166,7 +167,7 @@ export class LocalAuthAdapter implements AuthPort {
     const station: AppState['station'] = {
       id: stationId, companyId, name: payload.stationName.trim(), address: '',
       city: payload.city.trim(), phone: payload.phone.trim(), currency: 'FCFA',
-      logoUrl: null, hours: [], paymentMethods: [], cashRequiresOpen: true,
+      logoPath: null, hours: [], paymentMethods: [], cashRequiresOpen: true,
       maxCashierDiscount: 0, commissionRate: 0, monthlyTarget: 0,
       activated: false, activatedAt: null,
     };

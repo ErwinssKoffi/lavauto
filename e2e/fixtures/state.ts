@@ -8,7 +8,7 @@ export function baseState(): Record<string, unknown> {
     company: { id: 'co1', name: 'Clean Auto SARL', city: 'Abidjan', phone: '+225 0700000000', createdAt: now, suspended: false },
     station: {
       id: 'st1', companyId: 'co1', name: 'Clean Auto Cocody', address: 'Rue des Jardins, Cocody',
-      city: 'Abidjan', phone: '+225 0700000000', currency: 'FCFA', logoUrl: null,
+      city: 'Abidjan', phone: '+225 0700000000', currency: 'FCFA', logoPath: null,
       hours: ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
         .map((day, index) => ({ day, open: '08:00', close: '18:00', closed: index === 6 })),
       paymentMethods: ['especes', 'mobile_money', 'carte', 'virement'],

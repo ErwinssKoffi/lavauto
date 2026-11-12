@@ -1,5 +1,50 @@
 # Changelog
 
+## Non publié — Périmètre multi-stations et validation
+
+- Sélection explicite de la station accessible, lectures et mutations bornées à cette station, protection contre les réponses Auth ou réseau arrivées après changement de contexte. En mode connecté, l'état métier n'est plus restauré ni persisté dans le cache local du navigateur.
+- Migration locale `054` : boards, indicateurs exhaustifs et consolidation limités aux stations autorisées ; périmètre figé lors d'une certification de résultat. Une ancienne attestation sans périmètre ne peut pas être attribuée à une station ou à une consolidation.
+- Migration locale `055` : validation partagée des coordonnées, dates et valeurs numériques, et garde-fous finance/caisse. Les clés de dépenses sont sérialisées et les collisions de contenu refusées ; la reprise d'un paiement ultérieur conserve sa clé dans l'onglet jusqu'à confirmation par relecture.
+- Les migrations `053`–`055` et le frontend restent **non déployés** ; `051` et `052` sont déjà appliquées sur `lavauto` et ne doivent pas être rejouées. Aucune nouvelle migration distante n'a été appliquée pour ces changements. Les limites et résultats des tests sont décrits dans [docs/testing.md](docs/testing.md).
+
+## Non publié — Reçu client et avis WhatsApp de lavage prêt
+
+- Aperçu, impression isolée et PDF généré dans le navigateur, y compris en mode local ; prestations à prix figé, remise totale, paiements actifs/annulés et solde. Le reçu est un instantané non fiscal et avertit en cas d’incohérence. `jsPDF` et la police DejaVu Sans sous licence sont inclus ; `pdfjs-dist` sert aux tests.
+- Migration additive `053` locale : consentement WhatsApp distinct et lié au numéro, refus si le numéro confirmé a changé pendant l’enregistrement, révocation au changement, mise en attente automatique à `ready`, demande manuelle idempotente, journal et worker à privilèges limités. Après réponse invalide ou perdue, le panneau impose une relecture du consentement ; il conserve la clé de demande si la réponse ou le journal sont incohérents. L’ancienne file CRM reste distincte et non expédiée.
+- Fonctions Meta locales : modèle à deux paramètres, activation explicite, secret de dispatch, webhook HMAC et filtrage WABA/expéditeur, journalisation des statuts. Acceptation et livraison sont distinctes ; une réponse incertaine n’est pas relancée automatiquement. Une livraison tardive annule une relance non encore réclamée. L’ordonnanceur doit être configuré séparément.
+- L’utilisateur indique que le compte et l’expéditeur Meta sont approuvés ; l’approbation d’un modèle précis n’a pas été vérifiée. `053`, les fonctions, les secrets, le webhook, l’ordonnanceur et le frontend de cette branche ne sont pas déployés. Aucun message réel n’a été envoyé ; les migrations `051` et `052` sont déjà appliquées et ne doivent pas être rejouées.
+- Tests en base et fournisseur isolés, courses PostgreSQL, parcours Playwright local et Supabase simulé ; aucune recette réelle. Configuration, états et limites : [docs/whatsapp-receipts.md](docs/whatsapp-receipts.md) et [docs/testing.md](docs/testing.md).
+
+## Non publié — Création connectée atomique, tarifs et contrôles
+
+- `052_atomic_wash_creation.sql` ajoute une transaction idempotente pour la fiche et son paiement initial, avec vérification du tenant, de la station, de l’utilisateur et du contenu. La commande exacte est conservée dans l’onglet avant envoi et peut être rejouée après une réponse incertaine ; les collisions sont bloquées. La migration a été appliquée sur `lavauto` ; la recette métier connectée reste à effectuer avant le nouveau frontend. Les anciennes RPC et le paiement ultérieur dans le détail conservent leurs limites, documentées dans [docs/testing.md](docs/testing.md).
+- Les canaux Wave, Orange Money et MTN restent distincts dans les commandes et projections après `052`. Le rapprochement connecté indique son estimation limitée, impose un comptage entier et affiche le relevé serveur figé. Les anciennes données ne sont pas automatiquement corrigées.
+- Les assertions `check` correspondent à la vitrine actuelle et continuent de vérifier la navigation, les exemples fictifs et les formules serveur sans repli local. La page Abonnement ne lit plus le cache local de tarifs pendant le chargement connecté et indique que ses informations et demandes restent locales. Les limites des règles de caisse, de remise et de barèmes locaux sont explicitées.
+- La CLI Supabase `3.1.0` est ajoutée aux dépendances de développement et initialisée localement ; les migrations et le seed y sont désactivés par précaution. Elle n’est ni authentifiée ni liée dans ce sandbox ; l’historique distant horodaté ne correspond pas aux noms de fichiers locaux. Ne pas lancer un `db push` aveugle.
+- Avec l’accord de l’utilisateur et une sauvegarde déclarée vérifiée, le connecteur a appliqué `051` puis `052` sur `lavauto` sous les versions `20261112130423` et `20261112130520`. Leur SQL et les principaux objets/permissions ont été contrôlés à distance. La sauvegarde n’a pas été vérifiée indépendamment ; aucun frontend de cette branche n’a été déployé et la recette Auth/Storage et métier réelle reste à effectuer.
+- Tests locaux : PostgreSQL isolé avec 30 contrôles SQL et trois courses, Vitest, deux `check`, build et parcours Playwright locaux et Supabase simulé. Voir les résultats et limites dans [docs/testing.md](docs/testing.md).
+
+## Non publié — Parcours E2E caisse, lavages et invitations (étape précédente)
+
+- Quatre parcours Playwright locaux interactifs couvrent ouverture et clôture de caisse, fiche de lavage, paiements partiels et canaux, prix figé, qualité/livraison, validations et invitations avec révocation et contrôle d’accès UI. La fixture n’est injectée qu’une fois afin de vérifier les données après rechargement.
+- Quatre scénarios supplémentaires avec Supabase simulé contrôlent les requêtes et les refus pour caisse/lavage et invitation, y compris le succès partiel possible d’une création suivie d’un paiement refusé. Ils n’exécutent ni SQL, ni Edge Function, ni Auth réelle et n’envoient aucun e-mail.
+- Correction locale : un paiement espèces saisi à la création d’une fiche alimente désormais le journal de caisse et reste lié au paiement. Aucun rattrapage des anciennes données n’est effectué ; les anciennes caisses concernées doivent être vérifiées. Libellés de formulaires et fenêtres rendus identifiables pour les utilisateurs et les tests.
+- Limite constatée à cette étape : en mode connecté, création et paiement initial utilisaient deux RPC non atomiques. Elle est traitée par la migration `052` décrite ci-dessus pour le nouveau frontend ; les anciens clients restent concernés.
+- Validation à cette étape : 69 / 69 Vitest, 21 / 21 Playwright locaux et 6 / 6 Playwright avec Supabase simulé ; les échecs `check` constatés alors ont été traités depuis. Aucune opération ni recette sur un service distant.
+
+## Non publié — Simulations de stock réservées au mode local
+
+- Les raccourcis de consommation et de réapprovisionnement dans Paramètres et le bandeau d’alerte sont visibles uniquement avec une source **et** une Auth locales ; ils sont explicitement présentés comme des simulations dans le navigateur. Le store refuse les appels directs en mode connecté ou mixte.
+- Les seuils sont en lecture seule dans Paramètres hors mode local : l’ancien éditeur n’enregistrait rien sur le serveur. Les opérations réelles continuent d’utiliser les parcours et RPC stock existants ; en configuration mixte ou sans port RPC, les écritures stock sont refusées au lieu de retomber silencieusement en local. L’interface connectée ne propose pas encore la modification d’un seuil de produit existant.
+- Un tableau de bord serveur vide ne crée plus de produits fictifs : les exemples ne sont initialisés que dans une démonstration entièrement locale. Les anciens caches navigateur ne sont pas purgés automatiquement.
+- Tests Vitest des quatre configurations et des commandes RPC simulées, parcours Chromium local et connecté avec Supabase intercepté ; aucune modification ni recette de base distante. À cette étape, les deux contrôles P07 étaient de nouveau verts ; les contrôles de vitrine en échec ont été corrigés depuis (voir [docs/testing.md](docs/testing.md)).
+
+## Non publié — Logo privé dans Paramètres
+
+- Remplacement de la saisie d’URL par un téléversement PNG/JPEG/WebP (5 Mo maximum), partagé avec la mise en route. Le chemin privé est associé à la station et l’aperçu utilise une URL signée temporaire ; les anciens liens ne sont plus repris.
+- Migration `051_station_logo.sql`, RPC d’association et gardes RLS/permission. Appliquée sur `lavauto` et vérifiée structurellement ; la recette Auth/Storage réelle reste à faire avant déploiement du frontend de cette branche. Les anciens objets ne sont pas supprimés par un remplacement ou un retrait.
+- Tests Vitest, PostgreSQL isolé avec Auth/Storage simulés, Playwright local et parcours connecté à Supabase simulé ; aucune fixture distante créée. Les résultats actuels de `npm run check` figurent dans [docs/testing.md](docs/testing.md).
+
 ## Non publié — Fusion de la PR #3 et configuration de production
 
 - La **PR #3** est **fusionnée** dans `main` le 12/11/2026 (`gh pr merge 3 --merge`, `mergeCommit f6f6301`) après résolution du conflit avec `origin/main` / PR #2. Checks `quality`, `Vercel` et `Vercel Preview Comments` **pass** sur le commit de fusion ; `origin/main` est à `f6f6301`.
@@ -13,7 +58,7 @@
 - `origin/main` a reçu après la base `b119692` trois commits (`ccf9e1c`, `4343790`, `45ac7ff`) d'une refonte parallèle. La PR #3 est passée `CONFLICTING` ; `origin/main` a été fusionnée dans `arena/868cde36-lavauto` sans changer de branche.
 - Les 27 fichiers en conflit et les 4 fichiers auto-fusionnés (`ui.tsx`, `Onboarding.tsx`, `Services.tsx`, `Subscription.tsx`) sont résolus en faveur de la livraison P01–P10 : port `5173`, `allowedHosts` restreint, Auth/RBAC serveur, 19 routes, Storage privé et CI/CD conservés.
 - Les composants sources inutilisés de la branche parallèle (`RoleGuard`, `StationSwitcher`, `TodayActivityWidget`, `rbac.ts`) sont retirés du résultat de fusion pour garder `tsc -b` vert ; `docs/database-schema.md`, l'asset public, `seed.sql` et les 3 migrations datées sont conservés comme historiques non appliqués.
-- `scripts/check.cjs` et `scripts/lint.cjs` ne comptent désormais que les migrations `^\d{3}_` : 49 migrations appliquées, `048` absent, `050` présent.
+- `scripts/check.cjs` et `scripts/lint.cjs` ne comptent que les migrations `^\d{3}_` : à cette étape, 49 migrations appliquées, `048` absent, `050` présent. Le total actuel est indiqué plus haut.
 
 ## Non publié — Prompt 10 : QA, sécurité, performance, Storage et déploiement
 

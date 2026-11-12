@@ -1,3 +1,4 @@
+import { readNumber } from '../lib/validation';
 import React, { useState } from 'react';
 import {
   FiGift, FiPackage, FiPercent, FiRefreshCw, FiSend, FiUserCheck,
@@ -70,11 +71,11 @@ export default function Fidelisation() {
         <StatCard label="Cartes actives" value={String(stats.activeCards)} hint={`${state.loyaltyCards.length} carte(s)`} icon={<FiUserCheck />} />
         <StatCard label="Forfaits actifs" value={String(stats.activePackages)} hint={`${state.customerPackages.length} forfait(s) vendu(s)`} icon={<FiPackage />} />
         <StatCard label="Promotions actives" value={String(stats.activePromotions)} hint={`${state.promotionUsages.length} application(s)`} icon={<FiPercent />} />
-        <StatCard label="Notifications en attente" value={String(stats.pendingNotifications)} hint="Aucun fournisseur connecté" icon={<FiGift />} />
+        <StatCard label="File CRM en attente" value={String(stats.pendingNotifications)} hint="Aucun fournisseur pour cette file" icon={<FiGift />} />
       </div>
 
       <div className="mb-5"><Alert kind="info">
-        <strong>File d’attente uniquement :</strong> {state.crmRules.provider} {state.crmRules.promotion} {state.crmRules.package}
+        <strong>File CRM historique uniquement :</strong> {state.crmRules.provider} Elle est distincte des avis WhatsApp « lavage prêt », dont le journal se trouve dans chaque fiche de lavage. {state.crmRules.promotion} {state.crmRules.package}
       </Alert></div>
 
       <div className="mb-5"><Tabs value={tab} onChange={setTab} options={TABS} /></div>
@@ -84,8 +85,8 @@ export default function Fidelisation() {
           <h2 className="mb-3 text-sm font-bold">Programme de fidélité</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             <Input label="Nom *" value={program.name} onChange={(e) => setProgram({ ...program, name: e.target.value })} />
-            <Input label="Points / 1 000 FCFA" type="number" min={1} value={program.rate} onChange={(e) => setProgram({ ...program, rate: Number(e.target.value) })} />
-            <Input label="Seuil de rachat" type="number" min={1} value={program.threshold} onChange={(e) => setProgram({ ...program, threshold: Number(e.target.value) })} />
+            <Input label="Points / 1 000 FCFA" type="number" min={1} value={program.rate} onChange={(e) => setProgram({ ...program, rate: readNumber(e.target.value) })} />
+            <Input label="Seuil de rachat" type="number" min={1} value={program.threshold} onChange={(e) => setProgram({ ...program, threshold: readNumber(e.target.value) })} />
           </div>
           <button className="wg-btn wg-btn-primary mt-4" disabled={!activated} onClick={() => safe(async () => {
             await createLoyaltyProgram({ stationId, name: program.name, pointsPer1000Minor: program.rate, redemptionThreshold: program.threshold });
@@ -117,7 +118,7 @@ export default function Fidelisation() {
             <Select label="Type" value={tx.kind} onChange={(e) => setTx({ ...tx, kind: e.target.value })}>
               <option value="earn">Gain</option><option value="redeem">Rachat</option>
             </Select>
-            <Input label="Points" type="number" min={1} value={tx.points} onChange={(e) => setTx({ ...tx, points: Number(e.target.value) })} />
+            <Input label="Points" type="number" min={1} value={tx.points} onChange={(e) => setTx({ ...tx, points: readNumber(e.target.value) })} />
             <Input label="Motif" value={tx.reason} onChange={(e) => setTx({ ...tx, reason: e.target.value })} />
           </div>
           <button className="wg-btn wg-btn-primary mt-4" disabled={!activated} onClick={() => safe(async () => {
@@ -160,9 +161,9 @@ export default function Fidelisation() {
           <h2 className="mb-3 text-sm font-bold">Définir un forfait</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             <Input label="Nom *" value={plan.name} onChange={(e) => setPlan({ ...plan, name: e.target.value })} />
-            <Input label="Prix (FCFA)" type="number" min={0} value={plan.price} onChange={(e) => setPlan({ ...plan, price: Number(e.target.value) })} />
-            <Input label="Lavages inclus" type="number" min={1} value={plan.washCount} onChange={(e) => setPlan({ ...plan, washCount: Number(e.target.value) })} />
-            <Input label="Validité (jours)" type="number" min={1} value={plan.validityDays} onChange={(e) => setPlan({ ...plan, validityDays: Number(e.target.value) })} />
+            <Input label="Prix (FCFA)" type="number" min={0} value={plan.price} onChange={(e) => setPlan({ ...plan, price: readNumber(e.target.value) })} />
+            <Input label="Lavages inclus" type="number" min={1} value={plan.washCount} onChange={(e) => setPlan({ ...plan, washCount: readNumber(e.target.value) })} />
+            <Input label="Validité (jours)" type="number" min={1} value={plan.validityDays} onChange={(e) => setPlan({ ...plan, validityDays: readNumber(e.target.value) })} />
             <Input label="Début" type="date" value={plan.startsAt} onChange={(e) => setPlan({ ...plan, startsAt: e.target.value })} />
             <Input label="Fin (facultative)" type="date" value={plan.endsAt} onChange={(e) => setPlan({ ...plan, endsAt: e.target.value })} />
           </div>
@@ -221,11 +222,11 @@ export default function Fidelisation() {
             <Select label="Type" value={promo.kind} onChange={(e) => setPromo({ ...promo, kind: e.target.value })}>
               <option value="percent">Pourcentage</option><option value="amount">Montant fixe</option>
             </Select>
-            <Input label="Valeur" type="number" min={1} value={promo.value} onChange={(e) => setPromo({ ...promo, value: Number(e.target.value) })} />
+            <Input label="Valeur" type="number" min={1} value={promo.value} onChange={(e) => setPromo({ ...promo, value: readNumber(e.target.value) })} />
             <Input label="Début" type="date" value={promo.startsAt} onChange={(e) => setPromo({ ...promo, startsAt: e.target.value })} />
             <Input label="Fin" type="date" value={promo.endsAt} onChange={(e) => setPromo({ ...promo, endsAt: e.target.value })} />
             <Input label="Quota (facultatif)" type="number" min={1} value={promo.maxUsages} onChange={(e) => setPromo({ ...promo, maxUsages: e.target.value })} />
-            <Input label="Montant minimum" type="number" min={0} value={promo.minAmount} onChange={(e) => setPromo({ ...promo, minAmount: Number(e.target.value) })} />
+            <Input label="Montant minimum" type="number" min={0} value={promo.minAmount} onChange={(e) => setPromo({ ...promo, minAmount: readNumber(e.target.value) })} />
           </div>
           <button className="wg-btn wg-btn-primary mt-4" disabled={!activated} onClick={() => safe(async () => {
             await savePromotion({ stationId, name: promo.name, code: promo.code, kind: promo.kind as 'percent' | 'amount', value: promo.value, startsAt: promo.startsAt, endsAt: promo.endsAt || undefined, maxUsages: promo.maxUsages ? Number(promo.maxUsages) : null, minAmountMinor: promo.minAmount });
@@ -284,7 +285,7 @@ export default function Fidelisation() {
         </Card>
         <Card className="!p-0 overflow-hidden">
           <div className="p-4 text-sm font-bold">File d’attente</div>
-          {state.notificationOutbox.length === 0 ? <EmptyState icon={<FiGift />} title="File vide" description="Aucune notification, aucun fournisseur, aucun envoi simulé." /> : (
+          {state.notificationOutbox.length === 0 ? <EmptyState icon={<FiGift />} title="File CRM vide" description="Aucune notification CRM ; aucun fournisseur ni envoi simulé pour cette file." /> : (
             <div className="wg-scroll-x"><table>
               <thead><tr><th className="wg-th">Modèle</th><th className="wg-th">Canal</th><th className="wg-th">Statut</th><th className="wg-th">Action</th></tr></thead>
               <tbody>{state.notificationOutbox.map((n) => (

@@ -402,10 +402,14 @@ export function updateProductThresholdLocal(
   state: AppState, productId: string, reorderLevel: number
 ): AppState {
   const s = withStockDefaults(state);
-  const nextProducts = s.products.map((p) =>
-    p.id === productId ? { ...p, reorderLevel: Math.max(0, Math.round(reorderLevel)) } : p
+  const threshold = Math.max(0, Math.round(reorderLevel));
+  const products = s.products.map((p) =>
+    p.id === productId ? { ...p, reorderLevel: threshold } : p
   );
-  return withStockDefaults({ ...s, products: nextProducts });
+  const stockLevels = s.stockLevels.map((level) =>
+    level.productId === productId ? { ...level, reorderLevel: threshold } : level
+  );
+  return withStockDefaults({ ...s, products, stockLevels });
 }
 
 export function adjustProductStockQtyLocal(

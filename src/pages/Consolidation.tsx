@@ -4,7 +4,7 @@ import {
 } from 'recharts';
 import { FiBarChart2, FiRefreshCw, FiTrendingUp } from 'react-icons/fi';
 import { useStore } from '../lib/store';
-import { monthStartISO, previousPeriod } from '../lib/analytics';
+import { emptyAnalyticsBoard, monthStartISO, previousPeriod } from '../lib/analytics';
 import { formatDate, formatFCFA, todayISO } from '../lib/format';
 import {
   Alert, Badge, Card, EmptyState, Input, PageHeader, StatCard,
@@ -45,17 +45,12 @@ export default function Consolidation() {
     });
   }, [dataSource, authReady, identity?.userId, start, end, cs, ce, refreshAnalytics]);
 
-  const board = useMemo(() => {
-    const matches = analyticsBoard.periodStart === start
-      && analyticsBoard.periodEnd === end
-      && analyticsBoard.compareStart === cs
-      && analyticsBoard.compareEnd === ce;
-    return matches ? analyticsBoard : {
-      ...analyticsBoard,
-      periodStart: start, periodEnd: end, compareStart: cs, compareEnd: ce,
-      stations: [], rankings: [], trend: [],
-    };
-  }, [analyticsBoard, start, end, cs, ce]);
+  const matches = analyticsBoard.periodStart === start
+    && analyticsBoard.periodEnd === end
+    && analyticsBoard.compareStart === cs
+    && analyticsBoard.compareEnd === ce;
+  const board = useMemo(() => matches ? analyticsBoard : emptyAnalyticsBoard(start, end, cs, ce),
+    [analyticsBoard, matches, start, end, cs, ce]);
 
   const trend = board.trend;
   const rankings = board.rankings;
@@ -87,7 +82,7 @@ export default function Consolidation() {
           <Input label="Comparer jusqu’au" type="date" value={compareEnd} min={compareStart || undefined} onChange={(e) => setCompareEnd(e.target.value)} />
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
-          <button className="wg-btn wg-btn-primary" onClick={() => void refreshAnalytics(start, end, cs, ce)}>
+          <button className="wg-btn wg-btn-primary" onClick={() => { void refreshAnalytics(start, end, cs, ce).catch(() => {}); }}>
             <FiRefreshCw /> Actualiser les indicateurs
           </button>
           <button className="wg-btn wg-btn-ghost" onClick={() => {
@@ -99,6 +94,9 @@ export default function Consolidation() {
         </div>
       </Card>
 
+      {!matches ? <Alert kind={analyticsError ? 'danger' : 'info'}>
+        {analyticsError ? 'La période demandée est indisponible.' : 'Chargement des indicateurs pour la période demandée…'}
+      </Alert> : <>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Chiffre d’affaires" value={formatFCFA(board.stats.revenue)} hint={definitions.revenue} icon={<FiTrendingUp />} />
         <StatCard label="Encaissements nets" value={formatFCFA(board.stats.collected)} hint={definitions.collected} />
@@ -204,6 +202,7 @@ export default function Consolidation() {
           </div>
         )}
       </Card>
+      </>}
     </div>
   );
 }

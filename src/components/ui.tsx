@@ -24,8 +24,8 @@ export function Logo({ compact = false, light = false }: { compact?: boolean; li
   );
 }
 
-export function Card({ children, className = '', padded = true, onClick }: { children: React.ReactNode; className?: string; padded?: boolean; onClick?: React.MouseEventHandler<HTMLDivElement> }) {
-  return <div onClick={onClick} className={`wg-card ${padded ? 'p-5' : ''} ${className}`}>{children}</div>;
+export function Card({ children, className = '', padded = true, onClick, id }: { children: React.ReactNode; className?: string; padded?: boolean; onClick?: React.MouseEventHandler<HTMLDivElement>; id?: string }) {
+  return <div id={id} onClick={onClick} className={`wg-card ${padded ? 'p-5' : ''} ${className}`}>{children}</div>;
 }
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: React.ReactNode }) {
@@ -49,38 +49,45 @@ export function SectionTitle({ children, hint }: { children: React.ReactNode; hi
   );
 }
 
-export function Label({ children }: { children: React.ReactNode }) {
-  return <label className="wg-label">{children}</label>;
+export function Label({ children, htmlFor }: { children: React.ReactNode; htmlFor?: string }) {
+  return <label className="wg-label" htmlFor={htmlFor}>{children}</label>;
 }
 
 type InputProps = React.InputHTMLAttributes<HTMLInputElement> & { label?: string; hint?: string };
-export function Input({ label, hint, className = '', ...props }: InputProps) {
+export function Input({ label, hint, id, className = '', ...props }: InputProps) {
+  const generatedId = React.useId();
+  const inputId = id ?? generatedId;
   return (
     <div className={className}>
-      {label && <Label>{label}</Label>}
-      <input className="wg-input" {...props} />
+      {label && <Label htmlFor={inputId}>{label}</Label>}
+      <input className="wg-input" id={inputId} {...props}
+        value={props.type === 'number' && typeof props.value === 'number' && Number.isNaN(props.value) ? '' : props.value} />
       {hint && <p className="wg-muted mt-1 text-xs">{hint}</p>}
     </div>
   );
 }
 
 type SelectProps = React.SelectHTMLAttributes<HTMLSelectElement> & { label?: string; hint?: string };
-export function Select({ label, hint, className = '', children, ...props }: SelectProps) {
+export function Select({ label, hint, id, className = '', children, ...props }: SelectProps) {
+  const generatedId = React.useId();
+  const inputId = id ?? generatedId;
   return (
     <div className={className}>
-      {label && <Label>{label}</Label>}
-      <select className="wg-input" {...props}>{children}</select>
+      {label && <Label htmlFor={inputId}>{label}</Label>}
+      <select className="wg-input" id={inputId} {...props}>{children}</select>
       {hint && <p className="wg-muted mt-1 text-xs">{hint}</p>}
     </div>
   );
 }
 
 type TextareaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement> & { label?: string };
-export function Textarea({ label, className = '', ...props }: TextareaProps) {
+export function Textarea({ label, id, className = '', ...props }: TextareaProps) {
+  const generatedId = React.useId();
+  const inputId = id ?? generatedId;
   return (
     <div className={className}>
-      {label && <Label>{label}</Label>}
-      <textarea className="wg-input" rows={3} {...props} />
+      {label && <Label htmlFor={inputId}>{label}</Label>}
+      <textarea className="wg-input" id={inputId} rows={3} {...props} />
     </div>
   );
 }
@@ -129,16 +136,19 @@ export function EmptyState({ title, description, icon, action }: { title: string
 }
 
 export function Modal({ open, onClose, title, children, wide = false }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode; wide?: boolean }) {
+  const titleId = React.useId();
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center overflow-y-auto bg-black/60 p-4 backdrop-blur-sm" onClick={onClose}>
       <div
+        role="dialog"
+        aria-labelledby={titleId}
         className={`wg-card wg-fade-in w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} max-h-[90vh] overflow-y-auto`}
         style={{ background: 'var(--wg-surface)' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: 'var(--wg-border)' }}>
-          <h3 className="text-base font-bold">{title}</h3>
+          <h3 id={titleId} className="text-base font-bold">{title}</h3>
           <button className="wg-muted hover:text-sky-400" onClick={onClose} aria-label="Fermer"><FiX size={18} /></button>
         </div>
         <div className="p-5">{children}</div>

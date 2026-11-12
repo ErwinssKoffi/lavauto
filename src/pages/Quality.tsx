@@ -5,6 +5,7 @@ import {
 } from 'react-icons/fi';
 import { Alert, Badge, Card, EmptyState, PageHeader, SectionTitle } from '../components/ui';
 import { useStore } from '../lib/store';
+import { useStationLogoUrl } from '../lib/useStationLogoUrl';
 import { supabase } from '../lib/supabase';
 import {
   fetchQaBoard, fetchWashesPage, uploadStationLogo,
@@ -27,6 +28,13 @@ const E2E_SCENARIOS = [
   'Consolidation multi-stations',
   'Qualité & déploiement',
   'Back-office super admin',
+  'Logo privé en mode local et mise en route',
+  'Simulations de stock en mode local',
+  'Caisse, lavage, paiements mixtes et clôture',
+  'Validations lavage et caisse fermée',
+  'Invitation locale et révocation',
+  'Accès aux invitations limité selon le rôle',
+  'Reçu de lavage : aperçu, impression et PDF',
 ];
 
 const DOCS = [
@@ -53,8 +61,8 @@ function Stat({ label, value, ok }: { label: string; value: string | number; ok?
 }
 
 export default function Quality() {
-  const { state, dataSource } = useStore();
-  const serverReady = dataSource === 'supabase' && Boolean(supabase);
+  const { state, dataSource, authKind } = useStore();
+  const serverReady = dataSource === 'supabase' && authKind === 'supabase' && Boolean(supabase && state.session?.userId);
   const [board, setBoard] = useState<QaBoard | null>(null);
   const [page, setPage] = useState<WashPage | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
@@ -64,6 +72,7 @@ export default function Quality() {
   const [upload, setUpload] = useState<LogoUploadResult | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const logoPreview = useStationLogoUrl(upload?.path ?? null, serverReady, state.session?.userId ?? '');
   const limit = 5;
 
   useEffect(() => {
@@ -92,6 +101,7 @@ export default function Quality() {
     if (!file || !serverReady) return;
     setUploading(true);
     setUploadError(null);
+    setUpload(null);
     try {
       setUpload(await uploadStationLogo(file));
     } catch (error) {
@@ -105,7 +115,7 @@ export default function Quality() {
     <div>
       <PageHeader
         title="Qualité & déploiement"
-        subtitle="Prompt 10 : QA, sécurité, performance, Storage, CI/CD et documentation. Le libellé historique « Prévisions & alertes » ne correspond pas à un module livré ; aucune prévision ni alerte n'est fabriquée."
+        subtitle="Prompt 10 : QA, sécurité, performance, Storage, CI/CD et documentation. Le libellé historique « Prévisions & alertes » ne correspond pas à un module de prévision ou d’alerte additionnel."
         actions={<Badge tone="accent">Phase 9 livrée</Badge>}
       />
 
@@ -196,7 +206,7 @@ export default function Quality() {
         <Card>
           <div className="mb-4 flex items-center gap-2 text-sm font-bold"><FiHardDrive /> Stockage du logo</div>
           <p className="wg-muted mb-4 text-xs leading-relaxed">
-            Bucket privé <code>station-assets</code>, 5 Mo maximum, PNG / JPEG / WebP. Le logo est redimensionné à 512 px et recompressé en WebP côté navigateur avant l’envoi ; le chemin est construit par le serveur et l’URL est signée une heure. L’upsert rend l’envoi idempotent.
+            Bucket privé <code>station-assets</code>, 5 Mo maximum, PNG / JPEG / WebP. Le logo est optimisé en WebP jusqu’à 512 px lorsque possible ; sinon le fichier d’origine est conservé. Le chemin est construit par le serveur et l’URL est signée une heure. Cet envoi de diagnostic ne modifie pas le logo de la station : utilisez Paramètres pour l’associer.
           </p>
           <input
             aria-label="Fichier logo"
@@ -214,9 +224,11 @@ export default function Quality() {
               <div><span className="text-slate-400">Chemin :</span> <code>{upload.path}</code></div>
               <div><span className="text-slate-400">Clé d’idempotence :</span> <code>{upload.idempotencyKey}</code></div>
               <div><span className="text-slate-400">Optimisation :</span> {upload.optimized ? 'WebP 512 px' : 'fichier d’origine conservé'} · {upload.bytes} octets</div>
-              <a className="inline-flex items-center gap-1 text-sky-300 hover:underline" href={upload.signedUrl} target="_blank" rel="noreferrer">
+              {logoPreview.loading && <p>Préparation de l’URL signée…</p>}
+              {logoPreview.error && <button type="button" className="wg-link" onClick={logoPreview.retry}>Réessayer l’URL signée</button>}
+              {logoPreview.url && <a className="inline-flex items-center gap-1 text-sky-300 hover:underline" href={logoPreview.url} target="_blank" rel="noreferrer">
                 Ouvrir l’URL signée <FiExternalLink />
-              </a>
+              </a>}
             </div>
           )}
         </Card>
@@ -243,8 +255,8 @@ export default function Quality() {
         </Card>
 
         <Card>
-          <div className="mb-4 flex items-center gap-2 text-sm font-bold"><FiList /> 15 parcours E2E et 7 livrables</div>
-          <SectionTitle>Playwright — 15 parcours</SectionTitle>
+          <div className="mb-4 flex items-center gap-2 text-sm font-bold"><FiList /> {E2E_SCENARIOS.length} parcours E2E locaux et 7 livrables</div>
+          <SectionTitle>Playwright — {E2E_SCENARIOS.length} parcours locaux</SectionTitle>
           <ol className="mb-4 grid grid-cols-1 gap-1 text-xs text-slate-300 sm:grid-cols-2">
             {E2E_SCENARIOS.map((scenario, index) => (
               <li key={scenario}>{String(index + 1).padStart(2, '0')}. {scenario}</li>
@@ -255,7 +267,7 @@ export default function Quality() {
             {DOCS.map((doc) => <li key={doc}><code>{doc}</code></li>)}
           </ul>
           <p className="wg-muted mt-3 text-xs">
-            Les specs Playwright sont exécutées en CI avec Chromium ; 15 parcours JSDOM équivalents sont rejoués localement par <code>npm run check</code>.
+            Les parcours locaux et les scénarios Supabase simulés sont exécutés en CI avec Chromium. Les 15 vérifications de routes JSDOM de <code>npm run check</code> ne remplacent pas ces interactions ni une recette sur service réel.
           </p>
         </Card>
       </div>

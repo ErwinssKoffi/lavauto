@@ -1,50 +1,27 @@
-# Vitrine `/` — modèle public ixartz/Next-js-Boilerplate
+# Vitrine WashGuard `/`
 
-**Date :** 11/11/2026 · **Branche :** `arena/868cde36-lavauto` · **Portée :** remplacement complet de la seule route `/`.
+**Date :** 12/11/2026 · Ce document décrit la vitrine présente dans cette branche, conservée dans son design WashGuard sombre. Les exemples de station, de caisse, de stock, de fiche et de commissions sont **fictifs** et identifiés comme tels ; ils ne représentent ni des clients ni des performances réelles. Aucun témoignage inventé n’est affiché.
 
-## Source et décisions
+## Navigation et contenu
 
-Le dépôt privé `ErwinssKoffi/next-js-boilerplate` n'était pas lisible depuis l'intégration GitHub de l'espace de travail. À la demande explicite, la référence retenue est le modèle public [ixartz/Next-js-Boilerplate](https://github.com/ixartz/Next-js-Boilerplate), branche `main`, avec une **reprise fidèle** des textes, sections, illustrations et de la navigation. Les libellés traduits du modèle (`fr.json`) sont conservés : `Accueil`, `A propos`, `Compteur`, `Portfolio`, `Se connecter`, `S'inscrire`, `Partenaires`, ainsi que le pied de page français.
+| Élément | Destination / comportement |
+| --- | --- |
+| Logo WashGuard | `/` |
+| Fonctionnalités, Caisse & Stock, Tarifs, FAQ | Ancres `#fonctionnalites`, `#caisse-stock`, `#tarifs`, `#faq` |
+| Créer mon compte / Créer mon espace / CTA des formules | `/inscription` |
+| Connexion / Explorer les modules | `/connexion` |
+| Onglets de l’illustration et questions de la FAQ | État local de l’interface, sans écriture ni données réelles |
 
-Trois autres choix ont été appliqués :
+La page décrit les fiches, la caisse, les canaux, le stock et les relevés sans garantir l’élimination des erreurs ni une synchronisation hors ligne. Les moyens de paiement sont **enregistrés par canal** : il n’existe pas de connexion automatique aux opérateurs. Le plafond de remise du caissier est un contrôle d’interface/local ; la base connectée ne l’impose pas actuellement. Les règles et barèmes modifiés dans Paramètres ne configurent pas le serveur. Le résultat net dépend de l’attestation des coûts.
 
-1. **Landing + CTA existants** : aucune nouvelle page publique, aucune migration vers Next.js, aucune réécriture des modules `/app/*`.
-2. **Aucune nouvelle fonctionnalité** : ni formulaire, ni table, ni RPC, ni e-mail, ni secret, ni dépendance.
-3. **Arrêt avant P05 conservé pour cette refonte** : les écritures métier n'ont pas été branchées ici. Le Prompt 05 a ensuite été validé séparément (`p05_complet`).
+## Formules et tarifs
 
-Le modèle public est sous **licence MIT**, Copyright (c) 2026 Remi W. La notice complète est conservée dans `public/assets/images/LICENSE.txt` ; les neuf logos du tableau des partenaires sont copiés depuis `public/assets/images/` du modèle.
-
-## Correspondance des actions
-
-| Élément repris du modèle | Destination dans WashGuard | Nature |
-| --- | --- | --- |
-| Bandeau « Live Demo of Next.js Boilerplate — Explore the Authentication » | `Link` → `/inscription` | route Auth existante |
-| `Accueil` | `Link` → `/` | route existante |
-| `A propos` | ancre `#a-propos` sur le premier paragraphe | section existante |
-| `Compteur` | `Link` → `/app/tableau-de-bord` | route protégée existante ; un visiteur non connecté est redirigé vers `/connexion` |
-| `Portfolio` | ancre `#partenaires` | section du modèle |
-| `Tarifs` | ancre `#tarifs` | section WashGuard conservée |
-| `GitHub` | `https://github.com/ixartz/Next-js-Boilerplate` | lien externe du modèle |
-| `Se connecter` | `Link` → `/connexion` | route Auth existante |
-| `S'inscrire` | `Link` → `/inscription` | route Auth existante |
-| Sélecteur de langue | contrôle visuel inerte `FR` / `EN` | reflet du modèle ; aucune route i18n ni fonctionnalité ajoutée |
-| Badge « Demo of Next.js Boilerplate » | lien externe vers le dépôt public | lien du modèle |
-| `@Ixartz on Twitter`, Clerk, Neon, Crowdin, CodeRabbit, Sentry, Arcjet | URL externes exactes du modèle | aucun bouton mort |
-| Tableau des 9 partenaires | URL externes exactes du modèle | illustrations + liens exacts |
-| Lien du pied de page | `https://nextjs-boilerplate.com` | lien du modèle |
-| CTA de chaque formule | `Link` → `/inscription` | route Auth existante |
-
-La navigation du modèle ne contenait pas de section tarifs. Une section `Formules et tarifs` est donc **conservée depuis l'ancienne vitrine WashGuard** et restylée avec les bordures du modèle : elle lit `plans` via `useStore()`, affiche `formatFCFA(plan.priceMonthly)` et refuse tout prix local de repli lorsque la base Supabase est indisponible (`plansError`). C'est le seul ajout par rapport au contenu exact du modèle, nécessaire pour garder la connexion aux tarifs demandée.
-
-## Sécurité et non-régression
-
-- `AuthPort`, `onAuthStateChange`, `my_context()`, `usePermissions`, `RoleRoute`, RLS et audit P04 restent inchangés.
-- `src/pages/Landing.tsx` n'introduit aucun `company_id`, aucun mot de passe, aucune clé `service_role` / `sb_secret_`, ni `getSession()`.
-- Le thème global sombre/clair P02 reste disponible dans l'application ; la page `/` force uniquement son propre fond clair, comme le modèle public, via des règles ciblées `.wg-boilerplate-landing`.
-- `docs/audit.md`, `docs/architecture-audit.md` et `docs/design-system.md` restent des rapports historiques ; ce document décrit l'état actuel de `/`.
+En mode local, la vitrine utilise les formules locales de démonstration. En mode Supabase, elle attend les lignes actives et leurs limites depuis `plans` / `plan_limits`. Pendant le chargement, aucun prix local n’est affiché ; si la lecture échoue, si la table est vide ou si les données nécessaires sont invalides, un message explicite remplace les tarifs, sans repli fictif. Le même principe est appliqué à la lecture des formules dans l’écran Abonnement ; les informations d’abonnement courant et les notes de changement de cette page restent locales, non confirmées ni envoyées au serveur.
 
 ## Vérifications
 
-`npm ci` (185 paquets), `npm run typecheck` (0 erreur), `npm run lint` (11/11), `npm run build` (110 modules ; JS `663,46 kB` / gzip `176,94 kB`, CSS `31,25 kB` / gzip `7,40 kB`), `npm run check` (**140 OK / 0 KO · local**) et `WG_DATA_SOURCE=supabase npm run check` (**141 OK / 0 KO · supabase**) sont rejoués après la refonte. La section `[5]` de `scripts/check.cjs` valide la reprise du texte, l'attribution MIT, les neuf illustrations, la table de correspondance, les liens internes et le branchement des tarifs à `plans`. La section `[7]` continue de vérifier qu'en mode Supabase la vitrine affiche `16 000 FCFA` et non le repli local `15 000 FCFA`, et qu'aucun prix local n'est présenté comme tarif de la base si celle-ci ne répond pas.
+`scripts/check.cjs` contrôle le contenu réel de la vitrine, ses CTA et le comportement des tarifs. Les parcours Playwright locaux et avec Supabase simulé couvrent le chargement, l’erreur, la table vide, les limites serveur, les ancres, les exemples et la navigation. Voir [testing.md](testing.md) pour les résultats et limites : aucune de ces simulations ne constitue une recette sur un projet Supabase réel.
 
-**Le Prompt 05 n'a pas été engagé par cette refonte.** Il a été livré séparément après validation `p05_complet` : voir [washes.md](washes.md).
+## Historique et licence
+
+Une vitrine antérieure s’inspirait du modèle public [ixartz/Next-js-Boilerplate](https://github.com/ixartz/Next-js-Boilerplate), sous licence MIT, Copyright (c) 2026 Remi W. La notice des éléments historiques conservés se trouve dans `public/assets/images/LICENSE.txt`. La page actuelle ne prétend pas reprendre fidèlement ce modèle. La licence générale du dépôt figure dans `LICENSE.md`.

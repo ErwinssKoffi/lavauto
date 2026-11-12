@@ -1,4 +1,5 @@
-import type { AppState, Client, Plan, ProfitabilityReport } from '../../types';
+import type { AppState, AppUser, Client, Plan, ProfitabilityReport } from '../../types';
+import type { StationMetrics } from '../../lib/stationMetrics';
 import { clonePlans } from '../../lib/plans';
 import { withStockDefaults } from '../../lib/stock';
 import { buildProfitability, financeSnapshotFromState, type FinanceSnapshot } from '../../lib/finance';
@@ -72,6 +73,10 @@ export class LocalDataAdapter implements DataAdapter {
     };
   }
 
+  async listStationMetrics(_stationId: string, _start: string, _end: string): Promise<StationMetrics> {
+    throw new Error('Les indicateurs locaux sont calculés à partir des données du navigateur.');
+  }
+
   async listFinanceBoard(): Promise<FinanceSnapshot> {
     return financeSnapshotFromState(this.getState());
   }
@@ -106,6 +111,11 @@ export class LocalDataAdapter implements DataAdapter {
 
   async listClients(): Promise<Client[]> {
     return this.getState().clients ?? [];
+  }
+
+  async listAssignableUsers(stationId: string): Promise<AppUser[]> {
+    return this.getState().users.filter((u) => u.active &&
+      (u.stationIds?.length ? u.stationIds.includes(stationId) : !u.stationId || u.stationId === stationId));
   }
 
   async listWashBoard(): Promise<WashBoardSnapshot> {

@@ -1,3 +1,4 @@
+import { readNumber } from '../lib/validation';
 import React, { useState } from 'react';
 import {
   FiCheckCircle, FiDollarSign, FiLock, FiPlus, FiRefreshCw, FiRotateCcw, FiX,
@@ -28,7 +29,7 @@ export default function Cash() {
   const [reason, setReason] = useState('');
   const [start, setStart] = useState(todayISO());
   const [end, setEnd] = useState(todayISO());
-  const [countedByMethod, setCountedByMethod] = useState<Record<string, number>>({});
+  const [countedByMethod, setCountedByMethod] = useState<Record<string, number | ''>>({});
   const activated = Boolean(state.station?.activated);
   const open = state.cashSessions.find((c) => c.status === 'ouverte');
   const theoretical = open ? theoreticalCash(state, open.id) : 0;
@@ -53,10 +54,12 @@ export default function Cash() {
       />
       {!activated && <div className="mb-5"><LockedPanel /></div>}
 
-      <div className="mb-5"><Alert kind={state.station?.cashRequiresOpen ? 'warn' : 'info'}>
-        {state.station?.cashRequiresOpen
-          ? 'Règle active : un encaissement en espèces exige une caisse ouverte. Le Mobile Money, la carte et le virement ne créent aucun mouvement de caisse espèces.'
-          : 'Règle désactivée pour cette station : les encaissements en espèces ne nécessitent pas de caisse ouverte.'}
+      <div className="mb-5"><Alert kind={dataSource === 'supabase' || state.station?.cashRequiresOpen ? 'warn' : 'info'}>
+        {dataSource === 'supabase'
+          ? 'En mode connecté, un encaissement en espèces exige une caisse ouverte. Les autres canaux ne créent pas de mouvement de caisse espèces.'
+          : state.station?.cashRequiresOpen
+            ? 'Règle active : un encaissement en espèces exige une caisse ouverte. Le Mobile Money, la carte et le virement ne créent aucun mouvement de caisse espèces.'
+            : 'Règle désactivée pour cette station : les encaissements en espèces ne nécessitent pas de caisse ouverte.'}
       </Alert></div>
 
       {open ? (
@@ -125,31 +128,40 @@ export default function Cash() {
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-sm font-bold">Rapprochement par canal</h2>
           <div className="flex flex-wrap gap-2">
-            <Input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
-            <Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} />
+            <Input label="Début de la période" type="date" value={start} onChange={(e) => { setStart(e.target.value); setCountedByMethod({}); }} />
+            <Input label="Fin de la période" type="date" value={end} onChange={(e) => { setEnd(e.target.value); setCountedByMethod({}); }} />
           </div>
         </div>
-        <p className="wg-muted mb-4 text-xs">Chaque canal est rapproché séparément. Un relevé validé est figé : aucun recalcul, aucune modification.</p>
+        <p className="wg-muted mb-4 text-xs">Chaque canal est rapproché séparément. Un relevé validé est figé : aucun recalcul, aucune modification.
+          {dataSource === 'supabase' && ' Avant validation, l’aperçu est une estimation sur les fiches chargées (200 au maximum). Le serveur recalcule le montant attendu ; saisissez votre comptage réel.'}
+        </p>
         {methods.length === 0 ? <p className="wg-muted text-xs">Aucun moyen de paiement configuré.</p> : (
           <div className="grid gap-3 lg:grid-cols-2">
             {methods.map((m) => {
-              const expected = channelExpected(state, m.id, start, end);
-              const frozen = reconciliations.some(
+              const frozenRecord = reconciliations.find(
                 (r) => r.methodId === m.id && r.start === start && r.end === end && r.frozen
               );
-              const value = countedByMethod[m.id] ?? expected;
+              const frozen = Boolean(frozenRecord);
+              const expected = frozenRecord?.expected ?? channelExpected(state, m.id, start, end);
+              // Un comptage est une saisie de l'opérateur, pas une copie d'une
+              // estimation potentiellement limitée à 200 fiches côté serveur.
+              const value = countedByMethod[m.id] ?? frozenRecord?.counted
+                ?? (dataSource === 'supabase' ? '' : Math.max(0, expected));
+              const invalid = value === '' || !Number.isSafeInteger(value) || value < 0;
+              const name = m.label || PAY_METHOD_LABELS[m.uiMethod];
               return (
                 <div key={m.id} className="rounded-xl border p-3" style={{ borderColor: 'var(--wg-border)' }}>
                   <div className="mb-2 flex items-center justify-between gap-2">
-                    <span className="text-sm font-bold">{m.label || PAY_METHOD_LABELS[m.uiMethod]}</span>
+                    <span className="text-sm font-bold">{name}</span>
                     <Badge tone={frozen ? 'success' : 'warn'}>{frozen ? 'Figé' : 'À rapprocher'}</Badge>
                   </div>
-                  <p className="wg-muted text-xs">Attendu sur la période : {formatFCFA(expected)} · {m.affectsCash ? 'impacte la caisse espèces' : 'hors caisse espèces'}</p>
+                  <p className="wg-muted text-xs">{!frozen && dataSource === 'supabase' ? 'Estimation sur les fiches chargées' : 'Attendu sur la période'} : {formatFCFA(expected)} · {m.affectsCash ? 'impacte la caisse espèces' : 'hors caisse espèces'}</p>
                   <div className="mt-3 flex gap-2">
-                    <Input type="number" min="0" value={value} disabled={frozen}
-                      onChange={(e) => setCountedByMethod({ ...countedByMethod, [m.id]: Number(e.target.value) })} />
-                    <button className="wg-btn wg-btn-primary whitespace-nowrap" disabled={frozen || !activated}
-                      onClick={() => safe(async () => { await reconcileChannel(m.id, start, end, value); })}>
+                    <Input label={`Compté ${name} (FCFA)`} type="number" min="0" step="1" value={value} disabled={frozen}
+                      hint={!frozen ? 'Saisissez un montant entier positif ou nul.' : undefined}
+                      onChange={(e) => setCountedByMethod({ ...countedByMethod, [m.id]: e.target.value === '' ? '' : readNumber(e.target.value) })} />
+                    <button className="wg-btn wg-btn-primary whitespace-nowrap" disabled={frozen || !activated || invalid}
+                      onClick={() => { if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) void safe(async () => { await reconcileChannel(m.id, start, end, value); }); }}>
                       <FiLock /> Figer
                     </button>
                   </div>
@@ -186,7 +198,7 @@ export default function Cash() {
       </Card>
 
       <Modal open={openMode} onClose={() => setOpenMode(false)} title="Ouvrir la caisse">
-        <Input label="Fond de caisse (FCFA) *" type="number" min="0" value={float} onChange={(e) => setFloat(Number(e.target.value))} hint="Montant en espèces présent au départ." />
+        <Input label="Fond de caisse (FCFA) *" type="number" min="0" value={float} onChange={(e) => setFloat(readNumber(e.target.value))} hint="Montant en espèces présent au départ." />
         <div className="mt-5 flex justify-end gap-2">
           <button className="wg-btn wg-btn-ghost" onClick={() => setOpenMode(false)}><FiX /> Annuler</button>
           <button className="wg-btn wg-btn-primary" onClick={() => safe(async () => { await openCash(float); setOpenMode(false); })}>Ouvrir la caisse</button>
@@ -241,7 +253,7 @@ export default function Cash() {
           type="number"
           min="0"
           value={counted}
-          onChange={(e) => setCounted(Number(e.target.value))}
+          onChange={(e) => setCounted(readNumber(e.target.value))}
           hint="Saisissez la valeur exacte des billets et pièces comptés."
         />
 

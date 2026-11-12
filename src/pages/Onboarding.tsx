@@ -1,3 +1,4 @@
+import { readNumber } from '../lib/validation';
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -8,6 +9,7 @@ import { useStore, DEFAULT_DAYS } from '../lib/store';
 import type { OnboardingStep } from '../lib/store';
 import { PAY_METHOD_LABELS, type DayHours, type PayMethod } from '../types';
 import { formatFCFA } from '../lib/format';
+import { StationLogoEditor } from '../components/StationLogoEditor';
 import {
   Alert, Badge, Card, Input, PageHeader, Progress, SectionTitle, Select, useSafeAction,
 } from '../components/ui';
@@ -17,7 +19,8 @@ const SERVICE_SUGGESTIONS = ['Lavage extérieur', 'Lavage intérieur', 'Lavage c
 const METHODS: PayMethod[] = ['especes', 'mobile_money', 'carte', 'virement'];
 
 function SaveButton({ onClick, label = 'Enregistrer' }: { onClick: () => void; label?: string }) {
-  return <button className="wg-btn wg-btn-primary mt-4" onClick={onClick}><FiSave /> {label}</button>;
+  const safe = useSafeAction();
+  return <button className="wg-btn wg-btn-primary mt-4" onClick={() => safe(onClick)}><FiSave /> {label}</button>;
 }
 
 function CompanyForm() {
@@ -172,7 +175,7 @@ function PricesForm() {
                     {cats.map((c) => (
                       <td key={c.id} className="wg-td">
                         <input type="number" min="0" step="500" placeholder="—" className="wg-input !w-32" value={s.prices[c.id] || ''}
-                          onChange={(e) => setPrice(s.id, c.id, Number(e.target.value))} />
+                          onChange={(e) => { try { setPrice(s.id, c.id, readNumber(e.target.value)); } catch (error) { notify('error', error instanceof Error ? error.message : 'Prix invalide.'); } }} />
                       </td>
                     ))}
                   </tr>
@@ -225,14 +228,10 @@ function TeamForm() {
 }
 
 function LogoForm() {
-  const { state, updateStation, notify } = useStore();
-  const [url, setUrl] = useState(state.station?.logoUrl ?? '');
   return (
     <div>
-      <p className="wg-muted mb-4 text-sm">Facultatif. Le logo apparaît sur les fiches et les rapports. Saisissez l’adresse d’une image hébergée.</p>
-      <Input label="URL du logo" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…/logo.png" />
-      {url && <div className="mt-3"><img src={url} alt="Aperçu du logo" className="h-16 w-16 rounded-xl border object-contain" style={{ borderColor: 'var(--wg-border)' }} /></div>}
-      <SaveButton onClick={() => { updateStation({ logoUrl: url.trim() || null }); notify('success', 'Logo enregistré.'); }} />
+      <p className="wg-muted text-sm">Facultatif. Ajoutez le logo de la station dans le stockage privé.</p>
+      <StationLogoEditor />
     </div>
   );
 }
@@ -249,8 +248,8 @@ function CashRulesForm() {
         <div><p className="text-sm font-bold">Caisse ouverte obligatoire pour les espèces</p><p className="wg-muted text-xs">Désactivable station par station. Le Mobile Money reste enregistrable à tout moment.</p></div>
         <input type="checkbox" className="h-5 w-5 accent-sky-500" checked={requires} onChange={(e) => setRequires(e.target.checked)} />
       </label>
-      <div className="mt-3"><Input label="Remise maximale du caissier (FCFA)" type="number" min="0" value={max} onChange={(e) => setMax(Number(e.target.value))} /></div>
-      <SaveButton onClick={() => { updateStation({ cashRequiresOpen: requires, maxCashierDiscount: Math.max(0, Math.round(max)) }); notify('success', 'Règles de caisse enregistrées.'); }} />
+      <div className="mt-3"><Input label="Remise maximale du caissier (FCFA)" type="number" min="0" value={max} onChange={(e) => setMax(readNumber(e.target.value))} /></div>
+      <SaveButton onClick={() => { updateStation({ cashRequiresOpen: requires, maxCashierDiscount: max }); notify('success', 'Règles de caisse enregistrées.'); }} />
     </div>
   );
 }
@@ -261,8 +260,8 @@ function CommissionForm() {
   return (
     <div>
       <p className="wg-muted mb-4 text-sm">Barème appliqué aux lavages <strong>terminés</strong> de la période. Une exception peut être posée sur un compte depuis Employés.</p>
-      <Input label="Barème de la station (%)" type="number" min="0" max="100" value={rate} onChange={(e) => setRate(Number(e.target.value))} hint="0 % tant que vous n’avez pas choisi : aucune commission n’est calculée." />
-      <SaveButton onClick={() => { updateStation({ commissionRate: Math.min(100, Math.max(0, rate)) }); notify('success', 'Barème enregistré.'); }} />
+      <Input label="Barème de la station (%)" type="number" min="0" max="100" value={rate} onChange={(e) => setRate(readNumber(e.target.value))} hint="0 % tant que vous n’avez pas choisi : aucune commission n’est calculée." />
+      <SaveButton onClick={() => { updateStation({ commissionRate: rate }); notify('success', 'Barème enregistré.'); }} />
     </div>
   );
 }
@@ -273,8 +272,8 @@ function TargetForm() {
   return (
     <div>
       <p className="wg-muted mb-4 text-sm">Objectif de chiffre d’affaires du mois, suivi sur le tableau de bord.</p>
-      <Input label="Objectif du mois (FCFA)" type="number" min="0" step="10000" value={target} onChange={(e) => setTarget(Number(e.target.value))} hint={target > 0 ? `Soit ${formatFCFA(target)}.` : 'Aucun objectif fixé.'} />
-      <SaveButton onClick={() => { updateStation({ monthlyTarget: Math.max(0, Math.round(target)) }); notify('success', 'Objectif enregistré.'); }} />
+      <Input label="Objectif du mois (FCFA)" type="number" min="0" step="10000" value={target} onChange={(e) => setTarget(readNumber(e.target.value))} hint={target > 0 ? `Soit ${formatFCFA(target)}.` : 'Aucun objectif fixé.'} />
+      <SaveButton onClick={() => { updateStation({ monthlyTarget: target }); notify('success', 'Objectif enregistré.'); }} />
     </div>
   );
 }

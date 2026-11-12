@@ -153,7 +153,8 @@ export interface Station {
   city: string;
   phone: string;
   currency: 'FCFA';
-  logoUrl: string | null;
+  /** Chemin de l’objet dans le bucket privé, jamais une URL signée. */
+  logoPath: string | null;
   hours: DayHours[];
   paymentMethods: PayMethod[];
   cashRequiresOpen: boolean; // espèces exigent une caisse ouverte

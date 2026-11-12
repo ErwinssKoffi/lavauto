@@ -1,6 +1,6 @@
 # Mise en route — parcours d'ouverture
 
-> Ce document décrit le parcours **tel qu'implémenté dans le frontend**. Depuis le Prompt 04, l'identité, les permissions et le tenant viennent de Supabase Auth / `my_context()` ; les RPC du Prompt 05 couvrent désormais le cycle lavages ; les autres écritures métier de ce parcours restent simulées par `src/lib/store.tsx`. Le schéma distant applique déjà `company_id`, RLS et les contraintes d'unicité décrites derrière ce contrat.
+> Ce document décrit le parcours **tel qu'implémenté dans le frontend**. Depuis le Prompt 04, l'identité, les permissions et le tenant viennent de Supabase Auth / `my_context()` ; les RPC du Prompt 05 couvrent désormais le cycle lavages ; le logo utilise le Storage privé et la migration `051` en mode connecté ; plusieurs autres écritures métier de ce parcours restent locales dans `src/lib/store.tsx`. Le schéma distant applique déjà `company_id`, RLS et les contraintes d'unicité décrites derrière ce contrat.
 
 Ce n'est **pas** un formulaire de bienvenue. C'est un parcours de **treize étapes** dont l'état est **constaté sur les données réellement enregistrées** : aucune étape n'est cochée par le navigateur, aucun bouton ne déclare une étape « faite ». Le badge « Constaté » apparaît uniquement quand les données correspondantes existent.
 
@@ -27,13 +27,15 @@ Le contrat crée **une seule fois** l'entreprise, sa station, le compte proprié
 | 6 | Grille tarifaire | ✅ | **chaque** prestation active a un prix > 0 pour **chaque** catégorie active |
 | 7 | Moyens de paiement | ✅ | au moins un moyen sélectionné |
 | 8 | Comptes employés | facultatif | au moins un compte autre que le propriétaire |
-| 9 | Logo de la station | facultatif | URL du logo enregistrée |
+| 9 | Logo de la station | facultatif | chemin d’un objet privé associé à la station |
 | 10 | Règles de caisse | facultatif | remise maximale > 0 ou règle « caisse obligatoire » désactivée |
 | 11 | Barème des commissions | facultatif | taux > 0 (0 % par défaut, aucune commission calculée) |
 | 12 | Objectif du mois | facultatif | objectif > 0 |
 | 13 | Activation de la station | ✅ | `stations.activated = true` |
 
 **Huit étapes obligatoires** au total : les sept premières (identité de l'entreprise et de la station, horaires, catégories, catalogue, grille tarifaire, moyens de paiement) plus l'activation.
+
+L’étape logo utilise le même éditeur que **Paramètres** : fichier PNG, JPEG ou WebP de 5 Mo maximum, puis **Enregistrer le logo**. Elle nécessite Supabase et la migration `051` sur la cible ; elle est désactivée en mode local. L’ancienne saisie d’URL ne constitue plus un logo : un nouveau téléversement est nécessaire. Le remplacement et le retrait dissocient l’ancien fichier sans le supprimer.
 
 Les libellés proposés à la saisie (« Berline », « Lavage extérieur »…) sont des **raccourcis** : rien n'est inséré sans un clic de l'utilisateur. Les champs de prix démarrent vides ; la grille n'est constatée complète que lorsque toutes les cases sont renseignées.
 

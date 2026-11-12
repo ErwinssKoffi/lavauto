@@ -51,8 +51,10 @@ export async function withRetry<T>(
   const attempts = Math.max(1, (options.retries ?? 2) + 1);
   const baseDelay = Math.max(0, options.baseDelayMs ?? 200);
   let lastError: unknown;
+  let attempted = 0;
 
   for (let index = 0; index < attempts; index += 1) {
+    attempted = index + 1;
     try {
       return await operation();
     } catch (error) {
@@ -62,8 +64,8 @@ export async function withRetry<T>(
     }
   }
   throw new NetworkError(
-    `${options.label ?? 'Opération réseau'} indisponible après ${attempts} tentative(s)`,
+    `${options.label ?? 'Opération réseau'} indisponible après ${attempted} tentative(s)`,
     lastError,
-    attempts,
+    attempted,
   );
 }

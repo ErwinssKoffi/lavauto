@@ -5,9 +5,10 @@
 
 import { supabase } from './supabase';
 import { idempotencyKey, NetworkError, withRetry } from './network';
-import { optimizeStationLogo } from './image';
+import { isStationLogoPath, optimizeStationLogo, validateStationLogo } from './image';
 
 const BUCKET = import.meta.env.VITE_SUPABASE_STORAGE_BUCKET || 'station-assets';
+export const LOGO_URL_TTL_SECONDS = 3600;
 
 export interface QaBoard {
   migrations: number;
@@ -51,10 +52,16 @@ export interface WashPage {
 
 export interface LogoUploadResult {
   path: string;
-  signedUrl: string;
   idempotencyKey: string;
   optimized: boolean;
   bytes: number;
+}
+
+function logoBucket() {
+  if (BUCKET !== 'station-assets') {
+    throw new NetworkError('Le bucket privé station-assets est requis pour les logos.');
+  }
+  return client().storage.from(BUCKET);
 }
 
 function client() {
@@ -94,29 +101,53 @@ export function claimIdempotency(rpcName: string, key: string): Promise<{ firstC
   return rpc('claim_rpc_idempotency', { p_rpc: rpcName, p_key: key });
 }
 
+/** L'URL signée n'est pas une donnée persistante : seul le chemin est renvoyé. */
 export async function uploadStationLogo(file: File): Promise<LogoUploadResult> {
-  const c = client();
+  const validationError = validateStationLogo(file);
+  if (validationError) throw new Error(validationError);
+  const bucket = logoBucket();
   const key = idempotencyKey('logo');
   await claimIdempotency('station_asset_path', key);
 
   const optimized = await optimizeStationLogo(file);
-  const path = await rpc<string>('station_asset_path', { p_filename: optimized.name });
+  const extension = optimized.contentType === 'image/webp' ? 'webp'
+    : optimized.contentType === 'image/png' ? 'png' : 'jpg';
+  // Un nouveau nom par sélection évite d'écraser un logo existant (ou celui
+  // d'une autre station). La clé reste identique pendant les retries d'upload.
+  const path = await rpc<string>('station_asset_path', { p_filename: `${key}.${extension}` });
+  if (!isStationLogoPath(path)) throw new NetworkError('Chemin de logo renvoyé par le serveur invalide');
   await withRetry(async () => {
-    const result = await c.storage.from(BUCKET).upload(path, optimized.body, {
+    const result = await bucket.upload(path, optimized.body, {
       upsert: true,
       contentType: optimized.contentType,
     });
     if (result.error) throw result.error;
     return result;
-  }, { label: 'upload du logo' });
+  }, { label: 'Envoi du logo' });
 
-  const signed = await c.storage.from(BUCKET).createSignedUrl(path, 3600);
-  if (signed.error) throw new NetworkError('URL signée indisponible', signed.error);
   return {
     path,
-    signedUrl: signed.data.signedUrl,
     idempotencyKey: key,
     optimized: optimized.optimized,
     bytes: optimized.bytes,
   };
+}
+
+/** Associe uniquement un objet privé existant à une station autorisée. */
+export async function saveStationLogoPath(stationId: string, path: string | null): Promise<void> {
+  if (path !== null && !isStationLogoPath(path)) throw new Error('Chemin de logo invalide.');
+  await rpc('save_station_logo', { p_station_id: stationId, p_path: path });
+}
+
+/** Les URL temporaires ne sont générées qu'au moment de l'affichage. */
+export async function getStationLogoSignedUrl(path: string): Promise<string> {
+  if (!isStationLogoPath(path)) throw new Error('Chemin de logo invalide.');
+  const bucket = logoBucket();
+  const signed = await withRetry(async () => {
+    const result = await bucket.createSignedUrl(path, LOGO_URL_TTL_SECONDS);
+    if (result.error) throw result.error;
+    if (!result.data?.signedUrl) throw new Error('URL signée absente');
+    return result.data.signedUrl;
+  }, { label: 'Aperçu du logo' });
+  return signed;
 }

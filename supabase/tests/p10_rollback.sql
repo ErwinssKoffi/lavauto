@@ -16,8 +16,8 @@ INSERT INTO p10_result VALUES
   ('anon objects SELECT filtre 0 ligne malgre grant historique', false, 'en attente du garde'),
   ('anon buckets SELECT filtre 0 ligne malgre grant historique', false, 'en attente du garde');
 
--- 048 n a pas ete appliquee : 045, 046, 047, 049 et 050 portent le schema
--- a 49 migrations. Les grants Storage de supabase_storage_admin restent non
+-- 048 n a pas ete appliquee : 045, 046, 047, 049 et 050 portaient le schema
+-- historique a 49 migrations ; 051 peut s'y ajouter. Les grants Storage restent non
 -- revoquables depuis postgres ; la garde 050 est donc RLS RESTRICTIVE.
 INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES
   ('11111111-1111-4111-8111-111111111111', 'p10-a@test.invalid', jsonb_build_object('company_name','Tenant P10 A','station_name','Station P10 A','owner_name','Owner P10 A')),
@@ -155,9 +155,10 @@ END $$;
 RESET ROLE;
 
 INSERT INTO p10_result VALUES
-  ('P10 : 49 migrations, 70 tables, 2 vues, 48 permissions, 112 liaisons',
-    (SELECT count(*) FROM supabase_migrations.schema_migrations) = 49
-    AND (SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE') = 70
+  ('P10 : au moins 49 migrations, 70 tables, 2 vues, 48 permissions, 112 liaisons',
+    (SELECT count(*) FROM supabase_migrations.schema_migrations) >= 49
+    AND (SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE') =
+      70 + CASE WHEN to_regclass('public.wash_creation_requests') IS NULL THEN 0 ELSE 1 END
     AND (SELECT count(*) FROM pg_views WHERE schemaname='public' AND viewname IN ('v_station_daily_activity','v_company_quota_usage')) = 2
     AND (SELECT count(*) FROM public.permissions) = 48
     AND (SELECT count(*) FROM public.role_permissions) = 112,
@@ -168,11 +169,11 @@ INSERT INTO p10_result VALUES
     AND (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname IN ('my_washes_page','station_asset_path','claim_rpc_idempotency','my_qa_board') AND has_function_privilege('anon',p.oid,'EXECUTE')) = 0
     AND (SELECT count(*) FROM pg_trigger WHERE tgname IN ('trg_quota_stations','trg_quota_profiles','trg_quota_washes')) = 3,
     'index et RPC exposes a authenticated uniquement'),
-  ('P10 : bucket prive, 5 policies objets, 5 policies buckets, 5 restrictives',
+  ('P10 : bucket prive et au moins 5 policies restrictives',
     (SELECT count(*) FROM storage.buckets WHERE id='station-assets' AND "public" = false) = 1
     AND (SELECT count(*) FROM pg_policies WHERE schemaname='storage' AND tablename='objects' AND policyname LIKE 'p10_%') = 5
     AND (SELECT count(*) FROM pg_policies WHERE schemaname='storage' AND tablename='buckets' AND policyname LIKE 'p10_%') = 5
-    AND (SELECT count(*) FROM pg_policies WHERE schemaname='storage' AND permissive='RESTRICTIVE') = 5,
+    AND (SELECT count(*) FROM pg_policies WHERE schemaname='storage' AND permissive='RESTRICTIVE') >= 5,
     '046 + 049 + 050 : RLS restrictive'),
   ('P10 : my_qa_board mesure la garde RLS, pas les grants historiques',
     ((SELECT val FROM p10_board WHERE k='qaA')->>'anonStorageRevoked') = 'true'
@@ -180,8 +181,9 @@ INSERT INTO p10_result VALUES
     AND ((SELECT val FROM p10_board WHERE k='qaA')->>'anonStorageSelectGrant') = 'true',
     'grant SELECT anon compense par 0 ligne visible'),
   ('my_qa_board A : compteurs coherents, aucun company_id',
-    ((SELECT val FROM p10_board WHERE k='qaA')->>'migrations') = '49'
-    AND ((SELECT val FROM p10_board WHERE k='qaA')->>'tables') = '70'
+    ((SELECT val FROM p10_board WHERE k='qaA')->>'migrations')::integer >= 49
+    AND ((SELECT val FROM p10_board WHERE k='qaA')->>'tables')::integer =
+      (SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE')
     AND ((SELECT val FROM p10_board WHERE k='qaA')->>'indexes') = '5'
     AND ((SELECT val FROM p10_board WHERE k='qaA')->>'rpcCount') = '4'
     AND ((SELECT val FROM p10_board WHERE k='qaA')->>'storageBucket') = 'true'
@@ -189,7 +191,7 @@ INSERT INTO p10_result VALUES
     AND NOT ((SELECT val FROM p10_board WHERE k='qaA')::text LIKE '%company_id%'),
     'projection camelCase sans tenant brut'),
   ('my_qa_board admin : accessible, aucun company_id',
-    ((SELECT val FROM p10_board WHERE k='qaAdmin')->>'migrations') = '49'
+    ((SELECT val FROM p10_board WHERE k='qaAdmin')->>'migrations')::integer >= 49
     AND ((SELECT val FROM p10_board WHERE k='qaAdmin')->>'storageBucket') = 'true'
     AND NOT ((SELECT val FROM p10_board WHERE k='qaAdmin')::text LIKE '%company_id%'),
     'super admin uniquement'),

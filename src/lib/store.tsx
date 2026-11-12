@@ -6,7 +6,7 @@ import type {
   Plan, Role, Service, Session, Station, Subscription, VehicleCategory, Wash,
   WashItem, WashPost, WashQualityResult, WashStatus,
 } from '../types';
-import { ApiError } from '../types';
+import { ApiError, PAY_METHOD_DB_KEY } from '../types';
 import { canTransitionWash, normalizeWashes, washEvent } from './washLifecycle';
 import { mapCatalogToState } from './catalog';
 import { theoreticalCash } from './metrics';
@@ -17,7 +17,7 @@ import {
   validateCommissionPeriodLocal, withFinanceDefaults,
 } from './financeState';
 import {
-  emptyStockCollections, withStockDefaults,
+  emptyStockCollections, seedLocalDemoStock, withStockDefaults,
   type CostCertificationPayload, type CreatePurchaseOrderPayload,
   type InventoryCountPayload, type ProductPayload, type ReceivePurchasePayload,
   type ServiceConsumptionPayload, type SupplierPayload, type StockSnapshot,
@@ -53,6 +53,11 @@ import {
   type CrmMutation,
 } from './crmState';
 import { formatFCFA, uid, todayISO } from './format';
+import { idempotencyKey } from './network';
+import {
+  clearPendingWash, readPendingWash, savePendingWash, WashCreationError,
+  type PendingWashCreation,
+} from './washCreation';
 import { getPlans, setPlansCache } from './plans';
 import {
   analyticsBoardFromState, emptyAnalyticsBoard, emptyPlatformBoard,
@@ -72,6 +77,15 @@ import {
   type SignUpPayload, type UpdateUserPayload,
 } from '../services/auth/authTypes';
 import { clearDemoPasswords } from './demoPasswords';
+import { isStationLogoPath } from './image';
+import type { StationMetrics } from './stationMetrics';
+import { clearPendingPayment, readPendingPayment, savePendingPayment, PaymentCommandError, type PendingPayment } from './paymentAttempt';
+import {
+  validateCertification, validateConsumption, validateCustomer, validateDate, validateEmail,
+  validateExpense, validateFleet, validateFleetContract, validateFleetReceivable, validateInventory,
+  validateMoney, validateOrder, validatePackage, validatePercentage, validatePeriod, validatePhone, validatePlate,
+  validateProduct, validatePromotion, validateQuantity, validateReceipt, validateSupplier, validateWash,
+} from './validation';
 import type { LocalAuthAdapter } from '../services/auth/LocalAuthAdapter';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -146,6 +160,13 @@ export function load(): AppState {
   const state: AppState = withCrmDefaults(withStockDefaults(withFinanceDefaults({
     ...emptyState(), ...persisted, session: null,
   })));
+  // Les anciennes URL (parfois signées ou externes) ne sont jamais réutilisées
+  // comme chemin privé. Un nouveau téléversement est nécessaire pour ces logos.
+  if (state.station) {
+    const { logoUrl: _legacyLogoUrl, ...station } = state.station as Station & { logoUrl?: unknown };
+    state.station = { ...station, logoPath: isStationLogoPath(station.logoPath)
+      && station.logoPath.startsWith(`${station.companyId}/`) ? station.logoPath : null };
+  }
   // Prompt 05 : mapping des 4 statuts FR → 7 statuts EN + historique initial
   // par fiche importée. Idempotent, appliqué à chaque lecture du stockage.
   state.washes = normalizeWashes(persisted.washes as unknown[] | undefined);
@@ -236,8 +257,8 @@ export function computeOnboarding(s: AppState): OnboardingStep[] {
     },
     {
       id: 'logo', title: 'Logo de la station', required: false,
-      description: 'Apparaît sur les fiches et les rapports.',
-      done: Boolean(st?.logoUrl),
+      description: 'Ajoutez un logo dans le stockage privé.',
+      done: isStationLogoPath(st?.logoPath),
       hint: 'Facultatif.',
     },
     {
@@ -301,6 +322,10 @@ interface Ctx {
   plans: Plan[];
   /** Source active (diagnostic) : `local` par défaut, `supabase` en lecture seule. */
   dataSource: DataSource;
+  /** Les simulations de stock sont réservées à une source ET une Auth locales. */
+  isLocalStockDemo: boolean;
+  /** Les commandes stock sont reliées au port RPC Supabase. */
+  isServerStock: boolean;
   /** Erreur de chargement des tarifs : aucun prix local n'est affiché en repli. */
   plansError: string | null;
   onboarding: OnboardingStep[];
@@ -311,6 +336,12 @@ interface Ctx {
   authRecovery: boolean;
   authKind: AuthPort['kind'];
   identity: AuthIdentity | null;
+  /** Sélection de confort : les autorisations restent vérifiées par le serveur. */
+  selectStation: (stationId: string) => void;
+  assignableUsers: AppUser[];
+  stationMetrics: StationMetrics | null;
+  stationMetricsError: string | null;
+  refreshStationMetrics: (start: string, end: string) => Promise<void>;
   invitations: Invitation[];
   clearAuthError: () => void;
   signUp: (p: SignUpPayload) => Promise<AuthResult>;
@@ -326,6 +357,7 @@ interface Ctx {
   // données de base / paramètres
   updateCompany: (patch: Partial<Company>) => void;
   updateStation: (patch: Partial<Station>) => void;
+  setStationLogoPath: (stationId: string, userId: string, path: string | null) => void;
   setHours: (hours: DayHours[]) => void;
   addCategory: (name: string) => void;
   toggleCategory: (id: string) => void;
@@ -340,6 +372,10 @@ interface Ctx {
   // exploitation (protégées par le garde 409)
   // Prompt 05 : sync en mode local, Promise (RPC serveur) en mode supabase.
   createWash: (p: WashPayload) => Wash | Promise<Wash>;
+  /** Tentative conservée dans cet onglet lorsqu'une réponse serveur est incertaine. */
+  pendingWash: PendingWashCreation | null;
+  pendingWashError: string | null;
+  retryPendingWash: () => Promise<void>;
   setWashStatus: (id: string, status: WashStatus, reason?: string) => void | Promise<void>;
   addPayment: (washId: string, amount: number, method: PayMethod, idempotencyKey?: string) => void | Promise<void>;
   assignWash: (id: string, userIds: string[], postId?: string | null) => void | Promise<void>;
@@ -424,20 +460,59 @@ function logAction(state: AppState, action: string, detail: string): AppState['a
   return [{ id: uid('log'), at: new Date().toISOString(), actor, action, detail }, ...state.auditLogs].slice(0, 200);
 }
 
+/** Les collections d'une station ne doivent jamais subsister lors d'un changement. */
+function clearStationCollections(s: AppState): AppState {
+  return {
+    ...s, vehicleCategories: [], services: [], clients: [], washes: [], washPosts: [],
+    cashSessions: [], expenses: [], ...emptyFinanceCollections(),
+    ...emptyStockCollections(), ...emptyCrmCollections(), auditLogs: [], washCounter: 0,
+  };
+}
+
+type StationScope = { epoch: number; userId: string | null; companyId: string | null; stationId: string | null };
+const stationSelectionKey = (userId: string, companyId: string | null) =>
+  `washguard.station-selection.v1:${userId}:${companyId ?? ''}`;
+function rememberStation(userId: string, companyId: string | null, stationId: string): void {
+  try { sessionStorage.setItem(stationSelectionKey(userId, companyId), stationId); } catch { /* facultatif */ }
+}
+function rememberedStation(userId: string, companyId: string | null): string | null {
+  try { return sessionStorage.getItem(stationSelectionKey(userId, companyId)); } catch { return null; }
+}
+
 export function StoreProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<AppState>(load);
+  // Les données métier connectées ne sont ni restaurées ni persistées dans le
+  // cache de démonstration : seul un contexte JWT vérifié peut les afficher.
+  const [state, setState] = useState<AppState>(() => getDataSource() === 'supabase' && !TEST_AUTH ? emptyState() : load());
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [authReady, setAuthReady] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authRecovery, setAuthRecovery] = useState(false);
   const [identity, setIdentity] = useState<AuthIdentity | null>(null);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [pendingWashState, setPendingWashState] = useState<PendingWashCreation | null>(null);
+  const [pendingWashError, setPendingWashError] = useState<string | null>(null);
+  const washCreationInFlight = useRef(new Set<string>());
+  const paymentsInFlight = useRef(new Set<string>());
   const [theme, setTheme] = useState<'dark' | 'light'>(() =>
     localStorage.getItem('washguard.theme') === 'light' ? 'light' : 'dark'
   );
   const stateRef = useRef(state);
   stateRef.current = state;
   const authKeyRef = useRef('');
+  const authGenerationRef = useRef(0);
+  const scopeRef = useRef<StationScope>({ epoch: 0, userId: null, companyId: null, stationId: null });
+  const requestVersions = useRef<Record<string, number>>({});
+  const financePeriod = useRef<{ start: string; end: string } | null>(null);
+  const [assignableUsers, setAssignableUsers] = useState<AppUser[]>([]);
+  const [stationMetrics, setStationMetrics] = useState<StationMetrics | null>(null);
+  const [stationMetricsError, setStationMetricsError] = useState<string | null>(null);
+  /** La dernière requête gagne, et A → B → A invalide aussi les anciennes réponses A. */
+  const beginRequest = useCallback((key: string) => {
+    const epoch = scopeRef.current.epoch;
+    const version = (requestVersions.current[key] ?? 0) + 1;
+    requestVersions.current[key] = version;
+    return () => scopeRef.current.epoch === epoch && requestVersions.current[key] === version;
+  }, []);
   const authPort = useMemo<AuthPort>(() => getAuthPort({
     getState: () => stateRef.current,
     setState: (updater) => setState(updater),
@@ -449,6 +524,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   // comme un tarif de la base ; une erreur explicite est affichée à la place.
   const dataSource = getDataSource();
   const adapter = useMemo(() => getDataAdapter(() => stateRef.current), []);
+  // `demoMode` décrit l'état de l'interface et n'est pas un garde de sécurité.
+  // Une configuration mixte ne doit jamais activer ces mutations locales.
+  const isLocalStockDemo = dataSource === 'local' && authPort.kind === 'local';
   // Les RPC exigent une vraie session Supabase Auth. Le harnais JSDOM garde le
   // port Auth local même en VITE_DATA_SOURCE=supabase : il continue donc à
   // exercer les règles métier locales (gardes 409, caisse, prix figé).
@@ -472,11 +550,41 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [plansError, setPlansError] = useState<string | null>(null);
   const [analyticsBoard, setAnalyticsBoard] = useState<AnalyticsSnapshot>(() => emptyAnalyticsBoard());
   const [subscriptionUsage, setSubscriptionUsage] = useState<SubscriptionUsageSnapshot>(() => emptySubscriptionUsage());
-  const [platformBoard, setPlatformBoard] = useState<PlatformSnapshot>(() => emptyPlatformBoard(getPlans()));
+  const [platformBoard, setPlatformBoard] = useState<PlatformSnapshot>(() => emptyPlatformBoard(dataSource === 'local' ? getPlans() : []));
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [platformError, setPlatformError] = useState<string | null>(null);
 
-  useEffect(() => { persist(state); }, [state]);
+  // Une tentative indécise appartient à l'utilisateur et à la station vérifiés,
+  // jamais à une session restaurée depuis localStorage. Elle survit au reload
+  // de cet onglet, pas à l'effacement de son stockage ni à un autre appareil.
+  const pendingWash = serverWash && pendingWashState?.userId === identity?.userId
+    && pendingWashState?.stationId === state.station?.id ? pendingWashState : null;
+  useEffect(() => {
+    if (!serverWash || !authReady || !identity?.userId || !state.station?.id) {
+      setPendingWashState(null);
+      setPendingWashError(null);
+      return;
+    }
+    try {
+      setPendingWashState(readPendingWash(identity.userId, state.station.id));
+      setPendingWashError(null);
+    } catch (error) {
+      setPendingWashState(null);
+      setPendingWashError(error instanceof Error ? error.message : 'Tentative de création inaccessible.');
+    }
+  }, [serverWash, authReady, identity?.userId, state.station?.id]);
+
+  // Les produits d'exemple ne sont créés que pour la démonstration entièrement
+  // locale, jamais lors de la normalisation d'un tableau de bord serveur vide.
+  useEffect(() => {
+    if (isLocalStockDemo && state.station && state.products.length === 0) {
+      setState((current) => seedLocalDemoStock(current));
+    }
+  }, [isLocalStockDemo, state.station?.id, state.products.length]);
+
+  useEffect(() => {
+    if (authPort.kind === 'local') persist(state);
+  }, [state, authPort.kind]);
 
   const notify = useCallback((kind: Toast['kind'], message: string) => {
     const id = uid('toast');
@@ -485,13 +593,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, []);
   const dismissToast = useCallback((id: string) => setToasts((t) => t.filter((x) => x.id !== id)), []);
 
-  const sessionFromIdentity = useCallback((value: AuthIdentity): Session => ({
+  const sessionFromIdentity = useCallback((value: AuthIdentity, stationId: string | null): Session => ({
     userId: value.userId,
     email: value.email,
     name: value.fullName,
     role: value.role,
     companyId: value.companyId,
-    stationId: value.stationIds[0] ?? null,
+    stationId,
   }), []);
 
   const reasonMessage = useCallback((reason: AuthChange['reason']): string | null => {
@@ -503,14 +611,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const refreshInvitations = useCallback(async (): Promise<Invitation[]> => {
+    const generation = authGenerationRef.current;
     const list = await authPort.listInvitations();
-    setInvitations(list);
+    if (generation === authGenerationRef.current) setInvitations(list);
     return list;
   }, [authPort]);
 
   const refreshUsers = useCallback(async (): Promise<AppUser[]> => {
+    const generation = authGenerationRef.current;
     const users = await authPort.refreshUsers();
-    setState((s) => ({ ...s, users }));
+    if (generation === authGenerationRef.current) setState((s) => ({ ...s, users }));
     return users;
   }, [authPort]);
 
@@ -519,10 +629,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (change.type === 'PASSWORD_RECOVERY') setAuthRecovery(true);
 
     if (!value || !value.active || !value.emailConfirmed) {
+      authGenerationRef.current += 1;
       authKeyRef.current = 'signed-out';
-      setState((s) => ({ ...s, session: null }));
+      scopeRef.current = { epoch: scopeRef.current.epoch + 1, userId: null, companyId: null, stationId: null };
+      setState((s) => authPort.kind === 'supabase' ? emptyState() : { ...s, session: null });
       setIdentity(null);
       setInvitations([]);
+      setToasts([]);
+      setAssignableUsers([]);
+      setStationMetrics(null);
+      setStationMetricsError(null);
+      setAnalyticsBoard(emptyAnalyticsBoard());
+      setSubscriptionUsage(emptySubscriptionUsage());
+      setPlatformBoard(emptyPlatformBoard());
       setAuthError(value && !value.active
         ? 'Ce compte est désactivé. Contactez le propriétaire de la station.'
         : value && !value.emailConfirmed
@@ -531,45 +650,100 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setAuthReady(true);
       return;
     }
-    const key = `${value.userId}:${value.roleKey}:${value.permissions.join(',')}:${value.active}`;
-    // INITIAL_SESSION, SIGNED_IN et TOKEN_REFRESHED peuvent se succéder pour
-    // le même JWT : on n'applique qu'une fois, sans nouvelle rafale de RPC.
-    if (key === authKeyRef.current && change.type === 'TOKEN_REFRESHED') {
-      setAuthReady(true);
-      return;
+    const key = JSON.stringify([
+      value.userId, value.email, value.fullName, value.roleKey, value.permissions,
+      value.active, value.companyId, value.company, value.stations, value.isPlatformAdmin, value.profileReady,
+    ]);
+    if (key === authKeyRef.current) return;
+    const previousScope = scopeRef.current;
+    const sameUser = previousScope.userId === value.userId && previousScope.companyId === value.companyId;
+    const previousStation = stateRef.current.station;
+    const available = new Set(value.stations.map((s) => s.id));
+    const selected = [sameUser ? previousScope.stationId : null,
+      rememberedStation(value.userId, value.companyId), value.stations[0]?.id ?? null]
+      .find((id): id is string => Boolean(id && available.has(id))) ?? null;
+    const changedScope = !sameUser || previousScope.stationId !== selected;
+    // Des permissions peuvent être retirées sans changer de station. Ne pas
+    // conserver une projection chargée sous les anciennes autorisations.
+    const invalidate = changedScope || (authPort.kind === 'supabase' && sameUser && key !== authKeyRef.current);
+    if (invalidate) {
+      scopeRef.current = { epoch: previousScope.epoch + 1, userId: value.userId, companyId: value.companyId, stationId: selected };
+      setAssignableUsers([]);
+      setStationMetrics(null);
+      setStationMetricsError(null);
+      setAnalyticsBoard(emptyAnalyticsBoard()); setAnalyticsError(null);
+      setSubscriptionUsage(emptySubscriptionUsage()); setPlatformBoard(emptyPlatformBoard()); setPlatformError(null);
+      setToasts([]);
     }
+    if (selected) rememberStation(value.userId, value.companyId, selected);
+    const generation = ++authGenerationRef.current;
     authKeyRef.current = key;
-    const nextSession = sessionFromIdentity(value);
+    if (authPort.kind === 'supabase' && !sameUser) setAuthReady(false);
+    const nextSession = sessionFromIdentity(value, selected);
+    const projection = mapIdentityToAppState(value, [], selected);
     setIdentity(value);
     setAuthError(null);
     setState((s) => {
       if (authPort.kind === 'local') return { ...s, session: nextSession };
-      // En mode connecté, la projection company/station/users vient du
-      // serveur : aucun identifiant de tenant n'est fourni par le navigateur.
-      return { ...s, session: nextSession, demoMode: false };
+      const base = sameUser ? s : { ...emptyState(), demoMode: false };
+      const clean = invalidate ? clearStationCollections(base) : base;
+      const incoming = projection.station;
+      const current = !changedScope ? s.station : null;
+      const summary = value.stations.find((item) => item.id === selected);
+      const station = incoming && current && incoming.id === current.id ? {
+        ...incoming,
+        // Les anciens contextes ne contenaient pas ces champs. Ne pas effacer
+        // les réglages courants lorsqu'ils sont absents de la projection.
+        address: summary?.address === undefined ? current.address : incoming.address,
+        phone: summary?.phone === undefined ? current.phone : incoming.phone,
+        hours: summary?.hours === undefined ? current.hours : incoming.hours,
+        paymentMethods: current.paymentMethods,
+        cashRequiresOpen: current.cashRequiresOpen, maxCashierDiscount: current.maxCashierDiscount,
+        commissionRate: current.commissionRate, monthlyTarget: current.monthlyTarget,
+        logoPath: previousStation?.logoPath !== current.logoPath ? current.logoPath : incoming.logoPath,
+      } : incoming;
+      return { ...clean, session: nextSession, company: projection.company, station, demoMode: false };
     });
 
     void (async () => {
       try {
         const { users } = await authPort.listUsers();
+        if (authGenerationRef.current !== generation) return;
         if (authPort.kind === 'supabase') {
-          const projected = mapIdentityToAppState(value, users);
-          setState((s) => ({
-            ...s,
-            company: projected.company ?? s.company,
-            station: projected.station ?? s.station,
-            users: projected.users.length ? projected.users : s.users,
-          }));
+          // Une sélection effectuée pendant la lecture est conservée.
+          const projected = mapIdentityToAppState(value, users, scopeRef.current.stationId);
+          setState((s) => authGenerationRef.current === generation && s.session?.userId === value.userId
+            ? { ...s, users: projected.users } : s);
         }
-        await refreshInvitations();
+        const nextInvitations = await authPort.listInvitations();
+        if (authGenerationRef.current === generation) setInvitations(nextInvitations);
       } catch {
-        // Une erreur de lecture ne doit jamais fabriquer une session locale.
-        setAuthError('Lecture du profil ou des permissions impossible.');
+        if (authGenerationRef.current === generation) setAuthError('Lecture du profil ou des permissions impossible.');
       } finally {
-        setAuthReady(true);
+        if (authGenerationRef.current === generation) setAuthReady(true);
       }
     })();
-  }, [authPort, refreshInvitations, sessionFromIdentity, reasonMessage]);
+  }, [authPort, sessionFromIdentity, reasonMessage]);
+
+  const selectStation = useCallback((stationId: string) => {
+    if (authPort.kind !== 'supabase' || !authReady || !identity
+      || identity.userId !== scopeRef.current.userId || !identity.stations.some((s) => s.id === stationId)) {
+      throw new ApiError('station_inaccessible', 'Cette station n’est pas accessible à votre session.');
+    }
+    if (scopeRef.current.stationId === stationId) return;
+    // Invalidation synchrone AVANT le rendu : même une réponse déjà en vol pour
+    // la première station ne peut pas être appliquée au nouveau contexte.
+    scopeRef.current = { epoch: scopeRef.current.epoch + 1, userId: identity.userId,
+      companyId: identity.companyId, stationId };
+    rememberStation(identity.userId, identity.companyId, stationId);
+    const projected = mapIdentityToAppState(identity, [], stationId);
+    setAssignableUsers([]);
+    setStationMetrics(null);
+    setStationMetricsError(null);
+    setToasts([]);
+    setState((s) => ({ ...clearStationCollections(s), station: projected.station,
+      session: sessionFromIdentity(identity, stationId) }));
+  }, [authPort.kind, authReady, identity, sessionFromIdentity]);
 
   // UN seul abonnement Auth, jamais de fetchMeOnce(), jamais de boucle 401.
   useEffect(() => {
@@ -631,63 +805,97 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const refreshFinance = useCallback(async (from?: string, to?: string): Promise<void> => {
     const today = new Date();
     const first = new Date(today.getFullYear(), today.getMonth(), 1);
-    const start = from ?? `${first.getFullYear()}-${String(first.getMonth() + 1).padStart(2, '0')}-01`;
-    const endStr = to ?? `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const start = from ?? financePeriod.current?.start ?? `${first.getFullYear()}-${String(first.getMonth() + 1).padStart(2, '0')}-01`;
+    const endStr = to ?? financePeriod.current?.end ?? todayISO();
+    validatePeriod(start, endStr, 366);
+    if (from !== undefined || to !== undefined) financePeriod.current = { start, end: endStr };
     if (!serverFinance) {
-      setState((cur) => withFinanceDefaults({
-        ...cur, profitability: localProfitability(cur, start, endStr),
-      }));
+      setState((cur) => withFinanceDefaults({ ...cur, profitability: localProfitability(cur, start, endStr) }));
       return;
     }
-    // Aucun chargement automatique sans session Supabase vérifiée : les tests
-    // JSDOM et les visiteurs anonymes ne provoquent jamais d'appel RPC.
-    if (!authReady || !identity) return;
-    const [board, report] = await Promise.all([
-      adapter.listFinanceBoard(),
-      adapter.listProfitability(start, endStr),
-    ]);
-    setState((cur) => {
-      const linked = new Map(cur.expenses.map((e) => [e.id, e.purchaseOrderId ?? null]));
-      const expenses = board.expenses.map((e) => ({ ...e, purchaseOrderId: linked.get(e.id) ?? null }));
-      return withStockDefaults(withFinanceDefaults({
-        ...cur, ...board, expenses, profitability: report,
-      }));
-    });
-  }, [adapter, serverFinance, authReady, identity?.userId]);
+    const stationId = scopeRef.current.stationId;
+    if (!authReady || !identity || !stationId || !identity.permissions.some((p) =>
+      ['reports.view', 'cash.open', 'cash.close', 'cash.reopen', 'expenses.create', 'expenses.cancel', 'commissions.view'].includes(p))) return;
+    const current = beginRequest('finance');
+    try {
+      const [board, report] = await Promise.all([
+        adapter.listFinanceBoard(stationId),
+        identity.permissions.includes('reports.view') ? adapter.listProfitability(start, endStr, stationId) : Promise.resolve(null),
+      ]);
+      if (!current()) return;
+      setState((cur) => {
+        if (!current()) return cur;
+        return withStockDefaults(withFinanceDefaults({ ...cur, ...board, profitability: report }));
+      });
+    } catch (error) { if (current()) throw error; }
+  }, [adapter, beginRequest, serverFinance, authReady, identity, state.station?.id]);
 
-  const refreshWashes = useCallback(async (): Promise<void> => {
-    // En mode branché, catalogue et clients viennent aussi du serveur : les
-    // identifiants locaux (uid('cat'), uid('cli')) ne sont jamais envoyés aux
-    // RPC qui attendent des UUID. Aucun tarif/client local n'est fabriqué.
-    const [board, catalog, clients] = await Promise.all([
-      adapter.listWashBoard(),
-      serverWash ? adapter.listCatalog() : Promise.resolve(null),
-      serverWash ? adapter.listClients() : Promise.resolve(null),
-    ]);
-    const projected = catalog ? mapCatalogToState(catalog) : null;
-    setState((cur) => ({
-      ...cur,
-      washes: board.washes,
-      washPosts: board.posts,
-      ...(projected ? {
-        vehicleCategories: projected.vehicleCategories,
-        services: projected.services,
-      } : {}),
-      // P08 : en mode branché, `my_crm_board()` fournit les fiches enrichies ;
-      // `my_company_clients()` ne doit pas les écraser avec l'ancienne fiche.
-      ...(clients && !serverCrm ? { clients } : {}),
-    }));
-  }, [adapter, serverWash, serverCrm]);
+  const refreshWashes = useCallback(async (expectedPayment?: { washId: string; key: string }): Promise<void> => {
+    if (!serverWash) {
+      const board = await adapter.listWashBoard();
+      setState((cur) => ({ ...cur, washes: board.washes, washPosts: board.posts }));
+      return;
+    }
+    const stationId = scopeRef.current.stationId;
+    if (!authReady || !identity || !stationId || !identity.permissions.includes('washes.view')) {
+      if (expectedPayment) throw new Error('Lecture de la fiche non autorisée.');
+      return;
+    }
+    const current = beginRequest('washes');
+    try {
+      const [board, catalog, clients, assignable] = await Promise.all([
+        adapter.listWashBoard(stationId), adapter.listCatalog(stationId), adapter.listClients(stationId),
+        identity.permissions.includes('washes.assign') ? adapter.listAssignableUsers(stationId) : Promise.resolve([]),
+      ]);
+      if (!current()) {
+        if (expectedPayment) throw new Error('Lecture de la fiche dépassée par une autre actualisation.');
+        return;
+      }
+      if (expectedPayment && !board.washes.find((wash) => wash.id === expectedPayment.washId)
+        ?.payments.some((payment) => payment.idempotencyKey === expectedPayment.key)) {
+        throw new Error('Paiement absent de la lecture de la fiche.');
+      }
+      const projected = mapCatalogToState(catalog);
+      setAssignableUsers(assignable);
+      setState((cur) => {
+        if (!current()) return cur;
+        return { ...cur, washes: board.washes, washPosts: board.posts,
+          vehicleCategories: projected.vehicleCategories, services: projected.services,
+          // La liste lavage fait autorité pour l'appartenance à cette station ;
+          // les champs CRM supplémentaires déjà chargés restent disponibles.
+          clients: clients.map((client) => ({ ...cur.clients.find((x) => x.id === client.id), ...client })) };
+      });
+    } catch (error) { if (current() || expectedPayment) throw error; }
+  }, [adapter, beginRequest, serverWash, authReady, identity, state.station?.id]);
+
+  const refreshStationMetrics = useCallback(async (start: string, end: string): Promise<void> => {
+    validatePeriod(start, end, 92);
+    const stationId = scopeRef.current.stationId;
+    if (!serverWash || !authReady || !identity || !stationId || !identity.permissions.includes('washes.view')) return;
+    const current = beginRequest('stationMetrics');
+    setStationMetrics(null);
+    setStationMetricsError(null);
+    try {
+      const metrics = await adapter.listStationMetrics(stationId, start, end);
+      if (current()) setStationMetrics(metrics);
+    } catch (error) {
+      if (current()) {
+        setStationMetricsError(error instanceof Error ? error.message : 'Indicateurs indisponibles.');
+        throw error;
+      }
+    }
+  }, [adapter, beginRequest, serverWash, authReady, identity, state.station?.id]);
 
   const refreshStock = useCallback(async (): Promise<void> => {
-    if (!serverStock) {
-      setState((cur) => withStockDefaults(cur));
-      return;
-    }
-    if (!authReady || !identity) return;
-    const board: StockSnapshot = await adapter.listStockBoard();
-    setState((cur) => withStockDefaults({ ...cur, ...board }));
-  }, [adapter, serverStock, authReady, identity?.userId]);
+    if (!serverStock) { setState((cur) => withStockDefaults(cur)); return; }
+    const stationId = scopeRef.current.stationId;
+    if (!authReady || !identity || !stationId || !identity.permissions.includes('inventory.view')) return;
+    const current = beginRequest('stock');
+    try {
+      const board: StockSnapshot = await adapter.listStockBoard(stationId);
+      if (current()) setState((cur) => current() ? withStockDefaults({ ...cur, ...board }) : cur);
+    } catch (error) { if (current()) throw error; }
+  }, [adapter, beginRequest, serverStock, authReady, identity, state.station?.id]);
 
   const refreshCrm = useCallback(async (): Promise<void> => {
     if (!serverCrm) {
@@ -714,9 +922,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       });
       return;
     }
-    if (!authReady || !identity) return;
-    const board: CrmSnapshot = await adapter.listCrmBoard();
-    setState((cur) => withCrmDefaults({
+    const stationId = scopeRef.current.stationId;
+    if (!authReady || !identity || !stationId || !identity.permissions.some((p) =>
+      ['crm.view', 'customers.view', 'loyalty.view', 'packages.view', 'promotions.view', 'fleets.view'].includes(p))) return;
+    const current = beginRequest('crm');
+    try {
+      const board: CrmSnapshot = await adapter.listCrmBoard(stationId);
+      if (!current()) return;
+      setState((cur) => current() ? withCrmDefaults({
       ...cur,
       clients: board.clients, vehicles: board.vehicles,
       loyaltyPrograms: board.loyaltyPrograms,
@@ -733,45 +946,58 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       fleetReceivables: board.fleetReceivables,
       notificationOutbox: board.notificationOutbox,
       crmStats: board.stats, crmRules: board.rules,
-    }));
-  }, [adapter, serverCrm, authReady, identity?.userId]);
+      }) : cur);
+    } catch (error) { if (current()) throw error; }
+  }, [adapter, beginRequest, serverCrm, authReady, identity, state.station?.id]);
 
   const refreshAnalytics = useCallback(async (
     start: string = monthStartISO(), end: string = todayISO(),
     compareStart: string | null = null, compareEnd: string | null = null,
   ): Promise<void> => {
+    try {
+      validatePeriod(start, end, 92);
+      if ((compareStart === null) !== (compareEnd === null)) throw new Error('Période de comparaison incomplète.');
+      if (compareStart && compareEnd) validatePeriod(compareStart, compareEnd, 92);
+    } catch (error) {
+      setAnalyticsError(error instanceof Error ? error.message : 'Période invalide.');
+      throw error;
+    }
+    setAnalyticsError(null);
     if (!serverAnalytics) {
       setAnalyticsBoard(analyticsBoardFromState(stateRef.current, start, end, compareStart, compareEnd));
-      setAnalyticsError(null);
-      return;
+      setAnalyticsError(null); return;
     }
-    if (!authReady || !identity) return;
-    const board = await adapter.listAnalyticsBoard(start, end, compareStart, compareEnd);
-    setAnalyticsBoard(board);
-    setAnalyticsError(null);
-  }, [adapter, serverAnalytics, authReady, identity?.userId]);
+    if (!authReady || !identity || !identity.permissions.includes('analytics.view') || !identity.permissions.includes('reports.view')) return;
+    const current = beginRequest('analytics');
+    try {
+      const board = await adapter.listAnalyticsBoard(start, end, compareStart, compareEnd);
+      if (current()) { setAnalyticsBoard(board); setAnalyticsError(null); }
+    } catch (error) {
+      if (current()) {
+        setAnalyticsError(error instanceof Error ? error.message : 'Lecture analytics impossible.');
+        throw error;
+      }
+    }
+  }, [adapter, beginRequest, serverAnalytics, authReady, identity, state.station?.id]);
 
   const refreshSubscriptionUsage = useCallback(async (periodStart: string = monthStartISO()): Promise<void> => {
     if (!serverAnalytics) {
       const usage = subscriptionUsageFromState(stateRef.current, periodStart);
-      setSubscriptionUsage(usage);
-      setPlatformBoard(platformBoardFromState(stateRef.current, getPlans()));
-      return;
+      setSubscriptionUsage(usage); setPlatformBoard(platformBoardFromState(stateRef.current, getPlans())); return;
     }
     if (!authReady || !identity) return;
-    setSubscriptionUsage(await adapter.listSubscriptionUsage(periodStart));
-  }, [adapter, serverAnalytics, authReady, identity?.userId]);
+    const current = beginRequest('subscription');
+    try { const usage = await adapter.listSubscriptionUsage(periodStart); if (current()) setSubscriptionUsage(usage); }
+    catch (error) { if (current()) throw error; }
+  }, [adapter, beginRequest, serverAnalytics, authReady, identity, state.station?.id]);
 
   const refreshPlatform = useCallback(async (): Promise<void> => {
-    if (!serverAnalytics) {
-      setPlatformBoard(platformBoardFromState(stateRef.current, getPlans()));
-      setPlatformError(null);
-      return;
-    }
+    if (!serverAnalytics) { setPlatformBoard(platformBoardFromState(stateRef.current, getPlans())); setPlatformError(null); return; }
     if (!authReady || !identity?.isPlatformAdmin) return;
-    setPlatformBoard(await adapter.listPlatformBoard());
-    setPlatformError(null);
-  }, [adapter, serverAnalytics, authReady, identity?.userId, identity?.isPlatformAdmin]);
+    const current = beginRequest('platform');
+    try { const board = await adapter.listPlatformBoard(); if (current()) { setPlatformBoard(board); setPlatformError(null); } }
+    catch (error) { if (current()) throw error; }
+  }, [adapter, beginRequest, serverAnalytics, authReady, identity, state.station?.id]);
 
   const refreshUsageCounters = useCallback(async (periodStart: string = monthStartISO()): Promise<void> => {
     if (serverAnalytics && authReady && identity?.isPlatformAdmin && adapter.analyticsCommands) {
@@ -784,7 +1010,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const vehicleHistory = useCallback(async (plate: string): Promise<Wash[]> => {
     const key = plate.trim().toUpperCase();
     if (!key) return [];
-    if (serverWash && adapter.washCommands) return adapter.washCommands.vehicleHistory(key);
+    if (serverWash && adapter.washCommands) {
+      const stationId = scopeRef.current.stationId;
+      if (!stationId) return [];
+      const epoch = scopeRef.current.epoch;
+      const rows = await adapter.washCommands.vehicleHistory(key, stationId);
+      return epoch === scopeRef.current.epoch ? rows : [];
+    }
     return stateRef.current.washes
       .filter((w) => w.plate.trim().toUpperCase() === key)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -827,17 +1059,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     });
   }, [serverCrm, authReady, identity?.userId, refreshCrm, notify]);
 
-  // P09 : boards initiaux. Le mode local calcule immédiatement ; le mode
-  // serveur n'appelle aucune RPC sans session vérifiée.
-  useEffect(() => {
-    if (serverAnalytics && (!authReady || !identity)) return;
-    void refreshAnalytics().catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : 'Lecture analytics impossible.';
-      setAnalyticsError(message);
-      notify('error', `Analytics indisponibles : ${message}`);
-    });
-  }, [serverAnalytics, authReady, identity?.userId, refreshAnalytics, notify]);
-
+  // La page Consolidation demande explicitement sa période : ne pas lancer
+  // ici une lecture par défaut qui pourrait supplanter sa demande en vol.
   useEffect(() => {
     if (serverAnalytics && (!authReady || !identity?.isPlatformAdmin)) return;
     void refreshPlatform().catch((error: unknown) => {
@@ -857,8 +1080,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const rpc = useCallback(<T,>(action: (c: NonNullable<DataAdapter['washCommands']>) => Promise<T>): Promise<T> => {
     const commands = adapter.washCommands;
     if (!commands) return Promise.reject(new ApiError('server_unavailable', 'Commande serveur indisponible en mode local.'));
+    const epoch = scopeRef.current.epoch;
     return action(commands).then(async (value) => {
+      if (scopeRef.current.epoch !== epoch) return value;
       await refreshWashes();
+      if (scopeRef.current.epoch !== epoch) return value;
       if (serverFinance) {
         await refreshFinance().catch((error: unknown) => {
           notify('error', `Actualisation finance : ${error instanceof Error ? error.message : 'erreur'}`);
@@ -873,8 +1099,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   ): Promise<T> => {
     const commands = adapter.financeCommands;
     if (!commands) return Promise.reject(new ApiError('server_unavailable', 'Commande finance indisponible en mode local.'));
+    const epoch = scopeRef.current.epoch;
     return action(commands).then(async (value) => {
+      if (scopeRef.current.epoch !== epoch) return value;
       await refreshWashes();
+      if (scopeRef.current.epoch !== epoch) return value;
       await refreshFinance().catch((error: unknown) => {
         notify('error', `Actualisation finance : ${error instanceof Error ? error.message : 'erreur'}`);
       });
@@ -887,10 +1116,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   ): Promise<T> => {
     const commands = adapter.stockCommands;
     if (!commands) return Promise.reject(new ApiError('server_unavailable', 'Commande stock indisponible en mode local.'));
+    const epoch = scopeRef.current.epoch;
     return action(commands).then(async (value) => {
+      if (scopeRef.current.epoch !== epoch) return value;
       await refreshStock().catch((error: unknown) => {
         notify('error', `Actualisation stock : ${error instanceof Error ? error.message : 'erreur'}`);
       });
+      if (scopeRef.current.epoch !== epoch) return value;
       if (serverFinance) {
         await refreshFinance().catch((error: unknown) => {
           notify('error', `Actualisation finance : ${error instanceof Error ? error.message : 'erreur'}`);
@@ -905,10 +1137,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   ): Promise<T> => {
     const commands = adapter.crmCommands;
     if (!commands) return Promise.reject(new ApiError('server_unavailable', 'Commande CRM indisponible en mode local.'));
+    const epoch = scopeRef.current.epoch;
     return action(commands).then(async (value) => {
+      if (scopeRef.current.epoch !== epoch) return value;
       await refreshCrm().catch((error: unknown) => {
         notify('error', `Actualisation CRM : ${error instanceof Error ? error.message : 'erreur'}`);
       });
+      if (scopeRef.current.epoch !== epoch) return value;
       await refreshWashes().catch((error: unknown) => {
         notify('error', `Actualisation lavages : ${error instanceof Error ? error.message : 'erreur'}`);
       });
@@ -921,10 +1156,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   ): Promise<T> => {
     const commands = adapter.analyticsCommands;
     if (!commands) return Promise.reject(new ApiError('server_unavailable', 'Commande plateforme indisponible en mode local.'));
+    const epoch = scopeRef.current.epoch;
     return action(commands).then(async (value) => {
+      if (scopeRef.current.epoch !== epoch) return value;
       await refreshPlatform().catch((error: unknown) => {
         notify('error', `Actualisation plateforme : ${error instanceof Error ? error.message : 'erreur'}`);
       });
+      if (scopeRef.current.epoch !== epoch) return value;
       await refreshSubscriptionUsage().catch((error: unknown) => {
         notify('error', `Actualisation quotas : ${error instanceof Error ? error.message : 'erreur'}`);
       });
@@ -934,59 +1172,95 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const crmLocal = useCallback(<T,>(fn: (s: AppState) => CrmMutation<T>): T => {
     const result = fn(stateRef.current);
+    // Une deuxième commande locale dans le même événement doit voir la première.
+    stateRef.current = result.state;
     setState(result.state);
     return result.value;
   }, []);
 
+  const assertSelectedStation = useCallback((stationId: string) => {
+    if (!stationId || stationId !== stateRef.current.station?.id
+      || (authPort.kind === 'supabase' && stationId !== scopeRef.current.stationId)) {
+      throw new ApiError('station_changed', 'Cette opération ne concerne pas la station sélectionnée.');
+    }
+  }, [authPort.kind]);
+
   // ── Prompt 08 : 17 actions, sync locales ou RPC serveur ────────────────────
-  const saveCustomerProfile = useCallback((p: CustomerProfilePayload) =>
-    serverCrm ? crmRpc((c) => c.saveCustomerProfile(p))
-      : crmLocal((s) => saveCustomerProfileLocal(s, p)), [serverCrm, crmRpc, crmLocal]);
-  const saveCustomerVehicle = useCallback((p: CustomerVehiclePayload) =>
-    serverCrm ? crmRpc((c) => c.saveCustomerVehicle(p))
-      : crmLocal((s) => saveCustomerVehicleLocal(s, p)), [serverCrm, crmRpc, crmLocal]);
-  const createLoyaltyProgram = useCallback((p: LoyaltyProgramPayload) =>
-    serverCrm ? crmRpc((c) => c.createLoyaltyProgram(p))
-      : crmLocal((s) => createLoyaltyProgramLocal(s, p)), [serverCrm, crmRpc, crmLocal]);
-  const enrollLoyaltyCustomer = useCallback((p: LoyaltyEnrollmentPayload) =>
-    serverCrm ? crmRpc((c) => c.enrollLoyaltyCustomer(p))
-      : crmLocal((s) => enrollLoyaltyCustomerLocal(s, p)), [serverCrm, crmRpc, crmLocal]);
-  const recordLoyaltyTransaction = useCallback((p: LoyaltyTransactionPayload) =>
-    serverCrm ? crmRpc((c) => c.recordLoyaltyTransaction(p))
-      : crmLocal((s) => recordLoyaltyTransactionLocal(s, p)), [serverCrm, crmRpc, crmLocal]);
+  const saveCustomerProfile = useCallback((p: CustomerProfilePayload) => {
+    assertSelectedStation(p.stationId); validateCustomer(p);
+    return serverCrm ? crmRpc((c) => c.saveCustomerProfile(p))
+      : crmLocal((s) => saveCustomerProfileLocal(s, p));
+  }, [assertSelectedStation, serverCrm, crmRpc, crmLocal]);
+  const saveCustomerVehicle = useCallback((p: CustomerVehiclePayload) => {
+    assertSelectedStation(p.stationId); validatePlate(p.plate);
+    return serverCrm ? crmRpc((c) => c.saveCustomerVehicle(p))
+      : crmLocal((s) => saveCustomerVehicleLocal(s, p));
+  }, [assertSelectedStation, serverCrm, crmRpc, crmLocal]);
+  const createLoyaltyProgram = useCallback((p: LoyaltyProgramPayload) => {
+    assertSelectedStation(p.stationId); validateQuantity(p.pointsPer1000Minor); validateQuantity(p.redemptionThreshold);
+    return serverCrm ? crmRpc((c) => c.createLoyaltyProgram(p))
+      : crmLocal((s) => createLoyaltyProgramLocal(s, p));
+  }, [assertSelectedStation, serverCrm, crmRpc, crmLocal]);
+  const enrollLoyaltyCustomer = useCallback((p: LoyaltyEnrollmentPayload) => {
+    assertSelectedStation(p.stationId);
+    return serverCrm ? crmRpc((c) => c.enrollLoyaltyCustomer(p))
+      : crmLocal((s) => enrollLoyaltyCustomerLocal(s, p));
+  }, [assertSelectedStation, serverCrm, crmRpc, crmLocal]);
+  const recordLoyaltyTransaction = useCallback((p: LoyaltyTransactionPayload) => {
+    validateQuantity(Math.abs(p.pointsDelta));
+    if ((p.kind === 'earn' && p.pointsDelta <= 0) || (p.kind === 'redeem' && p.pointsDelta >= 0)) throw new ApiError('invalid_points', 'Sens des points invalide.');
+    return serverCrm ? crmRpc((c) => c.recordLoyaltyTransaction(p))
+      : crmLocal((s) => recordLoyaltyTransactionLocal(s, p));
+  }, [serverCrm, crmRpc, crmLocal]);
   const accrueLoyaltyForWash = useCallback((washId: string, key?: string | null) =>
     serverCrm ? crmRpc((c) => c.accrueLoyaltyForWash(washId, key))
       : crmLocal((s) => accrueLoyaltyForWashLocal(s, washId, key)), [serverCrm, crmRpc, crmLocal]);
-  const savePackagePlan = useCallback((p: PackagePlanPayload) =>
-    serverCrm ? crmRpc((c) => c.savePackagePlan(p))
-      : crmLocal((s) => savePackagePlanLocal(s, p)), [serverCrm, crmRpc, crmLocal]);
-  const sellPackageToCustomer = useCallback((p: PackageSalePayload) =>
-    serverCrm ? crmRpc((c) => c.sellPackageToCustomer(p))
-      : crmLocal((s) => sellPackageToCustomerLocal(s, p)), [serverCrm, crmRpc, crmLocal]);
+  const savePackagePlan = useCallback((p: PackagePlanPayload) => {
+    assertSelectedStation(p.stationId); validatePackage(p);
+    return serverCrm ? crmRpc((c) => c.savePackagePlan(p))
+      : crmLocal((s) => savePackagePlanLocal(s, p));
+  }, [assertSelectedStation, serverCrm, crmRpc, crmLocal]);
+  const sellPackageToCustomer = useCallback((p: PackageSalePayload) => {
+    assertSelectedStation(p.stationId); if (p.purchasedAt) validateDate(p.purchasedAt);
+    return serverCrm ? crmRpc((c) => c.sellPackageToCustomer(p))
+      : crmLocal((s) => sellPackageToCustomerLocal(s, p));
+  }, [assertSelectedStation, serverCrm, crmRpc, crmLocal]);
   const consumePackageForWash = useCallback((washId: string) =>
     serverCrm ? crmRpc((c) => c.consumePackageForWash(washId))
       : crmLocal((s) => consumePackageForWashLocal(s, washId)), [serverCrm, crmRpc, crmLocal]);
-  const savePromotion = useCallback((p: PromotionPayload) =>
-    serverCrm ? crmRpc((c) => c.savePromotion(p))
-      : crmLocal((s) => savePromotionLocal(s, p)), [serverCrm, crmRpc, crmLocal]);
+  const savePromotion = useCallback((p: PromotionPayload) => {
+    assertSelectedStation(p.stationId); validatePromotion(p);
+    return serverCrm ? crmRpc((c) => c.savePromotion(p))
+      : crmLocal((s) => savePromotionLocal(s, p));
+  }, [assertSelectedStation, serverCrm, crmRpc, crmLocal]);
   const applyPromotionToWash = useCallback((p: PromotionApplicationPayload) =>
     serverCrm ? crmRpc((c) => c.applyPromotionToWash(p))
       : crmLocal((s) => applyPromotionToWashLocal(s, p)), [serverCrm, crmRpc, crmLocal]);
-  const saveFleet = useCallback((p: FleetPayload) =>
-    serverCrm ? crmRpc((c) => c.saveFleet(p))
-      : crmLocal((s) => saveFleetLocal(s, p)), [serverCrm, crmRpc, crmLocal]);
-  const saveFleetContract = useCallback((p: FleetContractPayload) =>
-    serverCrm ? crmRpc((c) => c.saveFleetContract(p))
-      : crmLocal((s) => saveFleetContractLocal(s, p)), [serverCrm, crmRpc, crmLocal]);
-  const attachFleetVehicle = useCallback((p: AttachFleetVehiclePayload) =>
-    serverCrm ? crmRpc((c) => c.attachFleetVehicle(p))
-      : crmLocal((s) => attachFleetVehicleLocal(s, p)), [serverCrm, crmRpc, crmLocal]);
-  const recordFleetReceivable = useCallback((p: FleetReceivablePayload) =>
-    serverCrm ? crmRpc((c) => c.recordFleetReceivable(p))
-      : crmLocal((s) => recordFleetReceivableLocal(s, p)), [serverCrm, crmRpc, crmLocal]);
-  const enqueueNotification = useCallback((p: NotificationPayload) =>
-    serverCrm ? crmRpc((c) => c.enqueueNotification(p))
-      : crmLocal((s) => enqueueNotificationLocal(s, p)), [serverCrm, crmRpc, crmLocal]);
+  const saveFleet = useCallback((p: FleetPayload) => {
+    assertSelectedStation(p.stationId); validateFleet(p);
+    return serverCrm ? crmRpc((c) => c.saveFleet(p))
+      : crmLocal((s) => saveFleetLocal(s, p));
+  }, [assertSelectedStation, serverCrm, crmRpc, crmLocal]);
+  const saveFleetContract = useCallback((p: FleetContractPayload) => {
+    assertSelectedStation(p.stationId); validateFleetContract(p);
+    return serverCrm ? crmRpc((c) => c.saveFleetContract(p))
+      : crmLocal((s) => saveFleetContractLocal(s, p));
+  }, [assertSelectedStation, serverCrm, crmRpc, crmLocal]);
+  const attachFleetVehicle = useCallback((p: AttachFleetVehiclePayload) => {
+    assertSelectedStation(p.stationId);
+    return serverCrm ? crmRpc((c) => c.attachFleetVehicle(p))
+      : crmLocal((s) => attachFleetVehicleLocal(s, p));
+  }, [assertSelectedStation, serverCrm, crmRpc, crmLocal]);
+  const recordFleetReceivable = useCallback((p: FleetReceivablePayload) => {
+    assertSelectedStation(p.stationId); validateFleetReceivable(p);
+    return serverCrm ? crmRpc((c) => c.recordFleetReceivable(p))
+      : crmLocal((s) => recordFleetReceivableLocal(s, p));
+  }, [assertSelectedStation, serverCrm, crmRpc, crmLocal]);
+  const enqueueNotification = useCallback((p: NotificationPayload) => {
+    assertSelectedStation(p.stationId);
+    return serverCrm ? crmRpc((c) => c.enqueueNotification(p))
+      : crmLocal((s) => enqueueNotificationLocal(s, p));
+  }, [assertSelectedStation, serverCrm, crmRpc, crmLocal]);
   const cancelPendingNotification = useCallback((id: string) =>
     serverCrm ? crmRpc((c) => c.cancelPendingNotification(id))
       : crmLocal((s) => cancelPendingNotificationLocal(s, id)), [serverCrm, crmRpc, crmLocal]);
@@ -1005,16 +1279,21 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, [authPort, notify]);
 
   const signOut = useCallback(async (): Promise<void> => {
-    try {
-      await authPort.signOut();
-    } finally {
+    {
+      authGenerationRef.current += 1;
       authKeyRef.current = 'signed-out';
-      setState((s) => ({ ...s, session: null }));
+      scopeRef.current = { epoch: scopeRef.current.epoch + 1, userId: null, companyId: null, stationId: null };
+      setAuthReady(true);
+      setState((s) => authPort.kind === 'supabase' ? emptyState() : { ...s, session: null });
+      setAssignableUsers([]); setStationMetrics(null); setStationMetricsError(null);
+      setAnalyticsBoard(emptyAnalyticsBoard()); setSubscriptionUsage(emptySubscriptionUsage()); setPlatformBoard(emptyPlatformBoard());
       setIdentity(null);
       setInvitations([]);
       setAuthRecovery(false);
       setAuthError(null);
+      setToasts([]);
     }
+    await authPort.signOut();
   }, [authPort]);
 
   const requestPasswordReset = useCallback((email: string) =>
@@ -1047,7 +1326,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const clearAuthError = useCallback(() => setAuthError(null), []);
 
   // ── Données de base ────────────────────────────────────────────────────────
-  const updateCompany = useCallback((patch: Partial<Company>) => mutate((s) => {
+  const updateCompany = useCallback((patch: Partial<Company>) => {
+    if (patch.phone !== undefined) validatePhone(patch.phone);
+    return mutate((s) => {
     if (!s.company) return s;
     const company = { ...s.company, ...patch };
     return {
@@ -1057,13 +1338,32 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       } : c),
       auditLogs: logAction(s, 'Entreprise modifiée', Object.keys(patch).join(', ')),
     };
-  }), [mutate]);
+    });
+  }, [mutate]);
 
-  const updateStation = useCallback((patch: Partial<Station>) => mutate((s) => {
+  const updateStation = useCallback((patch: Partial<Station>) => {
+    if (patch.phone !== undefined) validatePhone(patch.phone);
+    if (patch.maxCashierDiscount !== undefined) validateMoney(patch.maxCashierDiscount);
+    if (patch.monthlyTarget !== undefined) validateMoney(patch.monthlyTarget);
+    if (patch.commissionRate !== undefined) validatePercentage(patch.commissionRate);
+    return mutate((s) => {
     if (!s.station) return s;
     return {
       ...s, station: { ...s.station, ...patch },
       auditLogs: logAction(s, 'Station modifiée', Object.keys(patch).join(', ')),
+    };
+    });
+  }, [mutate]);
+
+  // Une requête terminée après un changement de session ne doit pas modifier
+  // la station d'un autre utilisateur.
+  const setStationLogoPath = useCallback((stationId: string, userId: string, path: string | null) => mutate((s) => {
+    if (!s.station || s.station.id !== stationId || s.session?.userId !== userId
+      || s.session.stationId !== stationId || s.station.companyId !== s.session.companyId
+      || (path !== null && (!isStationLogoPath(path) || !path.startsWith(`${s.station.companyId}/`)))) return s;
+    return {
+      ...s, station: { ...s.station, logoPath: path },
+      auditLogs: logAction(s, 'Logo de la station modifié', 'logoPath'),
     };
   }), [mutate]);
 
@@ -1098,12 +1398,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     ...s, services: s.services.map((v) => v.id === id ? { ...v, ...patch } : v),
   })), [mutate]);
 
-  const setPrice = useCallback((serviceId: string, categoryId: string, price: number) => mutate((s) => ({
-    ...s,
-    services: s.services.map((v) => v.id === serviceId
-      ? { ...v, prices: { ...v.prices, [categoryId]: Math.max(0, Math.round(price)) } }
-      : v),
-  })), [mutate]);
+  const setPrice = useCallback((serviceId: string, categoryId: string, price: number) => {
+    validateMoney(price);
+    mutate((s) => ({ ...s, services: s.services.map((v) => v.id === serviceId
+      ? { ...v, prices: { ...v.prices, [categoryId]: price } } : v) }));
+  }, [mutate]);
 
   const removeService = useCallback((id: string) => mutate((s) => ({
     ...s, services: s.services.filter((v) => v.id !== id),
@@ -1136,6 +1435,79 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const submitPendingWash = useCallback(async (pending: PendingWashCreation, recovering: boolean): Promise<string> => {
+    const commands = adapter.washCommands;
+    if (!serverWash || !commands || identity?.userId !== pending.userId
+      || stateRef.current.station?.id !== pending.stationId) {
+      throw new ApiError('server_unavailable', 'Cette tentative exige la même session et la même station connectées.');
+    }
+    const lock = `${pending.userId}:${pending.stationId}`;
+    const epoch = scopeRef.current.epoch;
+    const current = () => scopeRef.current.epoch === epoch;
+    if (washCreationInFlight.current.has(lock)) {
+      throw new ApiError('wash_in_flight', 'Une création de fiche est déjà en cours.');
+    }
+    washCreationInFlight.current.add(lock);
+    try {
+      let id: string;
+      try {
+        id = await commands.createWash(pending.payload);
+      } catch (error) {
+        // Un refus explicite au premier appel prouve le rollback. Après une
+        // réponse incertaine, même un refus ultérieur peut venir d'une perte de
+        // permission : conserver la clé jusqu'à une confirmation positive.
+        if (!recovering && error instanceof WashCreationError && error.outcome === 'rejected') {
+          try {
+            clearPendingWash(pending);
+            if (current()) setPendingWashState(null);
+          } catch {
+            if (current()) setPendingWashState(pending);
+            if (current()) notify('error', 'La tentative n’a pas pu être effacée de cet onglet ; vérifiez-la avant de continuer.');
+          }
+        } else {
+          if (current()) setPendingWashState(pending);
+        }
+        throw error;
+      }
+      try {
+        clearPendingWash(pending);
+        if (current()) {
+          setPendingWashState((previous) => previous?.payload.idempotencyKey === pending.payload.idempotencyKey ? null : previous);
+          setPendingWashError(null);
+        }
+      } catch {
+        // La réponse est un succès ; garder la clé si son effacement échoue.
+        if (current()) setPendingWashState(pending);
+        if (current()) notify('error', 'Fiche confirmée, mais la tentative reste conservée dans cet onglet.');
+      }
+      // Un échec de relecture ne transforme pas une écriture confirmée en
+      // échec de création et ne doit pas inviter à créer une seconde fiche.
+      if (!current()) return id;
+      await refreshWashes().catch((error: unknown) => {
+        if (current()) notify('error', `Fiche enregistrée, mais actualisation des lavages impossible : ${error instanceof Error ? error.message : 'erreur'}. Utilisez Actualiser.`);
+      });
+      if (current() && serverFinance) {
+        await refreshFinance().catch((error: unknown) => {
+          if (current()) notify('error', `Fiche enregistrée, mais actualisation finance impossible : ${error instanceof Error ? error.message : 'erreur'}.`);
+        });
+      }
+      if (current()) notify('success', `Fiche ${id.slice(0, 8)} enregistrée par le serveur.`);
+      return id;
+    } finally {
+      washCreationInFlight.current.delete(lock);
+    }
+  }, [adapter, identity?.userId, notify, refreshFinance, refreshWashes, serverFinance, serverWash]);
+
+  const retryPendingWash = useCallback(async (): Promise<void> => {
+    const stationId = stateRef.current.station?.id;
+    if (!serverWash || !identity?.userId || !stationId) {
+      throw new ApiError('server_unavailable', 'Reconnectez-vous avec le même compte et la même station pour vérifier la tentative.');
+    }
+    const pending = readPendingWash(identity.userId, stationId);
+    if (!pending) throw new ApiError('not_found', 'Aucune tentative conservée dans cet onglet. Vérifiez les fiches avant de continuer.');
+    await submitPendingWash(pending, true);
+  }, [identity?.userId, serverWash, submitPendingWash]);
+
   const createWash = useCallback((p: WashPayload): Wash | Promise<Wash> => {
     assertActivated();
     const s = stateRef.current;
@@ -1146,37 +1518,65 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const employeeIds = Array.from(new Set(
       (p.employeeIds?.length ? p.employeeIds : [p.employeeId]).filter((id) => Boolean(id))
     ));
-    if (employeeIds.length === 0) throw new ApiError('invalid_employee', 'Choisissez au moins un employé.');
     if (p.items.length === 0) throw new ApiError('empty_items', 'Ajoutez au moins une prestation.');
-    const discount = Math.max(0, Math.round(p.discount));
+    if (p.items.some((item) => !Number.isSafeInteger(item.qty) || item.qty < 1)) {
+      throw new ApiError('invalid_quantity', 'Les quantités doivent être des nombres entiers positifs.');
+    }
+    if (!Number.isSafeInteger(p.discount) || p.discount < 0) {
+      throw new ApiError('invalid_discount', 'La remise doit être un montant entier positif ou nul.');
+    }
+    if (p.payment && (!Number.isSafeInteger(p.payment.amount) || p.payment.amount < 0
+      || !Object.prototype.hasOwnProperty.call(PAY_METHOD_DB_KEY, p.payment.method))) {
+      throw new ApiError('invalid_payment', 'Le montant ou le moyen de paiement est invalide.');
+    }
+    const gross = p.items.reduce((sum, item) => {
+      const service = s.services.find((v) => v.id === item.serviceId && v.active && v.stationId === st.id);
+      if (!service) throw new ApiError('invalid_service', 'Une prestation sélectionnée n’est plus disponible.');
+      const price = service.prices[cat.id] ?? 0;
+      if (!Number.isSafeInteger(price) || price <= 0) throw new ApiError('missing_price', `Aucun prix défini pour « ${service.name} » / ${cat.name}.`);
+      return sum + price * item.qty;
+    }, 0);
+    validateWash(p, gross);
+    const discount = p.discount;
     if (s.session?.role === 'caissier' && discount > st.maxCashierDiscount) {
       throw new ApiError('discount_exceeded', `Remise maximale autorisée pour un caissier : ${st.maxCashierDiscount} FCFA.`);
     }
 
-    // Mode Supabase : le serveur relit la grille tarifaire, fige les prix,
-    // vérifie la station, les affectations et l'idempotence. Aucun prix local.
+    // Mode Supabase : une transaction serveur relit les prix, crée la fiche et
+    // encaisse éventuellement. La commande exacte est conservée AVANT l'envoi.
     if (serverWash) {
-      const idempotencyKey = `ui-${uid('idem')}`;
+      if (!identity?.userId) throw new ApiError('server_unavailable', 'Session connectée requise pour créer une fiche.');
+      if (washCreationInFlight.current.has(`${identity.userId}:${st.id}`)) throw new ApiError('wash_in_flight', 'Une création de fiche est déjà en cours.');
+      const previous = readPendingWash(identity.userId, st.id);
+      if (previous) {
+        setPendingWashState(previous);
+        throw new ApiError('wash_pending', 'Une tentative précédente doit être vérifiée avant une nouvelle fiche.');
+      }
       const payload = {
         stationId: st.id, categoryId: cat.id, plate: p.plate.trim(),
         clientId: p.clientId || null, clientName: p.clientName.trim(),
-        items: p.items.map((it) => ({ serviceId: it.serviceId, qty: Math.max(1, it.qty) })),
-        discount, employeeIds, postId: p.postId ?? null, idempotencyKey,
-        payment: p.payment && p.payment.amount > 0 ? p.payment : null,
+        items: p.items.map((it) => ({ serviceId: it.serviceId, qty: it.qty })),
+        discount, employeeIds, postId: p.postId ?? null, idempotencyKey: idempotencyKey('ui'),
+        payment: p.payment && p.payment.amount > 0 ? { ...p.payment } : null,
       };
-      return rpc((c) => c.createWash(payload)).then((id) => {
-        notify('success', `Fiche ${id.slice(0, 8)} enregistrée par le serveur.`);
-        return {
-          id, stationId: st.id, number: '—', clientId: payload.clientId,
-          clientName: payload.clientName || null, vehicleCategoryId: cat.id,
-          vehicleLabel: cat.name, plate: payload.plate, employeeId: employeeIds[0],
-          assignedUserIds: employeeIds, postId: payload.postId,
-          items: [], discount, total: 0, paid: payload.payment?.amount ?? 0,
-          status: employeeIds.length ? 'assigned' : 'pending',
-          createdAt: new Date().toISOString(), finishedAt: null, deliveredAt: null,
-          cancelledReason: null, payments: [], history: [], qualityResult: null, qualityNotes: null,
-        } as Wash;
-      });
+      const pending: PendingWashCreation = {
+        version: 1, userId: identity.userId, stationId: st.id,
+        startedAt: new Date().toISOString(), payload,
+      };
+      savePendingWash(pending);
+      return submitPendingWash(pending, false).then((id) => ({
+        id, stationId: st.id, number: '—', clientId: payload.clientId,
+        clientName: payload.clientName || null, vehicleCategoryId: cat.id,
+        vehicleLabel: cat.name, plate: payload.plate, employeeId: employeeIds[0],
+        assignedUserIds: employeeIds, postId: payload.postId,
+        items: [], discount, total: 0, paid: payload.payment?.amount ?? 0,
+        status: employeeIds.length ? 'assigned' : 'pending',
+        createdAt: new Date().toISOString(), finishedAt: null, deliveredAt: null,
+        cancelledReason: null, payments: [], history: [], qualityResult: null, qualityNotes: null,
+      } as Wash));
+    }
+    if (authPort.kind === 'supabase') {
+      throw new ApiError('server_unavailable', 'Création serveur indisponible : aucune fiche locale n’a été enregistrée.');
     }
 
     // Mode local : le prix reste figé ici ; modifier la grille ne change JAMAIS
@@ -1186,9 +1586,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (!svc) throw new ApiError('invalid_service', 'Une prestation sélectionnée n’est plus disponible.');
       const unitPrice = svc.prices[cat.id] ?? 0;
       if (unitPrice <= 0) throw new ApiError('missing_price', `Aucun prix défini pour « ${svc.name} » / ${cat.name}.`);
-      return { serviceId: svc.id, serviceName: svc.name, unitPrice, qty: Math.max(1, it.qty) };
+      return { serviceId: svc.id, serviceName: svc.name, unitPrice, qty: it.qty };
     });
-    const total = Math.max(0, items.reduce((sum, it) => sum + it.unitPrice * it.qty, 0) - discount);
+    const total = items.reduce((sum, it) => sum + it.unitPrice * it.qty, 0) - discount;
     const payment = p.payment && p.payment.amount > 0 ? p.payment : null;
     if (payment) {
       assertCashRule(payment.method, payment.amount);
@@ -1219,10 +1619,24 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         byUserId: s.session?.userId ?? 'inconnu',
       }] : [],
     };
-    setState((cur) => ({ ...cur, washes: [wash, ...cur.washes], washCounter: counter }));
+    setState((cur0) => {
+      const cur = withFinanceDefaults(cur0);
+      const initial = wash.payments[0];
+      // Le paiement saisi à la création doit alimenter le même journal que les
+      // encaissements ultérieurs, sinon le théorique devient faux dès qu'un
+      // autre mouvement existe pour cette caisse. Les autres canaux restent
+      // hors caisse et aucune écriture n'est créée sans session ouverte.
+      const cash = initial
+        ? cashPaymentMovement(cur, wash.id, initial.id, initial.amount, initial.method, null, now)
+        : null;
+      return {
+        ...cur, washes: [wash, ...cur.washes], washCounter: counter,
+        cashMovements: cash ? [...cur.cashMovements, cash] : cur.cashMovements,
+      };
+    });
     notify('success', `Fiche ${wash.number} enregistrée — ${formatFCFA(total)}.`);
     return wash;
-  }, [assertActivated, assertCashRule, notify, adapter, serverWash, rpc]);
+  }, [assertActivated, assertCashRule, authPort.kind, identity?.userId, notify, serverWash, submitPendingWash]);
 
   const setWashStatus = useCallback((id: string, status: WashStatus, reason?: string): void | Promise<void> => {
     assertActivated();
@@ -1311,7 +1725,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   ): void | Promise<void> => {
     assertActivated();
     const clean = name.trim();
-    if (clean.length < 2 || capacity < 1) throw new ApiError('invalid_post', 'Nom ou capacité de poste invalide.');
+    if (clean.length < 2) throw new ApiError('invalid_post', 'Nom de poste invalide.');
+    validateQuantity(capacity);
+    if (stationId) assertSelectedStation(stationId);
     if (serverWash) {
       return rpc((c) => c.createPost(
         clean, capacity, stationId ?? stateRef.current.station?.id ?? null
@@ -1325,25 +1741,68 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       }],
     }));
     notify('success', `Poste « ${clean} » créé.`);
-  }, [assertActivated, adapter, serverWash, rpc, notify]);
+  }, [assertActivated, assertSelectedStation, adapter, serverWash, rpc, notify]);
 
   const addPayment = useCallback((washId: string, amount: number, method: PayMethod, idempotencyKey?: string): void | Promise<void> => {
     assertActivated();
     const s = stateRef.current;
     const wash = s.washes.find((w) => w.id === washId);
     if (!wash) throw new ApiError('not_found', 'Fiche introuvable.');
+    const amt = validateMoney(amount, true);
+    if (!Object.prototype.hasOwnProperty.call(PAY_METHOD_DB_KEY, method)) throw new ApiError('invalid_payment', 'Moyen de paiement invalide.');
+    const key = idempotencyKey ?? `pay-${uid('idem')}`;
+    if (serverWash) {
+      const commands = adapter.washCommands;
+      const userId = identity?.userId;
+      const stationId = s.station?.id;
+      if (!commands || !userId || !stationId || wash.stationId !== stationId) {
+        throw new ApiError('station_changed', 'Station ou session invalide.');
+      }
+      const lock = `${userId}:${stationId}:${washId}`;
+      if (paymentsInFlight.current.has(lock)) throw new ApiError('payment_in_flight', 'Un encaissement est déjà en cours.');
+      const previous = readPendingPayment(userId, stationId, washId);
+      if (previous && (previous.amount !== amt || previous.method !== method || previous.key !== key)) {
+        throw new ApiError('payment_pending', 'Vérifiez d’abord la tentative de paiement précédente avec son montant et sa clé d’origine.');
+      }
+      if (!previous) {
+        if (wash.status === 'cancelled') throw new ApiError('wash_cancelled', 'Cette fiche est annulée : aucun encaissement possible.');
+        if (amt > wash.total - wash.paid) throw new ApiError('overpayment', 'Le montant dépasse le reste à payer.');
+        assertCashRule(method, amt);
+      }
+      const pending: PendingPayment = previous ?? { version: 1, userId, stationId, washId, amount: amt, method, key };
+      if (!previous) savePendingPayment(pending); // avant tout envoi
+      paymentsInFlight.current.add(lock);
+      const epoch = scopeRef.current.epoch;
+      const current = () => scopeRef.current.epoch === epoch;
+      return (async () => {
+        let accepted = false;
+        try {
+          await commands.addPayment(washId, amt, method, key);
+          accepted = true;
+          // Tant que la nouvelle lecture n'est pas confirmée, conserver la clé :
+          // on peut alors vérifier à nouveau sans risquer un double paiement.
+          if (!current()) return;
+          try { await refreshWashes({ washId, key }); }
+          catch { throw new Error('Paiement confirmé, mais lecture impossible. Réessayez la vérification avec la même clé.'); }
+          if (!current()) return;
+          if (serverFinance) await refreshFinance().catch((error: unknown) => {
+            if (current()) notify('error', `Actualisation finance : ${error instanceof Error ? error.message : 'erreur'}`);
+          });
+          if (!current()) return;
+          clearPendingPayment(pending);
+        } catch (error) {
+          if (!accepted && !previous && error instanceof PaymentCommandError && error.outcome === 'rejected') {
+            clearPendingPayment(pending);
+          }
+          throw error;
+        } finally { paymentsInFlight.current.delete(lock); }
+      })();
+    }
     if (wash.status === 'cancelled') throw new ApiError('wash_cancelled', 'Cette fiche est annulée : aucun encaissement possible.');
-    const amt = Math.round(amount);
-    if (amt <= 0) throw new ApiError('invalid_amount', 'Le montant doit être supérieur à zéro.');
     if (amt > wash.total - wash.paid) throw new ApiError('overpayment', 'Le montant dépasse le reste à payer.');
     assertCashRule(method, amt);
-    const key = idempotencyKey ?? `pay-${uid('idem')}`;
-    // Idempotence locale : un double clic avec la même clé ne duplique JAMAIS
-    // le paiement ni son mouvement de caisse (miroir de `record_payment`).
+    // Idempotence locale : un double clic avec la même clé ne duplique pas le mouvement.
     if (s.washes.some((w) => w.payments?.some((p) => p.idempotencyKey === key))) return;
-    if (serverWash) {
-      return rpc((c) => c.addPayment(washId, amt, method, key));
-    }
     const now = new Date().toISOString();
     const paymentId = uid('pay');
     setState((cur0) => {
@@ -1373,18 +1832,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       };
     });
     notify('success', 'Encaissement enregistré.');
-  }, [assertActivated, assertCashRule, notify, adapter, serverWash, rpc]);
+  }, [assertActivated, assertCashRule, notify, adapter, serverWash, serverFinance, identity?.userId, refreshWashes, refreshFinance]);
 
   const openCash = useCallback((openingFloat: number): void | Promise<void> => {
     assertActivated();
+    validateMoney(openingFloat);
     const s = stateRef.current;
     if (s.cashSessions.some((c) => c.status === 'ouverte')) throw new ApiError('cash_open', 'Une caisse est déjà ouverte.');
     if (serverFinance) {
-      return financeRpc((c) => c.openCash(s.station!.id, Math.max(0, Math.round(openingFloat)))).then(() => {});
+      return financeRpc((c) => c.openCash(s.station!.id, openingFloat)).then(() => {});
     }
     const session: CashSession = {
       id: uid('cash'), stationId: s.station!.id, openedBy: s.session?.name ?? '—',
-      openedAt: new Date().toISOString(), openingFloat: Math.max(0, Math.round(openingFloat)),
+      openedAt: new Date().toISOString(), openingFloat: openingFloat,
       closedAt: null, countedAmount: null, closedBy: null, status: 'ouverte',
       reopenReason: null, reopenedAt: null,
     };
@@ -1398,7 +1858,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const s = stateRef.current;
     const open = s.cashSessions.find((c) => c.status === 'ouverte');
     if (!open) throw new ApiError('cash_closed', 'Aucune caisse ouverte.');
-    const value = Math.max(0, Math.round(counted));
+    const value = validateMoney(counted);
     if (serverFinance) return financeRpc((c) => c.closeCash(open.id, value));
     const at = new Date().toISOString();
     const theoretical = theoreticalCash(s, open.id);
@@ -1433,14 +1893,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const addExpense = useCallback((p: Omit<Expense, 'id' | 'stationId' | 'status' | 'cancelReason' | 'createdBy' | 'createdAt' | 'cashSessionId'>): void | Promise<void> => {
     assertActivated();
     const s = stateRef.current;
-    if (p.amount <= 0) throw new ApiError('invalid_amount', 'Le montant doit être supérieur à zéro.');
-    if (!p.reason.trim()) throw new ApiError('invalid_reason', 'Le motif est obligatoire.');
+    validateExpense(p);
     assertCashRule(p.method, p.amount);
     const key = p.idempotencyKey ?? `expense-${uid('idem')}`;
     if ((s.expenses ?? []).some((e) => e.idempotencyKey === key)) return;
     if (serverFinance) {
       return financeRpc((c) => c.addExpense({
-        stationId: s.station!.id, amount: Math.round(p.amount),
+        stationId: s.station!.id, amount: p.amount,
         category: p.category, reason: p.reason.trim(), supplier: p.supplier,
         date: p.date, method: p.method, idempotencyKey: key,
       })).then(() => {});
@@ -1452,7 +1911,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       ...p, id: expenseId, stationId: s.station!.id, status: 'enregistree',
       cancelReason: null, createdBy: s.session?.name ?? '—',
       createdAt: at, cashSessionId: open?.id ?? null,
-      amount: Math.round(p.amount), idempotencyKey: key,
+      amount: p.amount, idempotencyKey: key,
     };
     setState((cur0) => {
       const cur = withFinanceDefaults(cur0);
@@ -1501,10 +1960,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const reconcileChannel = useCallback((methodId: string, start: string, end: string, counted: number): void | Promise<void> => {
     assertActivated();
-    if (!start || !end || end < start || counted < 0) {
-      throw new ApiError('invalid_reconciliation', 'Période ou comptage invalide.');
-    }
-    const value = Math.round(counted);
+    validatePeriod(start, end);
+    validateMoney(counted);
+    const value = counted;
     if (serverFinance) return financeRpc((c) => c.reconcileChannel(methodId, start, end, value));
     const at = new Date().toISOString();
     reconcileChannelLocal(withFinanceDefaults(stateRef.current), methodId, start, end, value, at);
@@ -1514,15 +1972,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const createCommissionPeriod = useCallback((stationId: string, start: string, end: string): string | Promise<string> => {
     assertActivated();
-    if (!stationId || !start || !end || end < start) {
-      throw new ApiError('invalid_period', 'Période de commission invalide.');
-    }
+    assertSelectedStation(stationId);
+    validatePeriod(start, end);
     if (serverFinance) return financeRpc((c) => c.createCommissionPeriod(stationId, start, end));
     const result = createCommissionPeriodLocal(withFinanceDefaults(stateRef.current), stationId, start, end);
     setState(result.state);
     notify('success', 'Période de commission créée en brouillon.');
     return result.id;
-  }, [assertActivated, notify, serverFinance, financeRpc]);
+  }, [assertActivated, assertSelectedStation, notify, serverFinance, financeRpc]);
 
   const validateCommissionPeriod = useCallback((periodId: string): void | Promise<void> => {
     assertActivated();
@@ -1535,118 +1992,149 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const recordCommissionPayout = useCallback((periodId: string, userId: string, amount: number, reference: string): void | Promise<void> => {
     assertActivated();
-    if (amount < 0) throw new ApiError('invalid_amount', 'Montant de paie invalide.');
-    if (serverFinance) return financeRpc((c) => c.recordCommissionPayout(periodId, userId, Math.round(amount), reference));
+    validateMoney(amount);
+    if (serverFinance) return financeRpc((c) => c.recordCommissionPayout(periodId, userId, amount, reference));
     const at = new Date().toISOString();
-    recordCommissionPayoutLocal(withFinanceDefaults(stateRef.current), periodId, userId, Math.round(amount), reference, at);
-    setState((cur) => recordCommissionPayoutLocal(withFinanceDefaults(cur), periodId, userId, Math.round(amount), reference, at));
+    recordCommissionPayoutLocal(withFinanceDefaults(stateRef.current), periodId, userId, amount, reference, at);
+    setState((cur) => recordCommissionPayoutLocal(withFinanceDefaults(cur), periodId, userId, amount, reference, at));
     notify('success', 'Paie de commission enregistrée.');
   }, [assertActivated, notify, serverFinance, financeRpc]);
 
   // ── Prompt 07 : commandes stock, local pur ou RPC SECURITY DEFINER ──────────
+  // En configuration mixte ou si le port RPC manque, ne jamais présenter un
+  // repli navigateur comme une réception ou un inventaire enregistré.
+  const assertStockWriteMode = useCallback(() => {
+    if (!isLocalStockDemo && !serverStock) {
+      throw new ApiError('stock_server_unavailable', 'Stock serveur indisponible : aucune opération n’a été enregistrée.');
+    }
+  }, [isLocalStockDemo, serverStock]);
+
   const saveSupplier = useCallback((p: SupplierPayload): string | Promise<string> => {
     assertActivated();
+    assertStockWriteMode();
+    validateSupplier(p); assertSelectedStation(p.stationId);
     if (serverStock) return stockRpc((c) => c.saveSupplier(p));
     const result = saveSupplierLocal(withStockDefaults(stateRef.current), p);
     setState(result.state);
     notify('success', 'Fournisseur enregistré.');
     return result.id;
-  }, [assertActivated, serverStock, stockRpc, notify]);
+  }, [assertActivated, assertSelectedStation, assertStockWriteMode, serverStock, stockRpc, notify]);
 
   const saveProduct = useCallback((p: ProductPayload): string | Promise<string> => {
     assertActivated();
+    assertStockWriteMode();
+    validateProduct(p); assertSelectedStation(p.stationId);
     if (serverStock) return stockRpc((c) => c.saveProduct(p));
     const result = saveProductLocal(withStockDefaults(stateRef.current), p);
     setState(result.state);
     notify('success', 'Produit enregistré.');
     return result.id;
-  }, [assertActivated, serverStock, stockRpc, notify]);
+  }, [assertActivated, assertSelectedStation, assertStockWriteMode, serverStock, stockRpc, notify]);
 
   const createPurchaseOrder = useCallback((p: CreatePurchaseOrderPayload): string | Promise<string> => {
     assertActivated();
+    assertStockWriteMode();
+    validateOrder(p); assertSelectedStation(p.stationId);
     if (serverStock) return stockRpc((c) => c.createPurchaseOrder(p));
     const result = createPurchaseOrderLocal(withStockDefaults(stateRef.current), p);
     setState(result.state);
     notify('success', 'Commande créée sans incrémenter le stock.');
     return result.id;
-  }, [assertActivated, serverStock, stockRpc, notify]);
+  }, [assertActivated, assertSelectedStation, assertStockWriteMode, serverStock, stockRpc, notify]);
 
   const receivePurchaseLines = useCallback((p: ReceivePurchasePayload): void | Promise<void> => {
     assertActivated();
+    assertStockWriteMode();
+    validateReceipt(p);
     if (serverStock) return stockRpc((c) => c.receivePurchaseLines(p));
     setState(receivePurchaseLinesLocal(withStockDefaults(stateRef.current), p));
     notify('success', 'Réception valorisée enregistrée.');
-  }, [assertActivated, serverStock, stockRpc, notify]);
+  }, [assertActivated, assertStockWriteMode, serverStock, stockRpc, notify]);
 
   const startInventory = useCallback((stationId: string): string | Promise<string> => {
     assertActivated();
+    assertStockWriteMode();
+    assertSelectedStation(stationId);
     if (serverStock) return stockRpc((c) => c.startInventory(stationId));
     const result = startInventoryLocal(withStockDefaults(stateRef.current), stationId);
     setState(result.state);
     notify('success', 'Inventaire ouvert.');
     return result.id;
-  }, [assertActivated, serverStock, stockRpc, notify]);
+  }, [assertActivated, assertSelectedStation, assertStockWriteMode, serverStock, stockRpc, notify]);
 
   const recordInventoryCount = useCallback((p: InventoryCountPayload): void | Promise<void> => {
     assertActivated();
+    assertStockWriteMode();
+    validateInventory(p);
     if (serverStock) return stockRpc((c) => c.recordInventoryCount(p));
     setState(recordInventoryCountLocal(withStockDefaults(stateRef.current), p));
-  }, [assertActivated, serverStock, stockRpc]);
+  }, [assertActivated, assertStockWriteMode, serverStock, stockRpc]);
 
   const closeInventory = useCallback((sessionId: string): void | Promise<void> => {
     assertActivated();
+    assertStockWriteMode();
     if (serverStock) return stockRpc((c) => c.closeInventory(sessionId));
     setState(closeInventoryLocal(withStockDefaults(stateRef.current), sessionId));
     notify('success', 'Inventaire clôturé ; les écarts sont tracés.');
-  }, [assertActivated, serverStock, stockRpc, notify]);
+  }, [assertActivated, assertStockWriteMode, serverStock, stockRpc, notify]);
 
   const saveServiceConsumption = useCallback((p: ServiceConsumptionPayload): string | Promise<string> => {
     assertActivated();
+    assertStockWriteMode();
+    validateConsumption(p);
     if (serverStock) return stockRpc((c) => c.saveServiceConsumption(p));
     const result = saveServiceConsumptionLocal(withStockDefaults(stateRef.current), p);
     setState(result.state);
     notify('success', 'Norme de consommation enregistrée.');
     return result.id;
-  }, [assertActivated, serverStock, stockRpc, notify]);
+  }, [assertActivated, assertStockWriteMode, serverStock, stockRpc, notify]);
 
   const consumeWash = useCallback((washId: string): void | Promise<void> => {
     assertActivated();
+    assertStockWriteMode();
     if (serverStock) return stockRpc((c) => c.consumeWash(washId));
     setState(consumeWashLocal(withStockDefaults(stateRef.current), washId));
     notify('success', 'Consommation théorique valorisée.');
-  }, [assertActivated, serverStock, stockRpc, notify]);
+  }, [assertActivated, assertStockWriteMode, serverStock, stockRpc, notify]);
 
   const linkExpenseToOrder = useCallback((expenseId: string, orderId: string): void | Promise<void> => {
     assertActivated();
+    assertStockWriteMode();
     if (serverStock) {
-      // Le lien est conservé dans la projection locale : `my_finance_board()`
-      // n'expose pas encore cette colonne, mais la RPC serveur l'a écrite.
-      setState((cur) => ({
-        ...cur,
-        expenses: cur.expenses.map((e) => e.id === expenseId ? { ...e, purchaseOrderId: orderId } : e),
-      }));
+      // La projection de station contient purchaseOrderId. Ne rien modifier
+      // avant confirmation : un refus RPC ne doit pas simuler un rattachement.
       return stockRpc((c) => c.linkExpenseToOrder(expenseId, orderId));
     }
     setState(linkExpenseToOrderLocal(withStockDefaults(stateRef.current), expenseId, orderId));
     notify('success', 'Dépense rattachée : aucun double comptage.');
-  }, [assertActivated, serverStock, stockRpc, notify]);
+  }, [assertActivated, assertStockWriteMode, serverStock, stockRpc, notify]);
 
   const certifyCosts = useCallback((p: CostCertificationPayload): void | Promise<void> => {
     assertActivated();
+    assertStockWriteMode();
+    validateCertification(p);
     if (serverStock) return stockRpc((c) => c.certifyCosts(p));
     setState(certifyCostsLocal(withStockDefaults(stateRef.current), p));
     notify('success', 'Coûts certifiés : résultat net publié.');
-  }, [assertActivated, serverStock, stockRpc, notify]);
+  }, [assertActivated, assertStockWriteMode, serverStock, stockRpc, notify]);
 
   const updateStockThreshold = useCallback((productId: string, reorderLevel: number) => {
+    validateQuantity(reorderLevel, true);
+    if (!isLocalStockDemo) {
+      throw new ApiError('local_demo_only', 'La modification locale des seuils est réservée au mode démo local.');
+    }
     setState((cur) => updateProductThresholdLocal(cur, productId, reorderLevel));
-    notify('success', 'Seuil critique mis à jour.');
-  }, [notify]);
+    notify('success', 'Seuil critique mis à jour dans la démonstration locale.');
+  }, [isLocalStockDemo, notify]);
 
   const adjustProductStock = useCallback((productId: string, qtyOnHand: number) => {
+    validateQuantity(qtyOnHand, true);
+    if (!isLocalStockDemo) {
+      throw new ApiError('local_demo_only', 'La simulation de stock est réservée au mode démo local.');
+    }
     setState((cur) => adjustProductStockQtyLocal(cur, productId, qtyOnHand));
-    notify('info', 'Niveau de stock ajusté.');
-  }, [notify]);
+    notify('info', 'Simulation locale : niveau de stock ajusté dans ce navigateur.');
+  }, [isLocalStockDemo, notify]);
 
   // ── P09 : formules, limites, abonnements, suspension ─────────────────────
   const savePlan = useCallback(async (p: PlanPayload): Promise<string> => {
@@ -1722,15 +2210,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   // ── Abonnement / plateforme / activation ──────────────────────────────────
   const requestPlanChange = useCallback((planId: string) => {
-    const plan = getPlans().find((p) => p.id === planId);
-    if (!plan) return;
+    const plan = plans.find((p) => p.id === planId);
+    const current = stateRef.current;
+    if (!plan || !current.subscription || current.subscription.companyId !== current.company?.id) {
+      notify('error', 'Aucun abonnement local correspondant : aucune note n’a été enregistrée.');
+      return;
+    }
     setState((s) => {
-      if (!s.subscription) return s;
+      if (!s.subscription || s.subscription.companyId !== s.company?.id) return s;
       const next = { ...s, subscription: { ...s.subscription, pendingPlanId: planId } };
-      return { ...next, auditLogs: logAction(next, 'Demande de changement de formule', plan.name) };
+      return { ...next, auditLogs: logAction(next, 'Demande locale de changement de formule', plan.name) };
     });
-    notify('success', `Demande de passage à « ${plan.name} » enregistrée.`);
-  }, [notify]);
+    notify('success', `Note de passage à « ${plan.name} » enregistrée dans ce navigateur uniquement, sans envoi au serveur.`);
+  }, [notify, plans]);
 
   const toggleCompanySuspension = useCallback((companyId: string) => {
     setState((s) => {
@@ -1767,7 +2259,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     clearDemoPasswords();
     (authPort as LocalAuthAdapter).clearAll?.();
     try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignoré */ }
+    authGenerationRef.current += 1;
     authKeyRef.current = 'signed-out';
+    scopeRef.current = { epoch: scopeRef.current.epoch + 1, userId: null, companyId: null, stationId: null };
+    setAssignableUsers([]); setStationMetrics(null); setStationMetricsError(null);
+    setAuthReady(true);
     setState(emptyState());
     setIdentity(null);
     setInvitations([]);
@@ -1777,34 +2273,46 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     notify('info', 'Données locales de démonstration effacées.');
   }, [authPort, notify]);
 
+  const viewEpoch = scopeRef.current.epoch;
+  const scoped = <A extends unknown[], R>(fn: (...args: A) => R) => (...args: A): R => {
+    if (authPort.kind === 'supabase' && viewEpoch !== scopeRef.current.epoch) {
+      throw new ApiError('station_changed', 'La station ou la session a changé : vérifiez l’opération initiale avant de poursuivre.');
+    }
+    return fn(...args);
+  };
+
   const value: Ctx = {
-    state, toasts, notify, dismissToast, theme, toggleTheme, plans, dataSource, plansError,
+    state, toasts, notify: (kind, message) => { if (authPort.kind !== 'supabase' || viewEpoch === scopeRef.current.epoch) notify(kind, message); }, dismissToast, theme, toggleTheme, plans, dataSource, isLocalStockDemo, isServerStock: serverStock, plansError,
     onboarding, missing,
-    authReady, authError, authRecovery, authKind: authPort.kind, identity, invitations, clearAuthError,
+    authReady, authError, authRecovery, authKind: authPort.kind, identity, selectStation, invitations, clearAuthError,
+    assignableUsers: serverWash ? assignableUsers : state.users.filter((u) => u.active &&
+      (u.stationIds?.length ? u.stationIds.includes(state.station?.id ?? '') : !u.stationId || u.stationId === state.station?.id)),
+    stationMetrics, stationMetricsError, refreshStationMetrics,
     signUp, signIn, signOut, requestPasswordReset, updatePassword,
     inviteUser, revokeInvitation, updateUser, refreshUsers, refreshInvitations,
-    updateCompany, updateStation, setHours, addCategory, toggleCategory, removeCategory,
-    addService, updateService, setPrice, removeService,
-    updateEmployee, addClient, updateClient,
-    createWash, setWashStatus, addPayment, assignWash, recordQualityCheck, createWashPost,
+    updateCompany: scoped(updateCompany), updateStation: scoped(updateStation), setStationLogoPath: scoped(setStationLogoPath), setHours: scoped(setHours), addCategory: scoped(addCategory), toggleCategory: scoped(toggleCategory), removeCategory: scoped(removeCategory),
+    addService: scoped(addService), updateService: scoped(updateService), setPrice: scoped(setPrice), removeService: scoped(removeService),
+    updateEmployee: scoped(updateEmployee), addClient: scoped(addClient), updateClient: scoped(updateClient),
+    createWash: scoped(createWash), pendingWash, pendingWashError, retryPendingWash: scoped(retryPendingWash),
+    setWashStatus: scoped(setWashStatus), addPayment: scoped(addPayment), assignWash: scoped(assignWash), recordQualityCheck: scoped(recordQualityCheck), createWashPost: scoped(createWashPost),
     refreshWashes, vehicleHistory,
-    openCash, closeCash, reopenCash, addExpense, cancelExpense,
-    cancelPayment, reconcileChannel, createCommissionPeriod, validateCommissionPeriod,
-    recordCommissionPayout, refreshFinance,
-    refreshStock, saveSupplier, saveProduct, createPurchaseOrder, receivePurchaseLines,
-    startInventory, recordInventoryCount, closeInventory, saveServiceConsumption,
-    consumeWash, linkExpenseToOrder, certifyCosts,
-    updateStockThreshold, adjustProductStock,
-    refreshCrm, saveCustomerProfile, saveCustomerVehicle, createLoyaltyProgram,
-    enrollLoyaltyCustomer, recordLoyaltyTransaction, accrueLoyaltyForWash,
-    savePackagePlan, sellPackageToCustomer, consumePackageForWash,
-    savePromotion, applyPromotionToWash, saveFleet, saveFleetContract,
-    attachFleetVehicle, recordFleetReceivable, enqueueNotification,
-    cancelPendingNotification,
+    openCash: scoped(openCash), closeCash: scoped(closeCash), reopenCash: scoped(reopenCash), addExpense: scoped(addExpense), cancelExpense: scoped(cancelExpense),
+    cancelPayment: scoped(cancelPayment), reconcileChannel: scoped(reconcileChannel), createCommissionPeriod: scoped(createCommissionPeriod), validateCommissionPeriod: scoped(validateCommissionPeriod),
+    recordCommissionPayout: scoped(recordCommissionPayout), refreshFinance,
+    refreshStock, saveSupplier: scoped(saveSupplier), saveProduct: scoped(saveProduct), createPurchaseOrder: scoped(createPurchaseOrder), receivePurchaseLines: scoped(receivePurchaseLines),
+    startInventory: scoped(startInventory), recordInventoryCount: scoped(recordInventoryCount), closeInventory: scoped(closeInventory), saveServiceConsumption: scoped(saveServiceConsumption),
+    consumeWash: scoped(consumeWash), linkExpenseToOrder: scoped(linkExpenseToOrder), certifyCosts: scoped(certifyCosts),
+    updateStockThreshold: scoped(updateStockThreshold), adjustProductStock: scoped(adjustProductStock),
+    refreshCrm, saveCustomerProfile: scoped(saveCustomerProfile), saveCustomerVehicle: scoped(saveCustomerVehicle), createLoyaltyProgram: scoped(createLoyaltyProgram),
+    enrollLoyaltyCustomer: scoped(enrollLoyaltyCustomer), recordLoyaltyTransaction: scoped(recordLoyaltyTransaction), accrueLoyaltyForWash: scoped(accrueLoyaltyForWash),
+    savePackagePlan: scoped(savePackagePlan), sellPackageToCustomer: scoped(sellPackageToCustomer), consumePackageForWash: scoped(consumePackageForWash),
+    savePromotion: scoped(savePromotion), applyPromotionToWash: scoped(applyPromotionToWash), saveFleet: scoped(saveFleet), saveFleetContract: scoped(saveFleetContract),
+    attachFleetVehicle: scoped(attachFleetVehicle), recordFleetReceivable: scoped(recordFleetReceivable), enqueueNotification: scoped(enqueueNotification),
+    cancelPendingNotification: scoped(cancelPendingNotification),
     analyticsBoard, subscriptionUsage, platformBoard, analyticsError, platformError,
     refreshAnalytics, refreshSubscriptionUsage, refreshUsageCounters, refreshPlatform,
     savePlan, setPlanLimit, setCompanySubscription, setCompanySuspended,
-    requestPlanChange, toggleCompanySuspension, activateStation, resetAll,
+    requestPlanChange, toggleCompanySuspension, activateStation: scoped(activateStation), resetAll,
   };
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
