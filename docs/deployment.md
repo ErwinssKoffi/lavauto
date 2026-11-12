@@ -49,7 +49,7 @@ npx playwright install --with-deps chromium
 npm run test:e2e
 ```
 
-Le workflow de déploiement est séparé et protégé par les secrets ; aucun secret n’est versionné. Le preview Vercel de la PR #3 a été généré automatiquement et son check est **pass** ; la mise en production reste conditionnée aux secrets `VERCEL_*` et au domaine Auth réel.
+Le workflow de déploiement est séparé et protégé par les secrets ; aucun secret n’est versionné. Sur la **PR #3**, les checks `quality`, `Vercel` et `Vercel Preview Comments` sont **pass** : typecheck, lint, `check` ×2, Vitest, build, installation Chromium et 15 specs Playwright ont été rejoués en CI. Le preview Vercel a été généré automatiquement ; la mise en production reste conditionnée aux secrets `VERCEL_*` et au domaine Auth réel.
 
 ## 5. Sauvegardes et rollback
 
