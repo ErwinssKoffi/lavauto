@@ -23,7 +23,7 @@ async function open(page: Page, route: string, state: Record<string, unknown> | 
 test('01 — Vitrine publique et CTA', async ({ page }) => {
   await open(page, '/', null);
   await expect(page.getByText('Boilerplate Code for Your Next.js Project with Tailwind CSS').first()).toBeVisible();
-  await expect(page.getByRole('link', { name: /connexion/i }).first()).toBeVisible();
+  await expect(page.getByRole('link', { name: /se connecter|connexion/i }).first()).toBeVisible();
 });
 
 test('02 — Connexion', async ({ page }) => {

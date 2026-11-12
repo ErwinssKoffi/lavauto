@@ -12,7 +12,7 @@
 | Contrôles mode serveur | `WG_DATA_SOURCE=supabase npm run check` | **239 OK / 0 KO**. |
 | Règles pures | `npm run test:unit` | **16 tests Vitest**. |
 | Build | `npm run build` | Vite, lazy loading, CSS, bundle. |
-| E2E navigateur | `npm run test:e2e` | 15 specs Playwright / Chromium. |
+| E2E navigateur | `npm run test:e2e` | **15 / 15** specs Playwright / Chromium. |
 | Liste E2E | `npm run test:e2e:list` | Découverte des 15 specs sans navigateur. |
 | SQL distant | `supabase/tests/p10_rollback.sql` | 30 contrôles `BEGIN … ROLLBACK`, 0 fixture. |
 
@@ -45,16 +45,17 @@ La base étant vide en dehors des transactions annulées, les temps sont sub-mil
 
 `e2e/erp.spec.ts` contient **15 parcours** : vitrine, connexion, inscription, tableau de bord, mise en route, lavages, prestations, clients, employés, caisse, dépenses, rapports, consolidation, qualité, back-office super admin. L’état est injecté par `page.addInitScript` avec `VITE_WG_TEST_AUTH=1`, sans compte Auth ni réseau Supabase.
 
-Le sandbox Arena ne permet pas `npx playwright install chromium` (`cdn.playwright.dev` bloqué par l’allow-list). Les 15 specs sont donc listées et validées statiquement, et les 15 parcours équivalents sont rejoués en JSDOM ; aucun navigateur réel n’est annoncé vert depuis le sandbox. En conséquence :
+Le téléchargement officiel `npx playwright install chromium` reste bloqué dans le sandbox Arena (`cdn.playwright.dev` hors allow-list). Un binaire Chromium headless empaqueté, récupéré depuis `registry.npmjs.org` et **non versionné**, a toutefois permis d’exécuter réellement les 15 specs via `PLAYWRIGHT_CHROMIUM_PATH` : **15 passed (13,7 s)**. Le binaire de secours est utilisé uniquement pour la recette locale ; la CI utilise l’installation officielle.
 
 - `npm run test:e2e:list` valide la découverte des 15 specs ;
-- `npm run check` rejoue les 15 parcours en JSDOM ;
-- `.github/workflows/ci.yml` installe Chromium et exécute réellement `npm run test:e2e`.
+- `npm run test:e2e` exécute les 15 specs dans un vrai Chromium ;
+- `npm run check` rejoue les 15 parcours équivalents en JSDOM ;
+- `.github/workflows/ci.yml` installe Chromium et exécute `npm run test:e2e`.
 
 ## 5. Non-régression
 
 Aucun test ne crée de compte Auth persistant, d’e-mail, de secret, de clé API, de bucket public, de fournisseur d’envoi ou de fixture métier. Aucun `npm audit fix --force`, aucun navigateur réel exécuté dans le sandbox, aucun déploiement Vercel effectif. Les migrations `001`–`044` ne sont jamais réappliquées.
 
-Vérifications finales : `npm run typecheck` 0 erreur ; `npm run lint` 25/25 ; `npm run check` 238 OK / 0 KO · local ; `WG_DATA_SOURCE=supabase npm run check` 239 OK / 0 KO · supabase ; `npm run test:unit` 16/16 ; `npm run test:e2e:list` 15 specs ; `npm run build` 509 modules avec 7 chunks paresseux et `index-D-EI3sxK.js` 1 179,85 kB / gzip 314,10 kB (avertissement > 500 kB sur le bundle Recharts) ; `git diff --check` propre ; preview `0.0.0.0:5173` : `/` et `/app/qualite` 200, hôte `.e2b.app` 200, `evil.example.com` 403.
+Vérifications finales : `npm run typecheck` 0 erreur ; `npm run lint` 25/25 ; `npm run check` 238 OK / 0 KO · local ; `WG_DATA_SOURCE=supabase npm run check` 239 OK / 0 KO · supabase ; `npm run test:unit` 16/16 ; `npm run test:e2e:list` 15 specs ; `npm run test:e2e` **15 / 15** ; `npm run build` 509 modules avec 7 chunks paresseux et `index-D-EI3sxK.js` 1 179,85 kB / gzip 314,10 kB (avertissement > 500 kB sur le bundle Recharts) ; `git diff --check` propre ; preview `0.0.0.0:5173` : `/` et `/app/qualite` 200, hôte `.e2b.app` 200, `evil.example.com` 403.
 
 Voir [security.md](security.md) et [deployment.md](deployment.md).

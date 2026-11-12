@@ -1,6 +1,6 @@
 # LAVAUTO — Déploiement
 
-**Date :** 12/11/2026 · **Statut :** configuration P10 prête ; aucun déploiement Vercel effectif depuis le sandbox Arena (hôte non autorisé par l’allow-list réseau).
+**Date :** 12/11/2026 · **Statut :** configuration P10 prête ; aucun déploiement manuel depuis le sandbox Arena, mais le preview Vercel automatique de la PR #3 est **pass**.
 
 ## 1. Environnements
 
@@ -49,7 +49,7 @@ npx playwright install --with-deps chromium
 npm run test:e2e
 ```
 
-Le workflow de déploiement est séparé et protégé par les secrets ; aucun secret n’est versionné.
+Le workflow de déploiement est séparé et protégé par les secrets ; aucun secret n’est versionné. Le preview Vercel de la PR #3 a été généré automatiquement et son check est **pass** ; la mise en production reste conditionnée aux secrets `VERCEL_*` et au domaine Auth réel.
 
 ## 5. Sauvegardes et rollback
 

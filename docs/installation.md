@@ -51,7 +51,7 @@ npm run test:e2e:list
 npm run test:e2e       # nécessite Chromium installé
 ```
 
-`npm run test:e2e` télécharge le navigateur via `npx playwright install --with-deps chromium`. Ce téléchargement est exécuté par la CI GitHub Actions ; le sandbox Arena ne peut pas joindre `cdn.playwright.dev`, donc les specs y sont seulement **listées** et les 15 parcours équivalents sont rejoués en JSDOM par `npm run check`.
+`npm run test:e2e` exécute les 15 specs Playwright. La CI GitHub Actions installe Chromium via `npx playwright install --with-deps chromium`. Le sandbox Arena ne peut pas joindre `cdn.playwright.dev`, mais un binaire Chromium headless empaqueté récupéré depuis npm a permis la recette locale **15 / 15** via `PLAYWRIGHT_CHROMIUM_PATH` ; ce binaire n’est pas ajouté au dépôt. `npm run check` rejoue également les 15 parcours équivalents en JSDOM.
 
 ## 5. Dépannage
 

@@ -21,6 +21,20 @@ export default defineConfig({
     headless: true,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+    // Secours local : permet d'utiliser un binaire Chromium fourni par
+    // l'environnement quand le telechargement Playwright est bloque.
+    launchOptions: process.env.PLAYWRIGHT_CHROMIUM_PATH ? {
+      executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH,
+      args: [
+        '--no-sandbox', '--disable-dev-shm-usage', '--disable-setuid-sandbox',
+        '--disable-site-isolation-trials', '--disable-web-security',
+        '--allow-running-insecure-content',
+        '--disable-features=AudioServiceOutOfProcess,IsolateOrigins,site-per-process',
+        '--enable-features=SharedArrayBuffer', '--ignore-gpu-blocklist',
+        '--in-process-gpu', '--use-gl=angle', '--use-angle=swiftshader',
+        '--enable-unsafe-swiftshader',
+      ],
+    } : undefined,
   },
   projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
   webServer: {

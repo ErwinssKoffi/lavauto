@@ -2189,7 +2189,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     return pkgText.includes('"test:unit"') && pkgText.includes('"test:e2e"') &&
       pkgText.includes('"test:e2e:list"') &&
       playwright.includes('VITE_DATA_SOURCE=local') && playwright.includes('VITE_WG_TEST_AUTH=1') &&
-      playwright.includes('chromium') &&
+      playwright.includes('PLAYWRIGHT_CHROMIUM_PATH') && playwright.includes('chromium') &&
       vitest.includes("tests/unit/**/*.test.ts");
   })());
 

@@ -54,6 +54,6 @@ CI/CD
 
 ## 5. Limites conservées
 
-Aucun compte Auth persistant, e-mail, secret, clé API, bucket public, fournisseur d’envoi, navigateur réel exécuté dans le sandbox ni déploiement Vercel effectif. `npm audit fix --force` reste reporté. Les grants Storage historiques de `supabase_storage_admin` ne sont pas révoquables depuis le rôle de migration : la garde `050` est donc une RLS restrictive qui filtre 100 % des lignes pour `anon`. Le module « Prévisions & alertes » n’est pas livré : le libellé historique a été remplacé par l’écran réel « Qualité & déploiement ».
+Aucun compte Auth persistant, e-mail, secret, clé API, bucket public, fournisseur d’envoi ni déploiement Vercel manuel depuis le sandbox. Les 15 specs Playwright ont néanmoins été exécutées dans un Chromium headless empaqueté récupéré depuis npm, sans versionner le binaire ; le preview Vercel de la PR #3 est passé. `npm audit fix --force` reste reporté. Les grants Storage historiques de `supabase_storage_admin` ne sont pas révoquables depuis le rôle de migration : la garde `050` est donc une RLS restrictive qui filtre 100 % des lignes pour `anon`. Le module « Prévisions & alertes » n’est pas livré : le libellé historique a été remplacé par l’écran réel « Qualité & déploiement ».
 
 Voir [database.md](database.md), [security.md](security.md) et [deployment.md](deployment.md).
