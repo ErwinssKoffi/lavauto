@@ -2160,6 +2160,10 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     return ci.includes('playwright install --with-deps chromium') &&
       ci.includes('npm run test:unit') && ci.includes('npm run check') &&
       deploy.includes('VERCEL_TOKEN') && !deploy.includes('vercel-token:') &&
+      deploy.includes('VITE_DATA_SOURCE: supabase') &&
+      deploy.includes('VITE_SUPABASE_URL') && deploy.includes('VITE_SUPABASE_ANON_KEY') &&
+      deploy.includes("VITE_WG_TEST_AUTH: ''") &&
+      deploy.includes('repository_dispatch') && !deploy.includes('run: echo "Déploiement ignoré :') &&
       vercel.includes('"rewrites"') && vercel.includes('X-Frame-Options');
   })());
 

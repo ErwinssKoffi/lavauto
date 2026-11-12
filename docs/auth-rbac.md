@@ -19,12 +19,12 @@
 
 ## 2. Configuration Supabase Auth
 
-`get_auth_config` a été relu après l'unique `update_auth_config` du Prompt 04 :
+`get_auth_config` a été relu après le Prompt 04, puis `update_auth_config` a été rappelé le 12/11/2026 pour basculer `site_url` et l'allow-list sur le domaine de production Vercel, sans créer de compte ni modifier SMTP / fournisseurs / hooks :
 
 | Champ | Valeur distante |
 | --- | --- |
-| `site_url` | `https://5173-in4mdo7zgflqt72vpkywe.e2b.app` |
-| `uri_allow_list` | `http://localhost:5173/**`, `http://127.0.0.1:5173/**`, `https://5173-in4mdo7zgflqt72vpkywe.e2b.app/**` |
+| `site_url` | `https://lavauto-five.vercel.app` |
+| `uri_allow_list` | `http://localhost:5173/**`, `http://127.0.0.1:5173/**`, `https://5173-in4mdo7zgflqt72vpkywe.e2b.app/**`, `https://lavauto-five.vercel.app/**`, `https://lavauto-git-arena-868cde36-lavauto-durandobi634-8314s-projects.vercel.app/**` |
 | `jwt_exp` | `3600` (1 heure) |
 | `disable_signup` | `false` |
 | `external_email_enabled` / `external_phone_enabled` | `true` / `false` |
@@ -33,7 +33,7 @@
 | `security_refresh_token_reuse_interval` | `10` |
 | SMTP personnalisé / hook e-mail | **non configurés** ; aucun e-mail n'a été envoyé |
 
-La réponse du premier `update_auth_config` avait normalisé en `null` plusieurs champs non transmis ; la relecture confirme les valeurs par défaut restaurées (`rate_limit_email_sent=2`, `security_captcha_provider=hcaptcha`, `sms_provider=twilio`, `sessions_inactivity_timeout=0`). **Aucun nouvel update n'a été effectué.**
+Le premier `update_auth_config` du Prompt 04 avait normalisé en `null` plusieurs champs non transmis ; la relecture avait confirmé les valeurs par défaut restaurées. Le second update du 12/11/2026 ne change que `site_url` et `uri_allow_list` : sa réponse affiche temporairement `null` sur les champs non transmis, mais la relecture `get_auth_config` (`a199c5a2-883c-4336-9bbf-0a8bff881994`) confirme les valeurs effectives restaurées (`rate_limit_email_sent=2`, `security_captcha_provider=hcaptcha`, `sms_provider=twilio`, `sessions_inactivity_timeout=0`, `sessions_timebox=0`, `refresh_token_rotation_enabled=true`). `mailer_autoconfirm=false`, JWT 3 600 s, e-mail activé et téléphone désactivé sont conservés. Les origines CORS du projet restent à renseigner dans le tableau de bord Supabase (voir [`deployment.md`](deployment.md)).
 
 ---
 

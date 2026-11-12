@@ -7,8 +7,8 @@
 - Supabase Auth avec confirmation e-mail obligatoire (`mailer_autoconfirm=false`), reset réel et invitations.
 - `onAuthStateChange` est la seule entrée ; `auth.getUser()` valide le JWT et `my_context()` relit les permissions côté serveur.
 - `load()` / `persist()` n’écrivent jamais `state.session` dans `localStorage`.
-- Configuration distante constatée : `site_url=https://5173-in4mdo7zgflqt72vpkywe.e2b.app`, allow-list `http://localhost:5173/**`, `http://127.0.0.1:5173/**`, `https://5173-in4mdo7zgflqt72vpkywe.e2b.app/**`, JWT 3 600 s, aucun SMTP, aucun fournisseur OAuth, aucun hook e-mail/SMS.
-- En production, remplacer `site_url` et l’allow-list par le domaine Vercel réel ; ne jamais activer `mailer_autoconfirm`.
+- Configuration distante de production : `site_url=https://lavauto-five.vercel.app`, allow-list `http://localhost:5173/**`, `http://127.0.0.1:5173/**`, `https://5173-in4mdo7zgflqt72vpkywe.e2b.app/**`, `https://lavauto-five.vercel.app/**` et le preview Vercel de la PR #3, JWT 3 600 s, aucun SMTP, aucun fournisseur OAuth, aucun hook e-mail/SMS. Les origines CORS du projet restent à renseigner dans le tableau de bord Supabase (voir [`deployment.md`](deployment.md)).
+- Ne jamais activer `mailer_autoconfirm` ; ne jamais exposer de clé `service_role` dans une variable `VITE_*`.
 
 ## 2. Autorisation et RLS
 
