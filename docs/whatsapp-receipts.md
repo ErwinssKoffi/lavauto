@@ -1,6 +1,6 @@
 # Reçu client et avis WhatsApp « lavage prêt »
 
-**État de cette branche, 12/11/2026 :** le reçu, la migration `053_whatsapp_wash_notifications.sql` et les deux fonctions Meta sont implémentés et testés localement. `053`, les fonctions, leurs secrets, le webhook, l’ordonnanceur et le frontend de cette branche **ne sont pas déployés**. Aucun message réel n’a été envoyé. Le compte et l’expéditeur sont indiqués comme approuvés par l’utilisateur ; l’approbation d’un modèle précis n’a pas été vérifiée. Sur `lavauto`, seules les migrations `051` puis `052` ont été autorisées et appliquées : **ne pas les rejouer et ne pas appliquer `053` sans autorisation distincte**.
+**État de cette branche, 12/11/2026 :** le reçu, la migration `053_whatsapp_wash_notifications.sql` et les deux fonctions Meta sont implémentés et testés localement. `053`, les fonctions, leurs secrets, le webhook et l’ordonnanceur **ne sont pas déployés** ; le frontend n’est pas déployé en production, même si un aperçu Vercel est créé automatiquement pour la PR. Aucun message réel n’a été envoyé. Le compte et l’expéditeur sont indiqués comme approuvés par l’utilisateur ; l’approbation d’un modèle précis n’a pas été vérifiée. Sur `lavauto`, seules les migrations `051` puis `052` ont été autorisées et appliquées : **ne pas les rejouer et ne pas appliquer `053` sans autorisation distincte**.
 
 ## Reçu
 

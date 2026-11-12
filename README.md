@@ -73,7 +73,7 @@ L’état distant historique P10 comptait **49 migrations** (`001` → `050`, co
 
 ### Migrations et logo privé de la station
 
-Le dépôt contient **54 migrations locales numérotées** (`001`–`055`, sans `048`). Avec l’accord de l’utilisateur, `051_station_logo.sql` et `052_atomic_wash_creation.sql` ont été appliquées sur `lavauto` via le connecteur, sous les versions `20261112130423` et `20261112130520`. Ne pas les réappliquer sur ce projet. `053` (WhatsApp), `054` (stations et métriques) et `055` (validation et finance) restent **locales**, sans autorisation ni application distante. Aucun frontend de cette branche n’a été déployé ; une recette sur un environnement autorisé reste nécessaire.
+Le dépôt contient **54 migrations locales numérotées** (`001`–`055`, sans `048`). Avec l’accord de l’utilisateur, `051_station_logo.sql` et `052_atomic_wash_creation.sql` ont été appliquées sur `lavauto` via le connecteur, sous les versions `20261112130423` et `20261112130520`. Ne pas les réappliquer sur ce projet. `053` (WhatsApp), `054` (stations et métriques) et `055` (validation et finance) restent **locales**, sans autorisation ni application distante. Le frontend de cette branche n’a pas été déployé en production ; un aperçu Vercel est créé automatiquement pour la PR et ne remplace pas une recette autorisée.
 
 La CLI locale est installée et initialisée (`supabase/config.toml`), mais elle n’est ni authentifiée ni liée au projet. Les migrations et le seed sont désactivés dans cette configuration locale par précaution : les versions locales et distantes divergent. Ne pas lancer `supabase db push`, `migration repair` ou `db reset` aveuglément, même avec ce garde-fou. Voir [docs/deployment.md](docs/deployment.md) et [docs/testing.md](docs/testing.md).
 

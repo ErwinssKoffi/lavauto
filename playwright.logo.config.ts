@@ -8,7 +8,9 @@ export default defineConfig({
   workers: 1,
   forbidOnly: Boolean(process.env.CI),
   timeout: 30_000,
-  reporter: [['list']],
+  // Les échecs restent lisibles dans les annotations GitHub même lorsque les
+  // journaux d'exécution ne peuvent pas être téléchargés depuis le sandbox.
+  reporter: process.env.GITHUB_ACTIONS ? [['list'], ['github']] : [['list']],
   use: {
     baseURL: 'http://127.0.0.1:4174',
     browserName: 'chromium',

@@ -1,6 +1,6 @@
 # LAVAUTO — Architecture
 
-**Date :** 12/11/2026 · P10 historique : **49 migrations / 70 tables / 2 vues / 19 URL `/app`**. Depuis, `051` (logo) et `052` (création atomique) ont été appliquées sur `lavauto` via le connecteur : 51 migrations enregistrées et 71 tables sous RLS vérifiées à distance. Le reçu, `053`–`055` et les fonctions Meta ne sont que locaux ; aucun déploiement du frontend ou envoi réel n’a eu lieu. La recette Auth/Storage et métier réelle reste à faire.
+**Date :** 12/11/2026 · P10 historique : **49 migrations / 70 tables / 2 vues / 19 URL `/app`**. Depuis, `051` (logo) et `052` (création atomique) ont été appliquées sur `lavauto` via le connecteur : 51 migrations enregistrées et 71 tables sous RLS vérifiées à distance. Le reçu, `053`–`055` et les fonctions Meta ne sont pas déployés en production ; un aperçu Vercel est créé automatiquement pour la PR, sans envoi réel. La recette Auth/Storage et métier réelle reste à faire.
 
 ## 1. Vue d’ensemble
 

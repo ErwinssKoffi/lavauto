@@ -1,6 +1,6 @@
 # LAVAUTO — Tests
 
-**Date :** 12/11/2026 · Branche `arena/ae12061a-lavauto`. Les migrations `051_station_logo.sql` puis `052_atomic_wash_creation.sql` ont été appliquées sur le projet Supabase `lavauto` via le connecteur et contrôlées structurellement. La recette métier avec Auth et Storage réels n’a pas été effectuée ; le frontend de cette branche n’a pas été déployé. Les migrations `053`–`055`, le dispatch, le webhook et l’ordonnanceur WhatsApp restent locaux ; aucun message réel n’a été envoyé.
+**Date :** 12/11/2026 · Branche `arena/ae12061a-lavauto`. Les migrations `051_station_logo.sql` puis `052_atomic_wash_creation.sql` ont été appliquées sur le projet Supabase `lavauto` via le connecteur et contrôlées structurellement. La recette métier avec Auth et Storage réels n’a pas été effectuée ; le frontend de cette branche n’a pas été déployé en production. Un aperçu Vercel est créé automatiquement pour la PR ; il ne constitue pas une recette. Les migrations `053`–`055`, le dispatch, le webhook et l’ordonnanceur WhatsApp restent locaux ; aucun message réel n’a été envoyé.
 
 ## Application et contrôles distants du 12/11/2026
 
@@ -14,7 +14,7 @@ L’utilisateur a confirmé la cible `lavauto` (`cgxrqorwmmcyqescatzs`) et décl
 - **Logo :** colonne, contrainte, trigger, projection de `my_context()` et trois policies restrictives présents ; `save_station_logo` exécutable par `authenticated`, pas par `anon`. Le bucket `station-assets` est privé, limité à 5 Mio et aux formats PNG/JPEG/WebP.
 - **Création :** `wash_creation_requests` existe, est sous RLS et possède une contrainte unique `(company_id, idempotency_key)` ; `anon` et `authenticated` n’ont aucun des sept privilèges de table vérifiés. `create_wash_atomic` et `record_wash_payment_by_key` sont exécutables par `authenticated`, pas par `anon` ; `ensure_payment_method` ne l’est par aucun de ces deux rôles. Les prérequis de fonctions et la contrainte d’unicité des moyens sont présents. La projection SQL distingue `wave`, `orange_money` et `mtn_momo` ; les définitions distantes des boards l’utilisent et les commandes de paiement et de dépense appellent le helper de moyen.
 - La base présente **71 tables publiques, toutes avec RLS activée**, et deux vues ; les services DB, Auth, Storage et REST sont déclarés sains. Une lecture partielle a compté zéro utilisateur Auth, entreprise, station, lavage, paiement, réservation de création et objet `station-assets` : cela ne démontre pas que toute la base est vide.
-- Ces vérifications sont des lectures de catalogue, de privilèges et de projections SQL, **pas** une recette avec Auth, Storage et opérations métier réels. Aucun compte de test, e-mail ou fixture distante n’a été créé pendant cette application. La CLI a été installée et initialisée localement, mais ni authentifiée ni liée ; aucun frontend de cette branche n’a été déployé.
+- Ces vérifications sont des lectures de catalogue, de privilèges et de projections SQL, **pas** une recette avec Auth, Storage et opérations métier réels. Aucun compte de test, e-mail ou fixture distante n’a été créé pendant cette application. La CLI a été installée et initialisée localement, mais ni authentifiée ni liée ; aucun frontend de cette branche n’a alors été déployé.
 
 ## 1. Vérifications locales de la branche
 
@@ -29,7 +29,7 @@ L’utilisateur a confirmé la cible `lavauto` (`cgxrqorwmmcyqescatzs`) et décl
 | SQL concurrent | `npm run test:postgres:concurrency` avec PostgreSQL 17.11 temporaire vierge | 30 / 30 contrôles atomiques, 51 / 51 WhatsApp, 49 / 49 station et finance ; douze courses. La vérification antérieure sur PostgreSQL 18.6 concernait seulement les migrations jusqu’à `053`. |
 | Build | `npm run build` | Réussi ; avertissement Vite sur un chunk > 500 kB. |
 | Playwright local | `npm run test:e2e` | 22 / 22 dans Chromium, dont reçu et PDF. |
-| Playwright connecté simulé | `npx playwright test -c playwright.logo.config.ts` (par groupes) | Les 22 scénarios passent par groupes après adaptation des fixtures station ; exécution intégrale et CI à confirmer. Toutes les requêtes Supabase sont interceptées. |
+| Playwright connecté simulé | `npm run test:e2e:connected` | 22 / 22 après adaptation des fixtures station ; toutes les requêtes Supabase sont interceptées. |
 
 Les anciens échecs de `check` provenaient de contrôles réclamant encore une ancienne vitrine ixartz et des témoignages, ainsi que d’attentes de tarifs devenues obsolètes. Ils ont été remplacés par des assertions sur **la vitrine actuelle** : navigation réelle, données fictives identifiées, absence de témoignages inventés, plans serveur distincts des plans locaux et absence de repli sur erreur. Les deux contrôles P07 concernant l’ajout de produits fictifs passent aussi après correction du comportement. Les contrôles n’ont pas simplement été désactivés. Une assertion Playwright réclamant l’ancien libellé du CTA a également été mise à jour et teste désormais sa destination et son clic.
 
