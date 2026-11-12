@@ -103,8 +103,20 @@ const buildWith = (stdin, define=DEFINE) => esbuild.build({ stdin, bundle:true, 
 const build = (stdin) => buildWith(stdin);
 
 let pass = 0, fail = 0;
-const check = (name, cond, detail='') => { if(cond){pass++; console.log('  \u2713 '+name);} else {fail++; console.log('  \u2717 '+name+(detail?' \u2192 '+detail:''));} };
+const githubError = (message) => {
+  if (process.env.GITHUB_ACTIONS !== 'true') return;
+  const escaped = String(message).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+  console.log(`::error file=scripts/check.cjs,title=Contrôle fonctionnel::${escaped}`);
+};
+const check = (name, cond, detail='') => {
+  if (cond) { pass++; console.log('  \u2713 '+name); }
+  else { fail++; const message = name+(detail?' \u2192 '+detail:''); console.log('  \u2717 '+message); githubError(message); }
+};
 const wait = (ms=200) => new Promise(r=>setTimeout(r,ms));
+const waitUntil = async (predicate, timeout=5000) => {
+  const deadline = Date.now() + timeout;
+  while (!predicate() && Date.now() < deadline) await wait(25);
+};
 
 function makeDom(url, state) {
   const dom = new JSDOM('<!doctype html><html lang="fr" class="dark"><head></head><body><div id="root"></div></body></html>',
@@ -319,6 +331,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     if (variant==='support') fixture = {...base(), session:{...base().session, role:'super_admin', name:'Super admin SaaS', companyId:null, stationId:null}};
     const { dom, w } = makeDom(route, fixture);
     const errs = await mount(acode, w);
+    await waitUntil(() => w.document.body.textContent.includes(expected));
     const t = w.document.body.textContent.replace(/\s+/g,' ');
     check(route.padEnd(24), t.includes(expected) && errs.length===0, 'err='+errs.length+' '+(errs[0]||'').slice(0,160));
     dom.window.close();
@@ -756,6 +769,11 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
   {
     const { dom, w } = makeDom('/', { ...base(), session: null });
     const errs = await mount(acode, w);
+    // Attendre les tarifs et la navigation plutôt qu'un délai fixe : un runner
+    // chargé peut rendre la vitrine après les 220 ms de mount().
+    const expectedPrice = MODE === 'supabase' ? '16 000 FCFA' : '15 000 FCFA';
+    await waitUntil(() => (w.document.querySelector('#tarifs')?.textContent ?? '').includes(expectedPrice) &&
+      Boolean(w.document.querySelector('a[href="/inscription"]')) && Boolean(w.document.querySelector('a[href="/connexion"]')));
     const pricing = w.document.querySelector('#tarifs');
     const text = (pricing?.textContent ?? '').replace(/\s+/g, ' ');
     const anchors = [...w.document.querySelectorAll('a[href^="#"]')];
@@ -782,6 +800,10 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     });
     const { dom, w } = makeDom('/', { ...base(), session: null });
     await mount(acode, w);
+    await waitUntil(() => {
+      const text = w.document.querySelector('#tarifs')?.textContent ?? '';
+      return text.includes('Formules et tarifs indisponibles') || text.includes('Aucun prix local');
+    });
     const text = (w.document.querySelector('#tarifs')?.textContent ?? '').replace(/\s+/g, ' ');
     check('base indisponible : aucun prix local présenté comme tarif de la base',
       !text.includes('16 000 FCFA') && !text.includes('15 000 FCFA') &&
@@ -2125,6 +2147,8 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
   {
     const { dom, w } = makeDom('/app/tableau-de-bord', base());
     const errs = await mount(acode, w);
+    await waitUntil(() => w.document.body.textContent.includes('Tendance du mois') &&
+      Boolean(w.document.querySelector('a[href="/app/consolidation"]')));
     const t = w.document.body.textContent.replace(/\s+/g, ' ');
     check('DOM P09 : dashboard station, graphique et lien de consolidation',
       t.includes('Tendance du mois') && Boolean(w.document.querySelector('a[href="/app/consolidation"]')) &&
@@ -2136,6 +2160,8 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
   {
     const { dom, w } = makeDom('/app/consolidation', base());
     const errs = await mount(acode, w);
+    await waitUntil(() => w.document.body.textContent.includes('Comparaison des périodes') &&
+      w.document.querySelectorAll('svg').length >= 1);
     const t = w.document.body.textContent.replace(/\s+/g, ' ');
     check('DOM P09 : consolidation, comparaison et graphiques Recharts',
       t.includes('Consolidation multi-stations') && t.includes('Comparaison des périodes') &&
@@ -2148,6 +2174,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     const supportState = { ...base(), session: { ...base().session, role: 'super_admin', name: 'Super admin SaaS', companyId: null, stationId: null } };
     const { dom, w } = makeDom('/app/plateforme', supportState);
     const errs = await mount(acode, w);
+    await waitUntil(() => w.document.body.textContent.includes('Journal de la plateforme'));
     const t = w.document.body.textContent.replace(/\s+/g, ' ');
     check('DOM P09 : back-office super admin, quotas, formules et journaux',
       t.includes('Espace plateforme') && t.includes('Formules et limites administrables') &&
@@ -2287,6 +2314,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
   const runFlow = async (route, expected, state) => {
     const { dom, w } = makeDom(route, state);
     const errs = await mount(acode, w);
+    await waitUntil(() => w.document.body.textContent.includes(expected));
     const text = w.document.body.textContent.replace(/\s+/g, ' ');
     const ok = text.includes(expected) && errs.length === 0;
     dom.window.close();
@@ -2302,4 +2330,4 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
 
   console.log(`\n══ RÉSULTAT : ${pass} OK / ${fail} KO · mode ${MODE} ══`);
   process.exit(fail?1:0);
-})().catch(e=>{ console.error('CHECK FAIL', e); process.exit(1); });
+})().catch(e=>{ console.error('CHECK FAIL', e); githubError(`CHECK FAIL: ${e?.stack ?? e}`); process.exit(1); });
