@@ -2,17 +2,30 @@ name: Deploy Vercel
 
 on:
   workflow_dispatch:
+  repository_dispatch:
+    types: [deploy_production]
   push:
     branches: [main]
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VITE_DATA_SOURCE: supabase
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY || secrets.VITE_SUPABASE_ANON_KEY }}
+      VITE_SUPABASE_STORAGE_BUCKET: station-assets
+      VITE_WG_TEST_AUTH: ''
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,7 +34,16 @@ jobs:
           cache: npm
       - name: Vérifier la configuration Vercel
         if: env.VERCEL_TOKEN == ''
-        run: echo "Déploiement ignoré : secrets Vercel absents."
+        run: |
+          echo "Déploiement ignoré — secrets Vercel absents."
+      - name: Vérifier la configuration de production
+        if: env.VERCEL_TOKEN != ''
+        run: |
+          test -n "$VERCEL_ORG_ID" || { echo "VERCEL_ORG_ID manquant"; exit 1; }
+          test -n "$VERCEL_PROJECT_ID" || { echo "VERCEL_PROJECT_ID manquant"; exit 1; }
+          test -n "$VITE_SUPABASE_URL" || { echo "VITE_SUPABASE_URL manquant"; exit 1; }
+          test -n "$VITE_SUPABASE_ANON_KEY" || { echo "VITE_SUPABASE_ANON_KEY manquant"; exit 1; }
+          test -z "$VITE_WG_TEST_AUTH" || { echo "VITE_WG_TEST_AUTH doit rester vide en production"; exit 1; }
       - name: Install
         if: env.VERCEL_TOKEN != ''
         run: npm ci
