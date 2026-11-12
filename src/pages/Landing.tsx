@@ -1,359 +1,399 @@
-import React, { useState } from 'react';
+import React, { type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  FiArrowDownRight,
-  FiArrowRight,
-  FiBarChart2,
-  FiCheck,
-  FiCheckCircle,
-  FiChevronDown,
-  FiCreditCard,
-  FiDollarSign,
-  FiFileText,
-  FiGrid,
-  FiLock,
-  FiMoon,
-  FiPieChart,
-  FiSettings,
-  FiShield,
-  FiSun,
-  FiTruck,
-  FiUsers,
-  FiX,
-} from 'react-icons/fi';
-import { useStore } from '../lib/store';
 import { formatFCFA } from '../lib/format';
-import { Badge, Logo, Progress } from '../components/ui';
+import { useStore } from '../lib/store';
 
-const MODULES = [
-  { icon: <FiTruck />, number: '01', title: 'Suivez chaque lavage', text: 'Statuts clairs, remise autorisée, encaissement total ou partiel et reste à payer.' },
-  { icon: <FiDollarSign />, number: '02', title: 'Gardez une caisse juste', text: 'Fond de caisse, comptage à la clôture, écarts expliqués et réouverture motivée.' },
-  { icon: <FiUsers />, number: '03', title: 'Coordonnez votre équipe', text: 'Rôles adaptés, comptes activés au bon moment et commissions calculées sur les lavages terminés.' },
-  { icon: <FiCreditCard />, number: '04', title: 'Tracez chaque dépense', text: 'Catégorie, motif, fournisseur et annulation suivie. Les opérations ne disparaissent pas.' },
-  { icon: <FiBarChart2 />, number: '05', title: 'Lisez vos résultats', text: 'Rapports par jour, semaine ou mois, moyens de paiement et export CSV.' },
-  { icon: <FiSettings />, number: '06', title: 'Gardez la main sur vos tarifs', text: 'Votre catalogue appartient à votre station. Les lavages enregistrés gardent leur prix d’origine.' },
+/* ─── Vitrine `/` reprise du modèle public ixartz/Next-js-Boilerplate ───────
+   Source : https://github.com/ixartz/Next-js-Boilerplate (branche `main`).
+   Licence MIT — Copyright (c) 2026 Remi W. — voir
+   `public/assets/images/LICENSE.txt` et `docs/landing.md`.
+   Les textes, sections, illustrations et la navigation sont repris fidèlement ;
+   seules les actions internes sont branchées aux routes WashGuard existantes.
+   Aucune nouvelle fonctionnalité, dépendance, table ou clé n'est ajoutée.      */
+
+type Sponsor = {
+  label: string;
+  href: string;
+  src: string;
+  alt: string;
+};
+
+const SPONSORS: Sponsor[] = [
+  {
+    label: 'Visit Clerk',
+    href: 'https://clerk.com?utm_source=github&utm_medium=sponsorship&utm_campaign=nextjs-boilerplate',
+    src: '/assets/images/clerk-logo-dark.png',
+    alt: 'Clerk – Authentication & User Management for Next.js',
+  },
+  {
+    label: 'Visit CodeRabbit',
+    href: 'https://www.coderabbit.ai?utm_source=next_js_starter&utm_medium=github&utm_campaign=next_js_starter_oss_2025',
+    src: '/assets/images/coderabbit-logo-light.svg',
+    alt: 'CodeRabbit',
+  },
+  {
+    label: 'Visit Sentry',
+    href: 'https://sentry.io/for/nextjs/?utm_source=github&utm_medium=paid-community&utm_campaign=general-fy25q1-nextjs&utm_content=github-banner-nextjsboilerplate-logo',
+    src: '/assets/images/sentry-dark.png',
+    alt: 'Sentry',
+  },
+  {
+    label: 'Visit Arcjet',
+    href: 'https://launch.arcjet.com/Q6eLbRE',
+    src: '/assets/images/arcjet-light.svg',
+    alt: 'Arcjet',
+  },
+  {
+    label: 'Visit Crowdin',
+    href: 'https://l.crowdin.com/next-js',
+    src: '/assets/images/crowdin-dark.png',
+    alt: 'Crowdin',
+  },
+  {
+    label: 'Visit Better Stack',
+    href: 'https://betterstack.com/?utm_source=github&utm_medium=sponsorship&utm_campaign=next-js-boilerplate',
+    src: '/assets/images/better-stack-dark.png',
+    alt: 'Better Stack',
+  },
+  {
+    label: 'Visit PostHog',
+    href: 'https://posthog.com/?utm_source=github&utm_medium=sponsorship&utm_campaign=next-js-boilerplate',
+    src: '/assets/images/posthog-logo.svg',
+    alt: 'PostHog',
+  },
+  {
+    label: 'Visit Checkly',
+    href: 'https://www.checklyhq.com/?utm_source=github&utm_medium=sponsorship&utm_campaign=next-js-boilerplate',
+    src: '/assets/images/checkly-logo-light.png',
+    alt: 'Checkly',
+  },
+  {
+    label: 'Visit Next.js SaaS Boilerplate',
+    href: 'https://nextjs-boilerplate.com/pro-saas-starter-kit',
+    src: '/assets/images/nextjs-boilerplate-saas.png',
+    alt: 'Next.js SaaS Boilerplate',
+  },
 ];
 
-const FAQ = [
-  { q: 'Les prix affichés sont-ils les vrais ?', r: 'Oui. Les formules et leurs tarifs sont lus dans la base, comme la facturation. La vitrine ne peut donc pas afficher un prix différent de celui qui sera appliqué.' },
-  { q: 'Que se passe-t-il après l’inscription ?', r: 'Le serveur crée une seule fois votre entreprise, sa station, votre compte propriétaire et l’abonnement d’essai. Vous arrivez ensuite sur la Mise en route.' },
-  { q: 'Puis-je encaisser avant d’avoir fixé mes tarifs ?', r: 'Non. Tant que la station n’est pas activée, les fiches, encaissements, la caisse et les dépenses restent verrouillés. La mise en route vous indique ce qu’il reste à compléter.' },
-  { q: 'Puis-je modifier un tarif plus tard ?', r: 'Oui. Les lavages déjà enregistrés conservent toutefois le tarif en vigueur au moment de leur création, afin de préserver un historique juste.' },
-  { q: 'Y a-t-il déjà des avis de clients ?', r: 'Pas encore. Nous préférons attendre les retours de vraies stations plutôt que d’afficher des témoignages inventés.' },
-];
-
-function DashboardPreview() {
-  const stats = [
-    { label: 'Chiffre d’affaires', value: '0 FCFA', icon: <FiDollarSign /> },
-    { label: 'Lavages du jour', value: '0', icon: <FiTruck /> },
-    { label: 'Encaissements', value: '0 FCFA', icon: <FiCreditCard /> },
-    { label: 'Dépenses', value: '0 FCFA', icon: <FiPieChart /> },
-  ];
-
+function DemoBanner() {
   return (
-    <div className="landing-dashboard" role="img" aria-label="Aperçu visuel du tableau de bord WashGuard">
-      <div className="landing-dashboard-topbar">
-        <div className="landing-window-dots" aria-hidden="true"><i /><i /><i /></div>
-        <span className="landing-address">washguard.app / tableau-de-bord</span>
-        <span className="landing-live"><span /> Votre espace</span>
-      </div>
-      <div className="landing-dashboard-body">
-        <aside className="landing-sidebar" aria-label="Navigation de l’aperçu">
-          <div className="landing-sidebar-brand"><Logo compact /><span>WashGuard</span></div>
-          {[
-            ['Tableau de bord', <FiGrid />],
-            ['Lavages', <FiTruck />],
-            ['Prestations', <FiSettings />],
-            ['Clients', <FiUsers />],
-            ['Caisse', <FiDollarSign />],
-            ['Rapports', <FiBarChart2 />],
-          ].map(([label, icon], index) => (
-            <div key={label as string} className={`landing-sidebar-link ${index === 0 ? 'is-active' : ''}`}>
-              {icon as React.ReactNode}<span>{label as string}</span>
-            </div>
-          ))}
-        </aside>
-        <div className="landing-dashboard-content">
-          <div className="landing-dashboard-heading">
-            <div>
-              <p className="landing-eyebrow">VUE D’ENSEMBLE</p>
-              <h3>Tableau de bord</h3>
-              <p>Les chiffres de votre station, en un seul endroit.</p>
-            </div>
-            <span className="landing-avatar" aria-hidden="true"><FiUsers /></span>
-          </div>
-          <div className="landing-stat-grid">
-            {stats.map((stat) => (
-              <div className="landing-stat" key={stat.label}>
-                <span className="landing-stat-icon">{stat.icon}</span>
-                <p>{stat.label}</p>
-                <strong>{stat.value}</strong>
-                <span className="landing-stat-rule" />
-              </div>
-            ))}
-          </div>
-          <div className="landing-activity">
-            <div className="landing-activity-header"><div><h4>Activité récente</h4><p>Suivez les opérations de votre équipe.</p></div><span>Aujourd’hui</span></div>
-            <div className="landing-activity-empty">
-              <span className="landing-empty-icon"><FiTruck /></span>
-              <strong>Votre activité apparaîtra ici</strong>
-              <p>Aucune opération de démonstration n’est ajoutée.</p>
-            </div>
-          </div>
-          <div className="landing-preview-note"><FiLock /><span>Vos données restent les vôtres. Les montants sont calculés à partir de vos opérations.</span></div>
+    <div className="boilerplate-banner sticky top-0 z-50 bg-gray-900 p-4 text-center text-lg font-semibold text-gray-100">
+      Live Demo of Next.js Boilerplate -{' '}
+      <Link to="/inscription" className="text-fuchsia-500 hover:text-indigo-500">
+        Explore the Authentication
+      </Link>
+    </div>
+  );
+}
+
+function DemoBadge() {
+  return (
+    <div className="fixed right-20 bottom-0 z-10">
+      <a href="https://github.com/ixartz/Next-js-Boilerplate">
+        <div className="rounded-md bg-gray-900 px-3 py-2 font-semibold text-gray-100">
+          <span className="text-gray-500">Demo of</span>
+          {` Next.js Boilerplate`}
         </div>
+      </a>
+    </div>
+  );
+}
+
+/** Reflet visuel du sélecteur du modèle : l'i18n n'est pas une fonctionnalité WashGuard. */
+function LocaleSwitcher() {
+  return (
+    <select
+      defaultValue="FR"
+      disabled
+      aria-label="Changer de langue"
+      className="border border-gray-300 bg-white font-medium text-gray-700"
+    >
+      <option value="FR">FR</option>
+      <option value="EN">EN</option>
+    </select>
+  );
+}
+
+function BaseTemplate(props: { leftNav: ReactNode; rightNav?: ReactNode; children: ReactNode }) {
+  return (
+    <div className="w-full px-1 text-gray-700 antialiased">
+      <div className="mx-auto max-w-3xl">
+        <header className="border-b border-gray-300">
+          <div className="pt-16 pb-8">
+            <h1 className="text-3xl font-bold text-gray-900">Nextjs Starter</h1>
+            <h2 className="text-xl">Code de démarrage pour Next.js avec Tailwind CSS</h2>
+          </div>
+
+          <div className="flex justify-between">
+            <nav aria-label="Navigation principale">
+              <ul className="flex flex-wrap gap-x-5 text-xl">{props.leftNav}</ul>
+            </nav>
+
+            <nav>
+              <ul className="flex flex-wrap gap-x-5 text-xl">{props.rightNav}</ul>
+            </nav>
+          </div>
+        </header>
+
+        <main>{props.children}</main>
+
+        <footer className="border-t border-gray-300 py-8 text-center text-sm">
+          © {new Date().getFullYear()} Nextjs Starter. Fait avec{' '}
+          <a
+            href="https://nextjs-boilerplate.com"
+            className="text-blue-700 hover:border-b-2 hover:border-blue-700"
+          >
+            Next.js Boilerplate
+          </a>
+          .
+        </footer>
       </div>
     </div>
   );
 }
 
-function ActivityFlowPreview() {
-  const stages = [
-    { icon: <FiTruck />, title: 'Lavage enregistré', detail: 'Prestation · catégorie · tarif en vigueur' },
-    { icon: <FiCreditCard />, title: 'Encaissement suivi', detail: 'Paiement · montant reçu · reste à payer' },
-    { icon: <FiBarChart2 />, title: 'Rapport actualisé', detail: 'Activité · caisse · résultats regroupés' },
-  ];
-
+function Sponsors() {
+  const rows = [SPONSORS.slice(0, 3), SPONSORS.slice(3, 6), SPONSORS.slice(6, 9)];
   return (
-    <div className="landing-flow-card" role="img" aria-label="Schéma du suivi d’une opération, du lavage au rapport">
-      <div className="landing-flow-header">
-        <div><span className="landing-setup-kicker">DU TERRAIN AU RAPPORT</span><h3>Chaque opération laisse une trace.</h3></div>
-        <span className="landing-flow-shield"><FiShield /></span>
-      </div>
-      <p className="landing-flow-intro">Un suivi cohérent, de la fiche de lavage aux résultats de la station.</p>
-      <div className="landing-flow-stages">
-        {stages.map((stage, index) => (
-          <div className="landing-flow-stage" key={stage.title}>
-            <span className="landing-flow-icon">{stage.icon}</span>
-            <div><strong>{stage.title}</strong><span>{stage.detail}</span></div>
-            <span className="landing-flow-number">0{index + 1}</span>
+    <table className="border-collapse">
+      <tbody>
+        {rows.map((row, rowIndex) => (
+          <tr className="h-56" key={rowIndex}>
+            {row.map((sponsor) => (
+              <td className="border-2 border-gray-300 p-3" key={sponsor.label}>
+                <a aria-label={sponsor.label} href={sponsor.href}>
+                  <img
+                    src={sponsor.src}
+                    alt={sponsor.alt}
+                    width={220}
+                    style={{ maxWidth: '100%', height: 'auto' }}
+                  />
+                </a>
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+/** Section WashGuard conservée : mêmes formules que la facturation, sans nouveau prix local. */
+function Pricing() {
+  const { plans, plansError, dataSource } = useStore();
+  return (
+    <section id="tarifs" className="mt-10 scroll-mt-20 border-t border-gray-300 pt-8">
+      <h2 className="text-2xl font-bold">Formules et tarifs</h2>
+      <p className="text-base">
+        Ces montants sont lus depuis la table des formules : la vitrine et la facturation partagent la même source.
+      </p>
+      {plans.length === 0 && dataSource === 'supabase' && (
+        <div role="alert" className="mt-3 border-2 border-red-300 p-3 text-base text-red-700">
+          Formules et tarifs indisponibles. Aucun prix local n’est affiché en repli :{' '}
+          {plansError ?? 'réessayez dans un instant.'}
+        </div>
+      )}
+      <div className="mt-4 grid gap-4 text-base md:grid-cols-3">
+        {plans.map((plan) => (
+          <div className="border-2 border-gray-300 p-3" key={plan.id}>
+            <h3 className="font-bold">{plan.name}</h3>
+            <p className="mt-2 text-2xl font-bold">{formatFCFA(plan.priceMonthly)} / mois</p>
+            <ul className="mt-3">
+              {plan.features.map((feature) => (
+                <li key={feature}>{feature}</li>
+              ))}
+              <li>
+                {plan.limits.stations} station(s) · {plan.limits.employees} comptes ·{' '}
+                {plan.limits.washesPerMonth.toLocaleString('fr-FR')} lavages/mois
+              </li>
+            </ul>
+            <Link
+              to="/inscription"
+              className="mt-4 inline-block border-2 border-blue-700 px-3 py-1 font-semibold text-blue-700 hover:border-b-4"
+            >
+              {plan.trial ? 'Commencer l’essai' : `Choisir ${plan.name}`}
+            </Link>
           </div>
         ))}
       </div>
-      <div className="landing-flow-footer"><FiLock /><span>Les rapports regroupent les données saisies par vos équipes, jamais des exemples préremplis.</span></div>
-    </div>
-  );
-}
-
-function SetupPreview() {
-  const steps = [
-    'Identité de l’entreprise',
-    'Horaires et catégories de véhicules',
-    'Prestations et grille tarifaire',
-    'Moyens de paiement',
-    'Activation de la station',
-  ];
-
-  return (
-    <div className="landing-setup-card">
-      <div className="landing-setup-heading">
-        <div><span className="landing-setup-kicker">APERÇU DE LA MISE EN ROUTE</span><h3>Une station configurée à votre façon</h3></div>
-        <span className="landing-setup-count">0 <small>/ 13</small></span>
-      </div>
-      <div role="progressbar" aria-label="Avancement du parcours de mise en route" aria-valuenow={0} aria-valuemin={0} aria-valuemax={13}>
-        <Progress value={0} max={13} />
-      </div>
-      <ul className="landing-setup-list">
-        {steps.map((step, index) => (
-          <li key={step}>
-            <span className="landing-step-number">0{index + 1}</span>
-            <span>{step}</span>
-            <FiArrowDownRight aria-hidden="true" />
-          </li>
-        ))}
-      </ul>
-      <p className="landing-setup-footnote"><FiShield /> Parcours de 13 étapes. Pas de tarifs prédéfinis : vous décidez avant l’ouverture.</p>
-    </div>
+      <p className="text-base">
+        Aucun prix de prestation n’est prédéfini : vos tarifs de lavage sont choisis par vous pendant la mise en route.
+      </p>
+    </section>
   );
 }
 
 export default function Landing() {
-  const { plans, theme, toggleTheme } = useStore();
-  const [openFaq, setOpenFaq] = useState<number | null>(0);
-  const [menu, setMenu] = useState(false);
-
-  const closeMenu = () => setMenu(false);
-  const navigation = [
-    ['#fonctionnalites', 'Fonctionnalités'],
-    ['#apercu', 'Aperçu'],
-    ['#tarifs', 'Tarifs'],
-    ['#faq', 'FAQ'],
-  ];
-
   return (
-    <div className="landing-page">
-      <header className="landing-header">
-        <div className="landing-header-inner">
-          <Link to="/" aria-label="WashGuard, accueil" onClick={closeMenu}><Logo /></Link>
-          <nav className="landing-desktop-nav" aria-label="Navigation principale">
-            {navigation.map(([href, label]) => <a href={href} key={href}>{label}</a>)}
-          </nav>
-          <div className="landing-header-actions">
-            <button onClick={toggleTheme} className="landing-theme-toggle" aria-label={theme === 'dark' ? 'Activer le thème clair' : 'Activer le thème sombre'}>
-              {theme === 'dark' ? <FiSun /> : <FiMoon />}
-            </button>
-            <Link to="/connexion" className="landing-login">Se connecter</Link>
-            <Link to="/inscription" className="landing-button landing-button-primary landing-header-cta">Créer mon espace <FiArrowRight /></Link>
-            <button
-              className="landing-menu-toggle"
-              onClick={() => setMenu((current) => !current)}
-              aria-label={menu ? 'Fermer le menu' : 'Ouvrir le menu'}
-              aria-expanded={menu}
-              aria-controls="landing-mobile-menu"
+    <div className="wg-boilerplate-landing min-h-screen w-full bg-white">
+      <DemoBanner />
+      <BaseTemplate
+        leftNav={
+          <>
+            <li>
+              <Link to="/" className="border-none text-gray-700 hover:text-gray-900">
+                Accueil
+              </Link>
+            </li>
+            <li>
+              <a href="#a-propos" className="border-none text-gray-700 hover:text-gray-900">
+                A propos
+              </a>
+            </li>
+            <li>
+              <Link
+                to="/app/tableau-de-bord"
+                title="Tableau de bord WashGuard"
+                className="border-none text-gray-700 hover:text-gray-900"
+              >
+                Compteur
+              </Link>
+            </li>
+            <li>
+              <a href="#partenaires" className="border-none text-gray-700 hover:text-gray-900">
+                Portfolio
+              </a>
+            </li>
+            <li>
+              <a href="#tarifs" className="border-none text-gray-700 hover:text-gray-900">
+                Tarifs
+              </a>
+            </li>
+            <li>
+              <a
+                className="border-none text-gray-700 hover:text-gray-900"
+                href="https://github.com/ixartz/Next-js-Boilerplate"
+              >
+                GitHub
+              </a>
+            </li>
+          </>
+        }
+        rightNav={
+          <>
+            <li>
+              <Link to="/connexion" className="border-none text-gray-700 hover:text-gray-900">
+                Se connecter
+              </Link>
+            </li>
+            <li>
+              <Link to="/inscription" className="border-none text-gray-700 hover:text-gray-900">
+                S'inscrire
+              </Link>
+            </li>
+            <li>
+              <LocaleSwitcher />
+            </li>
+          </>
+        }
+      >
+        <div className="boilerplate-main py-5 text-xl">
+          <p id="a-propos">
+            {`Follow `}
+            <a
+              className="text-blue-700 hover:border-b-2 hover:border-blue-700"
+              href="https://twitter.com/ixartz"
+              target="_blank"
+              rel="noreferrer noopener"
             >
-              {menu ? <FiX /> : <span className="landing-menu-icon"><i /><i /></span>}
-            </button>
-          </div>
+              @Ixartz on Twitter
+            </a>
+            {` for updates and more information about the boilerplate.`}
+          </p>
+          <h2 className="mt-5 text-2xl font-bold">
+            Boilerplate Code for Your Next.js Project with Tailwind CSS
+          </h2>
+          <p className="text-base">
+            Next.js Boilerplate is a developer-friendly starter code for Next.js projects, built with
+            Tailwind CSS and TypeScript.{' '}
+            <span role="img" aria-label="Éclair">
+              ⚡️
+            </span>{' '}
+            Designed with developer experience in mind, it includes:
+          </p>
+          <ul className="mt-3 text-base">
+            <li>🚀 Next.js with App Router support</li>
+            <li>🔥 TypeScript for type checking</li>
+            <li>💎 Tailwind CSS integration</li>
+            <li>
+              🔒 Authentication with{' '}
+              <a
+                className="font-bold text-blue-700 hover:border-b-2 hover:border-blue-700"
+                href="https://clerk.com?utm_source=github&utm_medium=sponsorship&utm_campaign=nextjs-boilerplate"
+              >
+                Clerk
+              </a>{' '}
+              (includes passwordless, social, and multi-factor auth)
+            </li>
+            <li>📦 ORM with DrizzleORM (PostgreSQL, SQLite, MySQL support)</li>
+            <li>
+              💽 Dev database with PGlite and production with{' '}
+              <a
+                className="font-bold text-blue-700 hover:border-b-2 hover:border-blue-700"
+                href="https://get.neon.com/BMFYNtx"
+              >
+                Neon
+              </a>
+            </li>
+            <li>
+              🌐 Multi-language support (i18n) with next-intl and{' '}
+              <a
+                className="font-bold text-blue-700 hover:border-b-2 hover:border-blue-700"
+                href="https://l.crowdin.com/next-js"
+              >
+                Crowdin
+              </a>
+            </li>
+            <li>🔴 Form handling (React Hook Form) and validation (Zod)</li>
+            <li>📏 Linting and formatting (ESLint, Prettier)</li>
+            <li>🦊 Git hooks and commit linting (Husky, Commitlint)</li>
+            <li>🦺 Testing suite (Vitest, React Testing Library, Playwright)</li>
+            <li>🎉 Storybook for UI development</li>
+            <li>
+              🐰 AI-powered code reviews with{' '}
+              <a
+                className="font-bold text-blue-700 hover:border-b-2 hover:border-blue-700"
+                href="https://www.coderabbit.ai?utm_source=next_js_starter&utm_medium=github&utm_campaign=next_js_starter_oss_2025"
+              >
+                CodeRabbit
+              </a>
+            </li>
+            <li>
+              🚨 Error monitoring (
+              <a
+                className="font-bold text-blue-700 hover:border-b-2 hover:border-blue-700"
+                href="https://sentry.io/for/nextjs/?utm_source=github&utm_medium=paid-community&utm_campaign=general-fy25q1-nextjs&utm_content=github-banner-nextjsboilerplate-logo"
+              >
+                Sentry
+              </a>
+              ) and logging (LogTape, an alternative to Pino.js)
+            </li>
+            <li>🖥️ Monitoring as Code (Checkly)</li>
+            <li>
+              🔐 Security and bot protection (
+              <a
+                className="font-bold text-blue-700 hover:border-b-2 hover:border-blue-700"
+                href="https://launch.arcjet.com/Q6eLbRE"
+              >
+                Arcjet
+              </a>
+              )
+            </li>
+            <li>🤖 SEO optimization (metadata, JSON-LD, Open Graph tags)</li>
+            <li>⚙️ Development tools (VSCode config, bundler analyzer, changelog generation)</li>
+          </ul>
+          <p className="text-base">
+            Our sponsors' exceptional support has made this project possible. Their services
+            integrate seamlessly with the boilerplate, and we recommend trying them out.
+          </p>
+          <section id="partenaires" className="scroll-mt-20">
+            <h2 className="mt-5 text-2xl font-bold">Partenaires</h2>
+            <Sponsors />
+          </section>
+          <Pricing />
         </div>
-        {menu && (
-          <nav id="landing-mobile-menu" className="landing-mobile-nav" aria-label="Navigation mobile">
-            {navigation.map(([href, label]) => <a href={href} key={href} onClick={closeMenu}>{label}</a>)}
-            <Link to="/connexion" onClick={closeMenu}>Se connecter</Link>
-            <Link to="/inscription" className="landing-mobile-cta" onClick={closeMenu}>Créer mon espace <FiArrowRight /></Link>
-          </nav>
-        )}
-      </header>
-
-      <main>
-        <section className="landing-hero">
-          <div className="landing-hero-copy">
-            <Badge tone="accent"><span className="landing-badge-dot" /> Gestion de station · en français · FCFA</Badge>
-            <h1>Le quotidien de votre station, <span>enfin bien maîtrisé.</span></h1>
-            <p className="landing-hero-description">Lavages, caisse, équipe et résultats : WashGuard rassemble vos opérations pour vous aider à piloter votre station avec clarté.</p>
-            <div className="landing-hero-actions">
-              <Link to="/inscription" className="landing-button landing-button-primary">Découvrir WashGuard <FiArrowRight /></Link>
-              <a href="#apercu" className="landing-button landing-button-secondary">Voir l’interface <FiArrowDownRight /></a>
-            </div>
-            <div className="landing-hero-reassurance">
-              <span><FiCheckCircle /> Essai de 14 jours</span>
-              <span><FiCheckCircle /> Vos tarifs, votre choix</span>
-              <span><FiCheckCircle /> Aucun avis inventé</span>
-            </div>
-          </div>
-          <div className="landing-hero-visual">
-            <div className="landing-visual-glow" />
-            <DashboardPreview />
-            <div className="landing-float-card"><span className="landing-float-icon"><FiShield /></span><span><strong>Conçu pour le terrain</strong><small>Des opérations suivies, pas devinées.</small></span></div>
-          </div>
-          <div className="landing-hero-index" aria-hidden="true"><span>01</span><i /></div>
-        </section>
-
-        <section className="landing-trust-strip" aria-label="Les engagements WashGuard">
-          <div><FiLock /><span>Tarifs lus depuis la même base que la facturation</span></div>
-          <div><FiFileText /><span>Historique conservé pour chaque opération</span></div>
-          <div><FiShield /><span>Pas de témoignages ni de chiffres inventés</span></div>
-        </section>
-
-        <section className="landing-section landing-features" id="fonctionnalites">
-          <div className="landing-section-heading">
-            <div><span className="landing-section-kicker">TOUT EST À SA PLACE</span><h2>Moins de flou.<br /><span>Plus de maîtrise.</span></h2></div>
-            <p>Chaque module répond à un besoin concret de la station. Ils travaillent ensemble pour vous donner une vue cohérente de l’activité.</p>
-          </div>
-          <div className="landing-feature-grid">
-            {MODULES.map((module) => (
-              <article className="landing-feature-card" key={module.number}>
-                <div className="landing-feature-card-top"><span className="landing-feature-icon">{module.icon}</span><span className="landing-feature-number">{module.number}</span></div>
-                <h3>{module.title}</h3>
-                <p>{module.text}</p>
-                <span className="landing-feature-line" />
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="landing-showcase" id="apercu">
-          <div className="landing-showcase-copy">
-            <span className="landing-section-kicker">VOTRE STATION, EN UN COUP D’ŒIL</span>
-            <h2>Une vue claire sur ce qui se passe.</h2>
-            <p>Le tableau de bord rassemble les chiffres utiles : chiffre d’affaires, lavages, encaissements et dépenses. Les données présentées dans l’application proviennent de vos opérations, pas d’exemples préremplis.</p>
-            <ul className="landing-check-list">
-              <li><FiCheck /> Chiffres calculés à partir de vos données</li>
-              <li><FiCheck /> Les opérations récentes restent traçables</li>
-              <li><FiCheck /> Une interface adaptée aux écrans du quotidien</li>
-            </ul>
-            <Link to="/inscription" className="landing-text-link">Créer mon espace <FiArrowRight /></Link>
-          </div>
-          <div className="landing-showcase-visual"><ActivityFlowPreview /></div>
-        </section>
-
-        <section className="landing-setup-section">
-          <div className="landing-setup-copy">
-            <span className="landing-section-kicker">VOUS GARDEZ LA MAIN</span>
-            <h2>Prêt quand <span>vous l’êtes.</span></h2>
-            <p>Configurez l’identité de la station, ses prestations, ses tarifs et ses moyens de paiement. L’activation attend que les éléments obligatoires soient réellement renseignés.</p>
-            <div className="landing-setup-note"><FiShield /><span>Aucun tarif n’est imposé. Les écritures de gestion restent verrouillées tant que la station n’est pas activée.</span></div>
-            <Link to="/inscription" className="landing-button landing-button-secondary">Commencer la mise en route <FiArrowRight /></Link>
-          </div>
-          <SetupPreview />
-        </section>
-
-        <section className="landing-pricing-section" id="tarifs">
-          <div className="landing-section-heading landing-pricing-heading">
-            <div><span className="landing-section-kicker">DES FORMULES CLAIRES</span><h2>Choisissez votre rythme.</h2></div>
-            <p>Les formules et les montants ci-dessous sont ceux utilisés par l’application et la facturation.</p>
-          </div>
-          <div className="landing-pricing-grid">
-            {plans.map((plan) => {
-              const featured = plan.id === 'standard';
-              return (
-                <article key={plan.id} className={`landing-price-card ${featured ? 'is-featured' : ''}`}>
-                  {plan.trial && <span className="landing-plan-tag">14 JOURS D’ESSAI</span>}
-                  <div className="landing-plan-header"><h3>{plan.name}</h3><span>{plan.trial ? 'Pour démarrer' : 'Sans surprise'}</span></div>
-                  <p className="landing-plan-description">{plan.trial ? 'Prenez le temps de configurer votre station.' : 'La gestion complète de votre activité, chaque mois.'}</p>
-                  <p className="landing-price">{formatFCFA(plan.priceMonthly)}<span>{plan.trial ? ' / 14 jours' : ' / mois'}</span></p>
-                  <div className="landing-plan-divider" />
-                  <ul>
-                    {plan.features.map((feature) =>                     <li key={feature}><FiCheck /><span>{feature}</span></li>)}
-                  </ul>
-                  <Link to="/inscription" className={`landing-button ${featured ? 'landing-button-primary' : 'landing-button-secondary'}`}>
-                    {plan.trial ? 'Commencer l’essai' : `Choisir ${plan.name}`} <FiArrowRight />
-                  </Link>
-                </article>
-              );
-            })}
-          </div>
-          <p className="landing-pricing-footnote">Les tarifs de lavage sont définis par chaque station pendant la mise en route.</p>
-        </section>
-
-        <section className="landing-honesty">
-          <div className="landing-honesty-icon"><FiShield /></div>
-          <div><span className="landing-section-kicker">LA CONFIANCE SE MÉRITE</span><h2>Pas de témoignages inventés.</h2><p>Les avis viendront de vraies stations, quand elles auront quelque chose à raconter. En attendant, nous préférons vous montrer ce que le produit fait réellement.</p></div>
-          <a href="#apercu" className="landing-text-link">Voir le produit <FiArrowRight /></a>
-        </section>
-
-        <section className="landing-faq-section" id="faq">
-          <div className="landing-faq-intro"><span className="landing-section-kicker">BESOIN DE SAVOIR</span><h2>Questions fréquentes.</h2><p>Des réponses directes sur l’utilisation de WashGuard.</p></div>
-          <div className="landing-faq-list">
-            {FAQ.map((item, index) => (
-              <article className={`landing-faq-item ${openFaq === index ? 'is-open' : ''}`} key={item.q}>
-                <h3>
-                  <button aria-expanded={openFaq === index} aria-controls={`landing-faq-answer-${index}`} onClick={() => setOpenFaq(openFaq === index ? null : index)}>
-                    <span>{item.q}</span><FiChevronDown aria-hidden="true" />
-                  </button>
-                </h3>
-                {openFaq === index && <p id={`landing-faq-answer-${index}`} className="landing-faq-answer">{item.r}</p>}
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="landing-final-cta">
-          <div className="landing-cta-glow" />
-          <div className="landing-final-cta-content">
-            <span className="landing-section-kicker">ON Y VA ?</span>
-            <h2>La prochaine étape,<br /><span>c’est votre station.</span></h2>
-            <p>Créez votre espace, renseignez vos tarifs et avancez à votre rythme.</p>
-            <Link to="/inscription" className="landing-button landing-button-light">Créer mon espace <FiArrowRight /></Link>
-          </div>
-          <div className="landing-cta-mark" aria-hidden="true"><Logo compact /></div>
-        </section>
-      </main>
-
-      <footer className="landing-footer">
-        <Link to="/" aria-label="WashGuard, accueil"><Logo /></Link>
-        <p>© {new Date().getFullYear()} WashGuard <span>·</span> Interface en français <span>·</span> Montants en FCFA</p>
-        <nav aria-label="Liens de pied de page"><a href="#fonctionnalites">Fonctionnalités</a><a href="#tarifs">Tarifs</a><Link to="/connexion">Connexion</Link></nav>
-      </footer>
+      </BaseTemplate>
+      <DemoBadge />
     </div>
   );
 }

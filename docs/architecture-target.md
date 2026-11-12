@@ -1,176 +1,198 @@
-# WashGuard / Lavauto — Architecture Cible SaaS ERP Multi-Entreprises (Prompt 01)
+# 01 — Architecture cible (Foundation & Audit)
 
-> **Date :** 11 novembre 2026  
-> **Auteur :** Architecte Logiciel Senior ERP SaaS  
-> **Statut :** Spécification Technique de Référence  
-> **Cadre :** AI Development Playbook — Évolution du repository `ErwinssKoffi/lavauto`
+**Statut :** document de design, **aucun code produit**. Il complète `docs/architecture-audit.md`.
+**Règle directrice :** la structure ci-dessous est une **cible progressive**, pas un grand déménagement. On adapte l'existant sans multiplier les dossiers : aucun dossier n'est créé tant qu'un module n'en a pas besoin.
 
 ---
 
-## 1. Vision et Principes Directeurs
+## 1. Principes
 
-L'architecture cible transforme WashGuard d'une application mono-station stockée en mémoire navigateur en un **ERP SaaS multi-entreprises, multi-stations et multi-rôles**, haute disponibilité, déployable en Côte d'Ivoire et extensible à la zone UEMOA / CEMAC.
-
-### Principes Fondamentaux :
-1. **Multi-Tenancy Strict (Isolation par Entreprise)** : Une entreprise (`company_id`) possède une ou plusieurs stations de lavage (`station_id`). Aucune donnée ne peut fuiter d'une entreprise à une autre au niveau base de données grâce aux politiques PostgreSQL RLS (Row Level Security).
-2. **Double Pilote de Données (Dual Driver)** : L'application conserve un adaptateur local hors-ligne / démo pour permettre le développement et les tests immédiats, tout en connectant de manière transparente le client Supabase dès que les variables d'environnement sont injectées.
-3. **Immutabilité des Écritures Sensibles** :
-   - Figeage du prix unitaire des prestations à la création du ticket.
-   - Enregistrement chronologique sans suppression des transactions financières (paiements, clôtures de caisse, réouvertures motivées, annulations de dépenses).
-   - Traçabilité complète des mouvements de stock et des consommations théoriques/réelles.
-4. **Séparation des Responsabilités (Clean Architecture)** :
-   - Présentation : Composants UI réutilisables, formulaires, tables, modales et graphiques.
-   - Domaine & Métier : Entités, règles de calcul (commissions, marges, stock, TVA/taxes).
-   - Services : Communication réseau, requêtes Supabase, transactions SQL.
-   - État applicatif : Hooks TanStack Query ou Contexts modulaires spécialisés par domaine.
+| # | Principe | Conséquence concrète |
+| --- | --- | --- |
+| P1 | **Ne pas réécrire** | `src/pages/*`, `src/components/ui.tsx`, `src/index.css` restent la base ; on les fait évoluer, on ne les remplace pas |
+| P2 | **Le contrat `Ctx` est le point de bascule** | les 16 pages appellent `useStore()` ; conserver la forme du contrat permet de brancher Supabase sans modifier les écrans |
+| P3 | **Étranglement (strangler fig)** | un adaptateur `LocalDataAdapter` (l'actuel `store.tsx`) et un `SupabaseDataAdapter` cohabitent derrière la même interface ; bascule par module, pas par projet |
+| P4 | **Le serveur fait autorité** | `company_id`, rôles, quotas, montants, statuts et activation sont vérifiés en base (RLS + fonctions), jamais déduits d'un état navigateur |
+| P5 | **Le frontend ne transmet jamais `company_id` librement** | il est dérivé de `auth.uid()` via `user_profiles` / claim JWT |
+| P6 | **Domaine pur, effets aux bords** | `computeOnboarding`, `buildReport`, `buildCommissions`, `theoreticalCash` restent des fonctions pures testables ; les écritures passent par des services |
+| P7 | **Pas de faux chiffre** | aucun indicateur de rentabilité tant que les coûts ne sont pas tous renseignés ; état « données manquantes » explicite |
+| P8 | **Aucune donnée d'exemple en production** | la discipline actuelle (tout part vide, aucun prix inventé, aucun témoignage) est un actif à conserver |
+| P9 | **Français, XOF par défaut, multi-pays** | devise et formats configurables par entreprise ; `Intl` plutôt que des suffixes codés en dur |
+| P10 | **Chaque étape est réversible** | feature flag `VITE_DATA_SOURCE=local\|supabase`, rollback immédiat, `npm run check` doit rester vert |
 
 ---
 
-## 2. Structure Modulaire des Dossiers Cible
-
-Pour éviter le monolythe de `store.tsx` (747 lignes) sans fragmenter artificiellement le projet, l'arborescence est organisée par domaines métier (« feature modules ») :
+## 2. Organisation des dossiers cible
 
 ```
 src/
-├── app/
-│   ├── router/                   # Définition des routes publiques, protégées et admin
-│   ├── providers/                # AuthProvider, TenantProvider, QueryProvider, ToastProvider
-│   └── layouts/                  # AppShell, AuthLayout, PlatformLayout
+├── app/                          # créé à l'étape 02 (regroupement, pas de réécriture)
+│   ├── router/                   # routes.tsx, guards.tsx (RoleRoute, AuthRoute…)
+│   ├── providers/                # QueryProvider, ThemeProvider, StoreProvider (façade)
+│   └── layouts/                  # AppShell, AuthLayout, PublicLayout
 ├── components/
-│   ├── ui/                       # Composants atomiques (Button, Card, Badge, Modal, Drawer, Table...)
-│   ├── forms/                    # FormField, Select, MoneyInput, DatePicker, Toggle
-│   ├── feedback/                 # Toast, ConfirmDialog, SkeletonLoader, EmptyState
-│   └── charts/                   # Graphiques de chiffre d'affaires, rentabilité et performance
-├── modules/
-│   ├── dashboard/                # KPIs en temps réel, alertes, activités récentes
-│   ├── stations/                 # Gestion multi-stations, configuration horaires, postes
-│   ├── washes/                   # Workflow complet : file d'attente, postes, fiches, statut, contrôle qualité
-│   ├── services/                 # Prestations, catégories véhicules, grille tarifaire matricielle
-│   ├── customers/                # CRM, véhicules, fidélité (points/cartes), flottes entreprises
-│   ├── employees/                # Gestion des équipes, rôles, présences, pointage
-│   ├── cash/                     # Caisse physique : ouverture, clôture comptée, rapprochement Mobile Money
-│   ├── expenses/                 # Gestion des charges d'exploitation, justificatifs, catégories
-│   ├── commissions/              # Moteur de calcul des commissions laveurs, périodes et règlements
-│   ├── inventory/                # Consommables (shampooing, cire), alertes seuil bas, inventaires physiques
-│   ├── suppliers/                # Fournisseurs de produits, contacts, conditions
-│   ├── purchases/                # Commandes d'approvisionnement et réceptions en stock
-│   ├── finance/                  # Rentabilité globale, compte de résultat simplifié, marge brute
-│   ├── reports/                  # Rapports d'exploitation, exports Excel/CSV, synthèses périodiques
-│   └── settings/                 # Paramètres entreprise, règles de caisse, monnaie, seuils
-├── services/
-│   ├── supabase/                 # Client typé, requêtes SQL/RPCs, gestion des sessions
-│   ├── storage/                  # Stockage de justificatifs et logos via Supabase Storage
-│   └── local/                    # Adaptateur de compatibilité démo locale (fallback)
-├── hooks/                        # useAuth, useTenant, usePermissions, useDebounce, useNetwork
-├── types/                        # Interfaces TypeScript strictes du domaine et de la base
-├── schemas/                      # Schémas de validation Zod pour formulaires et APIs
-└── utils/                        # Formatage monnaie FCFA, fuseaux horaires, calculs arithmétiques
+│   ├── ui/                       # ISSU de components/ui.tsx : Button, Card, Input,
+│   │                             #   Select, Badge, Modal, Drawer, Tabs, ToastHost…
+│   ├── forms/                    # champs Zod + RHF, ConfirmDialog
+│   ├── tables/                   # DataTable (tri, filtres, pagination serveur)
+│   ├── charts/                   # wrappers Recharts
+│   └── feedback/                 # EmptyState, Skeleton, ErrorBoundary
+├── modules/                      # UN dossier par domaine, créé au moment du domaine
+│   └── <domaine>/
+│       ├── pages/                # écran(s) — déplacés depuis src/pages/*
+│       ├── components/
+│       ├── hooks/                # useWashes, useCashSession…
+│       ├── api.ts                # appels au service (TanStack Query)
+│       ├── schema.ts             # Zod
+│       └── rules.ts              # règles métier pures du domaine
+├── services/                     # accès données
+│   ├── supabase/client.ts        # issu de lib/supabase.ts
+│   ├── adapters/
+│   │   ├── DataAdapter.ts        # interface = forme de Ctx
+│   │   ├── LocalDataAdapter.ts   # enveloppe l'actuel store.tsx
+│   │   └── SupabaseDataAdapter.ts
+│   ├── repositories/             # washes.repo.ts, cash.repo.ts, finance.repo.ts…
+│   └── audit.ts
+├── hooks/                        # hooks transverses (usePermissions, useStationScope…)
+├── lib/                          # CONSERVÉ : format.ts, metrics.ts (extension), plans.ts
+│                                 #   → plans.ts devient un cache de la table `plans`
+├── types/                        # découpage progressif de types.ts (domain/*.ts)
+├── schemas/                      # schémas Zod partagés (env, pagination, montants)
+├── utils/                        # helpers neutres
+└── index.css                     # design tokens (variables CSS) — conservé et enrichi
 ```
+
+**Ce qu'on ne crée PAS maintenant :** aucun dossier vide, aucun `modules/*` anticipé, aucun double composant. `src/pages/*` reste en place jusqu'à ce que le domaine correspondant soit migré. Le déplacement se fait **module par module**, avec mise à jour des imports et `npm run check` après chacun.
+
+### Correspondance fichier actuel → cible
+
+| Actuel | Cible | Action |
+| --- | --- | --- |
+| `src/App.tsx` | `app/router/routes.tsx` + `app/router/guards.tsx` | **déplacer / scinder** |
+| `src/components/AppShell.tsx` | `app/layouts/AppShell.tsx` | déplacer, enrichir (sidebar repliable, breadcrumbs, recherche globale) |
+| `src/components/ui.tsx` | `components/ui/*` + `components/feedback/*` | **scinder**, garder l'API publique (`Card`, `Input`…) pour ne rien casser |
+| `src/pages/auth/AuthLayout.tsx` | `app/layouts/AuthLayout.tsx` | déplacer |
+| `src/main.tsx` | `main.tsx` + `app/providers/*` | conserver l'ordre des providers |
+| `src/lib/store.tsx` | `services/adapters/LocalDataAdapter.ts` + `app/providers/StoreProvider.tsx` (façade) | **envelopper**, ne pas supprimer les règles |
+| `src/lib/supabase.ts` | `services/supabase/client.ts` | déplacer + validation Zod de l'env |
+| `src/lib/metrics.ts` | `modules/finance/rules.ts` + `modules/analytics/rules.ts` | scinder **après** l'étape 06 ; conserver `buildReport`/`buildCommissions`/`theoreticalCash` et leurs tests |
+| `src/lib/format.ts` | `lib/format.ts` (+ `Intl`) | conserver et généraliser la devise |
+| `src/lib/plans.ts` | cache local de `plans` | remplacer la constante par une requête, garder un fallback hors ligne explicite |
+| `src/types.ts` | `types/domain/*.ts` | scinder progressivement, réexporter depuis `types/index.ts` |
+| `src/index.css` | `index.css` + `styles/tokens.css` | conserver les variables de thème |
+| `scripts/check.cjs` | `scripts/check.cjs` + `tests/` (Vitest/Playwright) | conserver comme filet de sécurité non-régression |
 
 ---
 
-## 3. Schéma Relationnel PostgreSQL / Supabase Cible
+## 3. Le contrat d'accès aux données (pièce maîtresse)
 
-### 3.1 Entités d'Organisation & Sécurité
-- **`companies`** :
-  - `id` (UUID, PK), `name` (TEXT), `legal_id` (TEXT), `city` (TEXT), `country` (TEXT default 'CI'), `currency` (TEXT default 'FCFA'), `phone` (TEXT), `suspended` (BOOLEAN), `created_at` (TIMESTAMPTZ).
-- **`stations`** :
-  - `id` (UUID, PK), `company_id` (UUID, FK -> companies.id), `name` (TEXT), `address` (TEXT), `city` (TEXT), `phone` (TEXT), `cash_requires_open` (BOOLEAN default true), `max_cashier_discount` (NUMERIC), `default_commission_rate` (NUMERIC), `monthly_target` (NUMERIC), `activated` (BOOLEAN), `activated_at` (TIMESTAMPTZ).
-- **`user_profiles`** :
-  - `id` (UUID, PK, matches `auth.users.id`), `company_id` (UUID, FK -> companies.id), `email` (TEXT UNIQUE), `name` (TEXT), `phone` (TEXT), `role` (TEXT: 'proprietaire' | 'gerant' | 'caissier' | 'laveur' | 'support'), `active` (BOOLEAN), `created_at` (TIMESTAMPTZ).
-- **`user_station_assignments`** :
-  - `id` (UUID, PK), `user_id` (UUID, FK -> user_profiles.id), `station_id` (UUID, FK -> stations.id), `is_primary` (BOOLEAN).
+L'interface ci-dessous est **la forme actuelle de `Ctx`**. Le but : que `LocalDataAdapter` et `SupabaseDataAdapter` l'implémentent tous les deux, si bien qu'aucune page ne change.
 
-### 3.2 Exploitation & Lavages
-- **`vehicle_categories`** :
-  - `id` (UUID, PK), `company_id` (UUID), `station_id` (UUID), `name` (TEXT), `display_order` (INT), `active` (BOOLEAN).
-- **`services`** :
-  - `id` (UUID, PK), `company_id` (UUID), `station_id` (UUID), `name` (TEXT), `description` (TEXT), `estimated_duration_min` (INT), `active` (BOOLEAN).
-- **`service_prices`** :
-  - `id` (UUID, PK), `service_id` (UUID, FK), `category_id` (UUID, FK), `price` (NUMERIC), UNIQUE(service_id, category_id).
-- **`wash_bays` (Postes de travail)** :
-  - `id` (UUID, PK), `station_id` (UUID), `name` (TEXT: 'Extérieur 1', 'Intérieur', 'Detailing'), `type` (TEXT), `status` (TEXT: 'libre' | 'occupe' | 'maintenance').
-- **`customers`** :
-  - `id` (UUID, PK), `company_id` (UUID), `name` (TEXT), `phone` (TEXT), `email` (TEXT), `notes` (TEXT), `is_fleet` (BOOLEAN).
-- **`vehicles`** :
-  - `id` (UUID, PK), `customer_id` (UUID, FK), `plate` (TEXT UNIQUE), `category_id` (UUID, FK), `brand` (TEXT), `model` (TEXT), `color` (TEXT).
-- **`washes`** :
-  - `id` (UUID, PK), `company_id` (UUID), `station_id` (UUID), `number` (TEXT), `vehicle_id` (UUID, FK), `customer_id` (UUID, FK), `category_id` (UUID, FK), `bay_id` (UUID, FK), `employee_id` (UUID, FK), `discount` (NUMERIC), `total_amount` (NUMERIC), `paid_amount` (NUMERIC), `status` (TEXT: 'en_attente' | 'assigne' | 'en_cours' | 'controle_qualite' | 'pret' | 'livre' | 'annule'), `created_at` (TIMESTAMPTZ), `started_at` (TIMESTAMPTZ), `finished_at` (TIMESTAMPTZ), `delivered_at` (TIMESTAMPTZ), `cancel_reason` (TEXT).
-- **`wash_items`** :
-  - `id` (UUID, PK), `wash_id` (UUID, FK), `service_id` (UUID, FK), `service_name` (TEXT), `unit_price` (NUMERIC), `quantity` (INT).
-- **`wash_quality_checks`** :
-  - `id` (UUID, PK), `wash_id` (UUID, FK), `inspector_id` (UUID, FK), `exterior_clean` (BOOLEAN), `interior_clean` (BOOLEAN), `windows_clean` (BOOLEAN), `rims_clean` (BOOLEAN), `mats_clean` (BOOLEAN), `approved` (BOOLEAN), `notes` (TEXT), `inspected_at` (TIMESTAMPTZ).
+```ts
+// services/adapters/DataAdapter.ts — extrait illustratif
+export interface DataAdapter {
+  // lecture
+  getSession(): Promise<Session | null>;
+  getBootstrap(): Promise<Bootstrap>;          // company, stations, profil, permissions
+  getOnboarding(): OnboardingStep[];           // constaté côté serveur, jamais coché par l'UI
+  // écriture de base
+  signUp(p: SignUpPayload): Promise<void>;
+  signIn(email: string, password: string): Promise<void>;
+  signOut(): Promise<void>;
+  updateStation(patch: Partial<Station>): Promise<void>;
+  setPrice(serviceId: string, categoryId: string, price: number): Promise<void>;
+  // exploitation (TOUJOURS protégées par le serveur)
+  createWash(p: WashPayload): Promise<Wash>;   // 409 onboarding_incomplete
+  addPayment(washId: string, amount: number, method: PayMethod): Promise<void>;
+  openCash(openingFloat: number): Promise<void>;
+  closeCash(counted: number): Promise<void>;
+  addExpense(p: ExpenseInput): Promise<void>;
+  // …les ~40 actions de Ctx
+}
+```
 
-### 3.3 Finance & Caisse
-- **`cash_sessions`** :
-  - `id` (UUID, PK), `station_id` (UUID), `opened_by` (UUID, FK), `opened_at` (TIMESTAMPTZ), `opening_float` (NUMERIC), `closed_at` (TIMESTAMPTZ), `closed_by` (UUID, FK), `counted_amount` (NUMERIC), `theoretical_amount` (NUMERIC), `difference_amount` (NUMERIC), `status` (TEXT: 'ouverte' | 'cloturee'), `reopened_at` (TIMESTAMPTZ), `reopen_reason` (TEXT).
-- **`payments`** :
-  - `id` (UUID, PK), `company_id` (UUID), `station_id` (UUID), `wash_id` (UUID, FK), `cash_session_id` (UUID, FK nullable), `amount` (NUMERIC), `method` (TEXT: 'especes' | 'orange_money' | 'wave' | 'mtn_momo' | 'carte' | 'virement'), `transaction_reference` (TEXT), `collected_by` (UUID, FK), `created_at` (TIMESTAMPTZ).
-- **`expenses`** :
-  - `id` (UUID, PK), `company_id` (UUID), `station_id` (UUID), `cash_session_id` (UUID, FK nullable), `category` (TEXT), `reason` (TEXT), `supplier` (TEXT), `amount` (NUMERIC), `method` (TEXT), `date` (DATE), `receipt_url` (TEXT), `status` (TEXT: 'enregistree' | 'annulee'), `cancel_reason` (TEXT), `created_by` (UUID, FK), `created_at` (TIMESTAMPTZ).
+- `LocalDataAdapter` = l'actuel `store.tsx` (localStorage), conservé pour la démo et le rollback.
+- `SupabaseDataAdapter` = repositories + RPC ; mêmes codes d'erreur (`onboarding_incomplete`, `cash_closed`, `wash_cancelled`…) pour que l'UI ne change pas.
+- `StoreProvider` devient une **façade** : il expose toujours `useStore()` avec la même forme, mais délègue à l'adaptateur choisi par `VITE_DATA_SOURCE`.
 
-### 3.4 Stocks, Consommables & Approvisionnements
-- **`product_categories`** :
-  - `id` (UUID, PK), `company_id` (UUID), `name` (TEXT).
-- **`products`** :
-  - `id` (UUID, PK), `company_id` (UUID), `station_id` (UUID), `name` (TEXT), `sku` (TEXT), `category_id` (UUID, FK), `unit` (TEXT: 'ml', 'litre', 'unite', 'kg'), `unit_cost` (NUMERIC), `current_stock` (NUMERIC), `alert_threshold` (NUMERIC), `active` (BOOLEAN).
-- **`service_recipes` (Consommations théoriques)** :
-  - `id` (UUID, PK), `service_id` (UUID, FK), `category_id` (UUID, FK), `product_id` (UUID, FK), `quantity_used` (NUMERIC).
-- **`suppliers`** :
-  - `id` (UUID, PK), `company_id` (UUID), `name` (TEXT), `contact_name` (TEXT), `phone` (TEXT), `email` (TEXT), `address` (TEXT).
-- **`purchase_orders`** :
-  - `id` (UUID, PK), `station_id` (UUID), `supplier_id` (UUID, FK), `order_number` (TEXT), `total_amount` (NUMERIC), `status` (TEXT: 'brouillon' | 'commandee' | 'recue_partielle' | 'recue_totale' | 'annulee'), `created_at` (TIMESTAMPTZ), `received_at` (TIMESTAMPTZ).
-- **`purchase_order_items`** :
-  - `id` (UUID, PK), `purchase_order_id` (UUID, FK), `product_id` (UUID, FK), `quantity_ordered` (NUMERIC), `quantity_received` (NUMERIC), `unit_cost` (NUMERIC).
-- **`stock_movements`** :
-  - `id` (UUID, PK), `product_id` (UUID, FK), `station_id` (UUID), `type` (TEXT: 'reception' | 'consommation_lavage' | 'ajustement_inventaire' | 'perte'), `quantity` (NUMERIC: positif ou négatif), `reference_id` (UUID: id lavage ou commande), `created_at` (TIMESTAMPTZ), `created_by` (UUID, FK).
-
-### 3.5 Ressources Humaines & Commissions
-- **`employees`** :
-  - `id` (UUID, PK), `user_id` (UUID, FK nullable si compte système non attribué), `station_id` (UUID), `first_name` (TEXT), `last_name` (TEXT), `role` (TEXT), `phone` (TEXT), `base_salary` (NUMERIC default 0), `commission_rate_override` (NUMERIC nullable), `active` (BOOLEAN).
-- **`commission_periods`** :
-  - `id` (UUID, PK), `station_id` (UUID), `start_date` (DATE), `end_date` (DATE), `status` (TEXT: 'en_cours' | 'validee' | 'payee'), `validated_at` (TIMESTAMPTZ), `validated_by` (UUID, FK).
-- **`commission_payouts`** :
-  - `id` (UUID, PK), `period_id` (UUID, FK), `employee_id` (UUID, FK), `total_washes` (INT), `revenue_base` (NUMERIC), `commission_rate` (NUMERIC), `total_commission` (NUMERIC), `paid` (BOOLEAN), `paid_at` (TIMESTAMPTZ).
-
-### 3.6 CRM, Fidélisation & Flottes
-- **`loyalty_cards`** :
-  - `id` (UUID, PK), `customer_id` (UUID, FK), `points_balance` (INT), `total_washes_count` (INT), `tier` (TEXT: 'bronze' | 'argent' | 'or' | 'vip').
-- **`fleet_contracts`** :
-  - `id` (UUID, PK), `company_id` (UUID), `client_name` (TEXT), `contact_phone` (TEXT), `billing_cycle` (TEXT: 'mensuel' | 'bimensuel'), `discount_percent` (NUMERIC), `active` (BOOLEAN).
-
-### 3.7 SaaS Platform & Audit
-- **`plans`** :
-  - `id` (TEXT, PK: 'essai', 'standard', 'premium'), `name` (TEXT), `price_monthly` (NUMERIC), `max_stations` (INT), `max_employees` (INT), `max_washes_per_month` (INT), `features` (JSONB).
-- **`subscriptions`** :
-  - `id` (UUID, PK), `company_id` (UUID, FK), `plan_id` (TEXT, FK), `status` (TEXT: 'essai' | 'active' | 'en_attente' | 'suspendue'), `started_at` (TIMESTAMPTZ), `trial_ends_at` (TIMESTAMPTZ), `current_period_end` (TIMESTAMPTZ).
-- **`audit_logs`** :
-  - `id` (UUID, PK), `company_id` (UUID), `station_id` (UUID nullable), `actor_id` (UUID), `actor_name` (TEXT), `action` (TEXT), `details` (JSONB), `created_at` (TIMESTAMPTZ).
+**Bénéfice :** l'étape 03 peut créer le schéma sans casser une seule page ; l'étape 04 peut brancher Auth sans réécrire les formulaires.
 
 ---
 
-## 4. Politiques RLS (Row Level Security)
+## 4. Modèle multi-entreprises et sécurité
 
-Exemple standard de politique d'isolation pour toute table comportant `company_id` :
-
-```sql
-ALTER TABLE washes ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Isolation multi-entreprises pour les lavages"
-ON washes
-FOR ALL
-USING (
-  company_id IN (
-    SELECT company_id FROM user_profiles
-    WHERE user_profiles.id = auth.uid()
-  )
-)
-WITH CHECK (
-  company_id IN (
-    SELECT company_id FROM user_profiles
-    WHERE user_profiles.id = auth.uid()
-  )
-);
+```
+auth.users (Supabase Auth)
+   │ 1:1
+user_profiles ── company_id ──> companies ── 1:N ──> stations
+   │                                   │
+   └── user_station_assignments ───────┘   (un utilisateur ↔ N stations)
+            │
+       roles ── role_permissions ──> permissions
 ```
 
-Une fonction de sécurité PostgreSQL `get_current_user_company_id()` en `SECURITY DEFINER` sera déployée au Prompt 03 pour optimiser les performances des index sans exécuter de sous-requêtes répétées.
+| Règle | Implémentation |
+| --- | --- |
+| Isolation | RLS sur **toutes** les tables : `company_id = (SELECT company_id FROM user_profiles WHERE id = auth.uid())` ; aucune politique `USING (true)` |
+| Portée station | `station_id IN (SELECT station_id FROM user_station_assignments WHERE user_id = auth.uid())` |
+| `company_id` | jamais accepté depuis le frontend : valeur par défaut ou trigger serveur |
+| Opérations sensibles | fonctions SQL `SECURITY DEFINER` (clôture de caisse, validation de commissions, annulation de paiement, suspension d'entreprise), avec vérification de permission **dans la fonction** |
+| Audit | `audit_logs` en append-only, écriture par trigger/fonction, acteur = `auth.uid()`, jamais par le client |
+| Données niveau entreprise | `station_id NULL` autorisé (ex. `companies`, `plans`, abonnements, contrats de flotte) |
+| Suppression | logique (`deleted_at`) pour l'historique métier ; interdiction de `DELETE` sur `payments`, `cash_movements`, `stock_movements`, `wash_status_history`, `audit_logs` |
+| Idempotence | clé d'idempotence sur paiements / encaissements / réceptions ; contraintes d'unicité sur `wash_items`, numéros de lavage par station |
+| Rôles cibles | `proprietaire`, `gerant`, `caissier`, `laveur`, `super_admin` (ce dernier hors `company_id`, via une table/service plateforme distinct) |
+
+**Permissions granulaires** (`washes.create`, `washes.update_status`, `payments.create`, `cash.open`, `cash.close`, `expenses.create`, `employees.manage`, `reports.view`, `inventory.manage`, `settings.manage`, …) : la table fait foi, l'UI ne fait que **refléter** (`usePermissions`). `RoleRoute` reste utile comme confort, jamais comme protection.
+
+> **État Prompt 04 :** ce modèle est appliqué. `my_context()` renvoie les permissions depuis `auth.uid()`, les mutations d'identité passent par des fonctions `SECURITY DEFINER`, l'Edge Function d'invitation vérifie le JWT et `has_permission()`, et `audit_logs` est alimenté par triggers avec acteur `auth.uid()`. Voir [docs/auth-rbac.md](auth-rbac.md).
+
+---
+
+## 5. Découpage des responsabilités (SOLID)
+
+| Couche | Responsabilité | Interdit |
+| --- | --- | --- |
+| `pages` / `components` | rendu, interactions, états locaux | appeler `supabase` directement, calculer un montant financier |
+| `hooks` | orchestration, cache (TanStack Query), états loading/empty/error | contenir une règle métier |
+| `services/repositories` | requêtes, mapping DTO ↔ domaine | décider d'une autorisation |
+| `modules/*/rules.ts` | règles pures (prix figé, théorique de caisse, commission, consommation stock, rentabilité) | effets de bord, I/O |
+| `schemas` (Zod) | validation des entrées et des réponses | remplacer les contraintes SQL |
+| Base (RLS + fonctions) | autorité finale, intégrité, audit | faire confiance au client |
+
+Erreurs : un type `AppError` (extension de l'actuel `ApiError`) normalisé `{ code, message, missing?, cause? }`, traduit en toast par une seule couche. États : `loading` → squelette, `empty` → message explicite (jamais de donnée factice), `error` → retry.
+
+---
+
+## 6. Cycles de vie et énumérations cibles
+
+| Domaine | Actuel | Cible | Migration |
+| --- | --- | --- | --- |
+| Lavage | `en_attente`, `en_cours`, `termine`, `annule` | `pending`, `assigned`, `in_progress`, `quality_check`, `ready`, `delivered`, `cancelled` | table de correspondance + `wash_status_history` (acteur, date, motif) ; **« terminé » ne vaut pas « livré »** |
+| Paiement | `especes`, `mobile_money`, `carte`, `virement` | table `payment_methods` par station : Espèces, Orange Money, MTN MoMo, Wave, Carte, Virement, autres | seed par station ; `mobile_money` historique → méthode générique puis ventilation |
+| Devise | `'FCFA'` littéral | `companies.currency` (`XOF` par défaut) + `Intl.NumberFormat` | migration de `formatFCFA` vers `formatMoney(amount, currency)` avec rétrocompatibilité |
+| Rôle | 4 valeurs FR | `owner`, `manager`, `cashier`, `washer`, `super_admin` | mapping + `ROLE_LABELS` conservé pour l'affichage FR |
+| Caisse | une session, un comptage | `cash_sessions` + `cash_movements` immuables, clôtures figées | convertir l'actuel `countedAmount` en écriture de clôture |
+| Commission | recalcul à la volée | `commission_periods` (figé) → `employee_commissions` → `commission_payouts` | ne jamais recalculer une période validée |
+
+---
+
+## 7. États, performance et expérience
+
+- **État serveur** : TanStack Query (clés `[company, station, domain, params]`), invalidation après mutation, optimistic UI uniquement sur les actions réversibles.
+- **État UI** : contexte léger (thème, sidebar, filtres persistants), pas de données métier dupliquées.
+- **Performance** : pagination côté serveur sur lavages / paiements / mouvements, index `(company_id, station_id, created_at)`, lazy-loading des modules, agrégations de dashboard en vues matérialisées ou fonctions SQL, images via Supabase Storage avec transformations.
+- **Accessibilité / responsive** : navigation clavier, focus visible, `aria-*`, tables responsives (déjà présentes via `.wg-scroll-x`), sidebar repliable, cibles tactiles adaptées au terrain.
+- **Connectivité** : les stations peuvent avoir un réseau instable. Décision à trancher à l'étape 05 : file d'attente hors ligne avec idempotence, **ou** exigence de connexion explicite. Ne pas promettre un mode hors ligne sans le tester.
+
+---
+
+## 8. Critères de sortie de l'architecture cible
+
+1. `useStore()` conserve sa forme publique ; les 16 écrans rendent sans modification fonctionnelle.
+2. `LocalDataAdapter` et `SupabaseDataAdapter` passent **la même suite** `npm run check` (66 assertions) sur les parcours communs.
+3. Deux entreprises de test ne peuvent pas se lire mutuellement (test d'isolation).
+4. Aucun `company_id` n'est envoyé par le frontend.
+5. Aucun mot de passe, aucun token, aucun secret dans `localStorage` ni dans le bundle.
+6. `npm run typecheck`, `npm run build`, lint et tests passent en CI.
+7. Les documents `docs/database.md`, `docs/security.md` (étapes 03/04) reprennent exactement ce modèle.

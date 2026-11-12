@@ -1,206 +1,131 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { FiCornerDownLeft, FiSearch, FiX } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
-import {
-  FiArrowRight, FiBox, FiCreditCard, FiDollarSign, FiFileText,
-  FiGrid, FiList, FiSearch, FiSettings, FiTruck, FiUsers, FiX,
-} from 'react-icons/fi';
-import { useStore } from '../lib/store';
-import { formatFCFA } from '../lib/format';
-import { Badge } from './ui';
+import { groupsForRole, normalizeNavText, type NavEntry } from './navigation';
+import type { Role } from '../types';
 
-interface CommandPaletteProps {
+interface Result { entry: NavEntry; group: string }
+
+/** Recherche globale réelle (Ctrl/Cmd + K) : ne liste QUE des écrans
+ *  existants et autorisés pour le rôle, et navigue effectivement.       */
+export function CommandPalette({
+  open,
+  onClose,
+  role,
+  permissions,
+}: {
   open: boolean;
   onClose: () => void;
-}
-
-export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
-  const [query, setQuery] = useState('');
+  role: Role;
+  permissions: string[];
+}) {
   const navigate = useNavigate();
-  const { state } = useStore();
+  const [query, setQuery] = useState('');
+  const [active, setActive] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const entries = useMemo<Result[]>(() => groupsForRole(role, permissions).flatMap((group) =>
+    group.entries
+      .filter((entry) => Boolean(entry.to) && !entry.upcoming)
+      .map((entry) => ({ entry, group: group.label }))
+  ), [role, permissions]);
+
+  const results = useMemo(() => {
+    const q = normalizeNavText(query.trim());
+    if (!q) return entries;
+    return entries.filter(({ entry, group }) =>
+      normalizeNavText([entry.label, group, ...(entry.keywords ?? [])].join(' ')).includes(q)
+    );
+  }, [entries, query]);
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        if (open) onClose();
-        else setQuery('');
-      }
-      if (e.key === 'Escape' && open) {
+    if (!open) return;
+    setQuery('');
+    setActive(0);
+    const timer = setTimeout(() => inputRef.current?.focus(), 0);
+    return () => clearTimeout(timer);
+  }, [open]);
+
+  useEffect(() => { setActive(0); }, [query]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
         onClose();
+      } else if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        setActive((index) => Math.min(index + 1, Math.max(0, results.length - 1)));
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        setActive((index) => Math.max(index - 1, 0));
+      } else if (event.key === 'Enter') {
+        const target = results[active];
+        if (target?.entry.to) {
+          event.preventDefault();
+          navigate(target.entry.to);
+          onClose();
+        }
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [open, onClose]);
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [open, results, active, onClose, navigate]);
 
   if (!open) return null;
 
-  const q = query.trim().toLowerCase();
-
-  const navigationItems = [
-    { label: 'Tableau de bord', to: '/app/tableau-de-bord', icon: <FiGrid /> },
-    { label: 'Lavages & File d’attente', to: '/app/lavages', icon: <FiTruck /> },
-    { label: 'Caisse & Sessions', to: '/app/caisse', icon: <FiDollarSign /> },
-    { label: 'Dépenses d’exploitation', to: '/app/depenses', icon: <FiCreditCard /> },
-    { label: 'Clients & Véhicules', to: '/app/clients', icon: <FiUsers /> },
-    { label: 'Prestations & Grille tarifaire', to: '/app/prestations', icon: <FiBox /> },
-    { label: 'Rapports & Exports', to: '/app/rapports', icon: <FiFileText /> },
-    { label: 'Commissions laveurs', to: '/app/commissions', icon: <FiTruck /> },
-    { label: 'Équipe & Employés', to: '/app/employes', icon: <FiUsers /> },
-    { label: 'Paramètres station', to: '/app/parametres', icon: <FiSettings /> },
-    { label: 'Mise en route (13 étapes)', to: '/app/mise-en-route', icon: <FiList /> },
-  ].filter((it) => !q || it.label.toLowerCase().includes(q));
-
-  const matchedWashes = q
-    ? state.washes
-        .filter(
-          (w) =>
-            w.number.toLowerCase().includes(q) ||
-            w.plate.toLowerCase().includes(q) ||
-            (w.clientName && w.clientName.toLowerCase().includes(q))
-        )
-        .slice(0, 5)
-    : [];
-
-  const matchedClients = q
-    ? state.clients
-        .filter(
-          (c) =>
-            c.name.toLowerCase().includes(q) ||
-            c.phone.toLowerCase().includes(q) ||
-            c.plate.toLowerCase().includes(q)
-        )
-        .slice(0, 5)
-    : [];
-
-  const handleSelect = (to: string) => {
-    navigate(to);
-    onClose();
-  };
-
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-16 backdrop-blur-sm sm:pt-24"
-      onClick={onClose}
+      className="wg-overlay fixed inset-0 z-[95] flex items-start justify-center px-4 pt-[12vh]"
+      onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
     >
       <div
-        className="wg-card wg-fade-in w-full max-w-xl overflow-hidden shadow-2xl border"
-        style={{ background: 'var(--wg-surface)', borderColor: 'var(--wg-border)' }}
-        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Recherche rapide"
+        className="wg-card wg-elev-2 wg-fade-in w-full max-w-xl overflow-hidden"
+        style={{ background: 'var(--wg-surface)' }}
       >
-        {/* Search Input Bar */}
         <div className="flex items-center gap-3 border-b px-4 py-3" style={{ borderColor: 'var(--wg-border)' }}>
-          <FiSearch className="wg-muted text-base" />
+          <FiSearch className="wg-muted shrink-0" aria-hidden="true" />
           <input
-            type="text"
-            autoFocus
-            className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-500"
-            placeholder="Rechercher une fiche, une plaque, un client ou une page... (Échap pour fermer)"
+            ref={inputRef}
+            type="search"
+            className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+            style={{ color: 'var(--wg-text)' }}
+            aria-label="Rechercher un écran"
+            placeholder="Rechercher un écran, un module…"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(event) => setQuery(event.target.value)}
           />
-          {query && (
-            <button className="wg-muted hover:text-slate-300" onClick={() => setQuery('')}>
-              <FiX size={16} />
+          <button type="button" className="wg-muted" onClick={onClose} aria-label="Fermer la recherche"><FiX size={18} /></button>
+        </div>
+        <div role="listbox" aria-label="Écrans disponibles" className="wg-scroll-thin max-h-[52vh] overflow-y-auto p-2">
+          {results.length === 0 ? (
+            <p className="wg-muted px-3 py-6 text-center text-xs">Aucun écran autorisé ne correspond à « {query} ».</p>
+          ) : results.map(({ entry, group }, index) => (
+            <button
+              key={entry.to}
+              type="button"
+              role="option"
+              aria-selected={index === active}
+              onMouseEnter={() => setActive(index)}
+              onClick={() => { if (entry.to) { navigate(entry.to); onClose(); } }}
+              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition ${index === active ? 'wg-nav-item-active' : 'wg-nav-item'}`}
+            >
+              <span className="text-base">{entry.icon}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-semibold">{entry.label}</span>
+                <span className="wg-muted block truncate text-[11px]">{group}</span>
+              </span>
+              {index === active && <FiCornerDownLeft className="wg-muted shrink-0" size={14} aria-hidden="true" />}
             </button>
-          )}
-          <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-mono text-slate-400">
-            ESC
-          </span>
+          ))}
         </div>
-
-        {/* Search Results */}
-        <div className="max-h-[60vh] overflow-y-auto p-2 space-y-3">
-          {/* Fiches de lavage correspondantes */}
-          {matchedWashes.length > 0 && (
-            <div>
-              <p className="wg-muted px-3 py-1 text-[10px] font-bold uppercase tracking-wider">
-                Fiches de lavage ({matchedWashes.length})
-              </p>
-              <div className="space-y-0.5">
-                {matchedWashes.map((w) => (
-                  <button
-                    key={w.id}
-                    onClick={() => handleSelect('/app/lavages')}
-                    className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs hover:bg-sky-500/10 transition"
-                  >
-                    <div className="flex items-center gap-2">
-                      <FiTruck className="text-sky-400" />
-                      <div>
-                        <span className="font-bold text-slate-200">{w.number}</span>
-                        <span className="wg-muted ml-2">
-                          {w.plate ? `Plaque : ${w.plate}` : w.vehicleLabel}
-                        </span>
-                        {w.clientName && <span className="wg-muted ml-2">· {w.clientName}</span>}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-slate-300">{formatFCFA(w.total)}</span>
-                      <Badge tone={w.status === 'termine' ? 'success' : w.status === 'annule' ? 'danger' : 'warn'}>
-                        {w.status}
-                      </Badge>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Clients correspondants */}
-          {matchedClients.length > 0 && (
-            <div>
-              <p className="wg-muted px-3 py-1 text-[10px] font-bold uppercase tracking-wider">
-                Clients ({matchedClients.length})
-              </p>
-              <div className="space-y-0.5">
-                {matchedClients.map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => handleSelect('/app/clients')}
-                    className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs hover:bg-sky-500/10 transition"
-                  >
-                    <div className="flex items-center gap-2">
-                      <FiUsers className="text-sky-400" />
-                      <div>
-                        <span className="font-bold text-slate-200">{c.name}</span>
-                        {c.phone && <span className="wg-muted ml-2">· {c.phone}</span>}
-                        {c.plate && <span className="wg-muted ml-2">· {c.plate}</span>}
-                      </div>
-                    </div>
-                    <FiArrowRight className="text-slate-500" />
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Navigation modules */}
-          <div>
-            <p className="wg-muted px-3 py-1 text-[10px] font-bold uppercase tracking-wider">
-              Navigation rapide
-            </p>
-            <div className="space-y-0.5">
-              {navigationItems.map((it) => (
-                <button
-                  key={it.to}
-                  onClick={() => handleSelect(it.to)}
-                  className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs hover:bg-sky-500/10 transition text-slate-300 hover:text-white"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-sky-400">{it.icon}</span>
-                    <span className="font-medium">{it.label}</span>
-                  </div>
-                  <FiArrowRight className="text-slate-500 text-xs" />
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Footer shortcuts hint */}
-        <div className="flex items-center justify-between border-t px-4 py-2 text-[11px] text-slate-500" style={{ borderColor: 'var(--wg-border)', background: 'var(--wg-surface-2)' }}>
-          <span>Utilisez les flèches ou la souris pour naviguer</span>
-          <span>WashGuard ERP v1.0</span>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-2.5 text-[11px]" style={{ borderColor: 'var(--wg-border)' }}>
+          <span className="wg-muted">{results.length} écran(s) · ↑ ↓ pour parcourir · Entrée pour ouvrir</span>
+          <span className="wg-kbd">Échap</span>
         </div>
       </div>
     </div>

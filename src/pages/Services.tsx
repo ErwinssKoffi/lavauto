@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { FiCheckCircle, FiEdit3, FiPlus, FiTrash2, FiX } from 'react-icons/fi';
 import { useStore } from '../lib/store';
 import { formatFCFA } from '../lib/format';
-import { Alert, Badge, Breadcrumbs, Card, Input, Modal, PageHeader, useSafeAction } from '../components/ui';
+import { Alert, Badge, Card, Input, Modal, PageHeader, useSafeAction } from '../components/ui';
 
 export default function Services() {
   const { state, addService, updateService, setPrice, removeService, notify } = useStore();
@@ -18,7 +18,6 @@ export default function Services() {
 
   return (
     <div>
-      <Breadcrumbs items={[{ label: 'Exploitation', to: '/app/prestations' }, { label: 'Prestations & Tarifs' }]} />
       <PageHeader title="Prestations" subtitle="Catalogue propre à la station. Modifier un tarif ne change jamais les lavages déjà enregistrés."
         actions={<button className="wg-btn wg-btn-primary" onClick={() => setAddOpen(true)}><FiPlus /> Nouvelle prestation</button>} />
 

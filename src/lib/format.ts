@@ -14,7 +14,10 @@ export function formatNumber(n: number): string {
 /** '2026-11-11' ou ISO → '11/11/2026' */
 export function formatDate(value: string | null | undefined): string {
   if (!value) return '—';
-  const d = new Date(value);
+  // « aaaa-mm-jj » est interprété en UTC par new Date(), ce qui décale d'un
+  // jour à l'ouest de Greenwich. On construit la date explicitement en local.
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  const d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(value);
   if (Number.isNaN(d.getTime())) return '—';
   const dd = String(d.getDate()).padStart(2, '0');
   const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -48,8 +51,13 @@ export function uid(prefix = 'id'): string {
 /** Télécharge un CSV (BOM UTF-8 pour Excel FR). */
 export function downloadCSV(filename: string, headers: string[], rows: (string | number)[][]) {
   const escape = (v: string | number) => {
-    const s = String(v ?? '');
-    return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    if (typeof v === 'number') return String(v);
+    let s = String(v ?? '');
+    // Anti-injection de formule Excel / LibreOffice sur les textes saisis
+    // (noms de clients, motifs, fournisseurs…). Les nombres, y compris
+    // négatifs, restent des nombres.
+    if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+    return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const csv = [headers, ...rows].map((r) => r.map(escape).join(';')).join('\r\n');
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
