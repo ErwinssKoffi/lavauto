@@ -50,12 +50,13 @@ test('vitrine connectée simulée : base indisponible, aucune formule locale de 
     : undefined);
   await page.goto('/');
   const pricing = page.locator('#tarifs');
-  await expect(pricing.getByRole('alert')).toContainText('Formules et tarifs indisponibles');
+  // PostgREST peut retenter une réponse 503 avant de remonter l'erreur.
+  await expect(pricing.getByRole('alert')).toContainText('Formules et tarifs indisponibles', { timeout: 15_000 });
   await expect(pricing).toContainText('Aucun prix local');
   await expect(pricing).not.toContainText('15 000 FCFA');
   await expect(pricing).not.toContainText('16 000 FCFA');
   await expect(pricing.getByRole('link', { name: 'Créer un compte' })).toHaveCount(0);
-  expect(mock.calls.filter((call) => call.path === '/rest/v1/plans').length).toBeGreaterThan(0);
+  expect(mock.calls.filter((call) => call.path === '/rest/v1/plans').length).toBeGreaterThan(1);
   expect(mock.unexpected).toEqual([]);
   expect(mock.blocked).toEqual([]);
 });

@@ -22,6 +22,8 @@ const headers = {
   'access-control-allow-origin': '*',
   'access-control-allow-headers': '*',
   'access-control-allow-methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
+  // Permet au client PostgREST de lire le Retry-After simulé en CORS réel.
+  'access-control-expose-headers': 'retry-after',
 };
 async function json(route: Route, data: unknown, status = 200, extraHeaders: Record<string, string> = {}): Promise<void> {
   await route.fulfill({ status, headers: { ...headers, ...extraHeaders }, contentType: 'application/json', body: JSON.stringify(data) });
