@@ -15,6 +15,7 @@ import { usePermissions } from '../lib/usePermissions';
 import StockAlertBanner from './StockAlertBanner';
 import { AccountSecurity } from './AccountSecurity';
 import { PWAInstallButton } from './PwaControls';
+import { ThemePicker } from './ThemeSwitcher';
 
 const SIDEBAR_KEY = 'washguard.sidebar.collapsed';
 
@@ -195,7 +196,7 @@ export default function AppShell() {
               <p className="truncate text-sm font-bold sm:hidden">{current}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {identity && identity.stations.length > 1 && state.session?.stationId && (
               <label className="flex min-w-0 items-center gap-2 text-xs">
                 <span className="hidden text-base-content/60 xl:inline">Station</span>
@@ -210,9 +211,10 @@ export default function AppShell() {
               <kbd className="hidden xl:inline-flex">Ctrl K</kbd>
             </button>
             <PWAInstallButton compact />
-            <button type="button" onClick={toggleTheme} className="btn btn-sm px-2.5!" aria-label="Changer de thème" title="Thème clair / sombre">
+            <button type="button" onClick={toggleTheme} className="btn btn-sm px-2.5!" aria-label="Changer de thème" title="Thème WashGuard clair / sombre">
               {theme === 'dark' ? <FiSun size={16} /> : <FiMoon size={16} />}
             </button>
+            <ThemePicker />
             <a href="/#faq" className="btn btn-sm px-2.5!" title="Questions fréquentes" aria-label="Questions fréquentes"><FiHelpCircle size={16} /></a>
 
             {/* Cloche d'alertes stock en temps réel */}

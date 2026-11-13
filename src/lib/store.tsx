@@ -8,6 +8,7 @@ import type {
 } from '../types';
 import { ApiError, PAY_METHOD_DB_KEY } from '../types';
 import { canTransitionWash, normalizeWashes, washEvent } from './washLifecycle';
+import { DEFAULT_THEME, isKnownTheme, themeScheme } from './themes';
 import { mapCatalogToState } from './catalog';
 import { theoreticalCash } from './metrics';
 import {
@@ -309,8 +310,14 @@ interface Ctx {
   toasts: Toast[];
   notify: (kind: Toast['kind'], message: string) => void;
   dismissToast: (id: string) => void;
+  /** Schéma de couleurs du thème actif, conservé pour la bascule rapide. */
   theme: 'dark' | 'light';
+  /** Bascule rapide entre les deux thèmes WashGuard. */
   toggleTheme: () => void;
+  /** Thème DaisyUI actif (`data-theme`), parmi les 37 thèmes disponibles. */
+  themeName: string;
+  /** Applique et persiste un thème DaisyUI ; les noms inconnus sont ignorés. */
+  setTheme: (name: string) => void;
   /** Formules affichées : cache du repli local ou lignes lues dans `plans`. */
   plans: Plan[];
   /** Source active (diagnostic) : `local` par défaut, `supabase` en lecture seule. */
@@ -565,10 +572,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const localWashReservations = useRef(new Set<string>());
   const localAccountReservations = useRef(new Set<string>());
   const [setupLoad, setSetupLoad] = useState<{ epoch: number; status: 'loading' | 'ready' | 'error'; error: string | null }>({ epoch: -1, status: 'loading', error: null });
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    try { return localStorage.getItem('washguard.theme') === 'light' ? 'light' : 'dark'; }
-    catch { return 'dark'; }
+  // Thème DaisyUI actif : `washguard.theme.name` fait foi. L'ancienne clé
+  // `washguard.theme` (dark|light) reste lue et maintenue pour compatibilité
+  // (script inline de index.html, préférences déjà enregistrées).
+  const [themeName, setThemeName] = useState<string>(() => {
+    try {
+      const savedName = localStorage.getItem('washguard.theme.name');
+      if (isKnownTheme(savedName)) return savedName;
+      return localStorage.getItem('washguard.theme') === 'light' ? 'washguard' : DEFAULT_THEME;
+    } catch { return DEFAULT_THEME; }
   });
+  const theme = themeScheme(themeName);
   const stateRef = useRef(state);
   stateRef.current = state;
   useEffect(() => {
@@ -1102,22 +1116,29 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
   }, [adapter, serverSubscription, authReady, identity?.isPlatformAdmin, beginRequest]);
 
-  const toggleTheme = useCallback(() => {
-    setTheme((t) => {
-      const next = t === 'dark' ? 'light' : 'dark';
-      try { localStorage.setItem('washguard.theme', next); } catch { /* préférence facultative */ }
-      return next;
-    });
+  const setTheme = useCallback((name: string) => {
+    if (!isKnownTheme(name)) return;
+    setThemeName(name);
   }, []);
 
-  // Le thème pilote deux attributs du document : la classe `dark` (utilisée par
-  // quelques surcharges Tailwind) et `data-theme`, seule source de vérité des
-  // thèmes DaisyUI `washguard` / `washguard-dark`.
+  // Bascule rapide : uniquement entre les deux thèmes WashGuard, quelle que
+  // soit la palette exotique éventuellement sélectionnée.
+  const toggleTheme = useCallback(() => {
+    setThemeName((current) => (themeScheme(current) === 'dark' ? 'washguard' : DEFAULT_THEME));
+  }, []);
+
+  // Persistance + application au document. `data-theme` est la source de vérité
+  // de DaisyUI ; la classe `dark` est conservée pour compatibilité.
   useEffect(() => {
+    const scheme = themeScheme(themeName);
     const root = document.documentElement;
-    root.classList.toggle('dark', theme === 'dark');
-    root.setAttribute('data-theme', theme === 'dark' ? 'washguard-dark' : 'washguard');
-  }, [theme]);
+    root.classList.toggle('dark', scheme === 'dark');
+    root.setAttribute('data-theme', themeName);
+    try {
+      localStorage.setItem('washguard.theme.name', themeName);
+      localStorage.setItem('washguard.theme', scheme);
+    } catch { /* préférence facultative */ }
+  }, [themeName]);
 
   const onboarding = useMemo(() => computeOnboarding(state), [state]);
   const missing = useMemo(() => missingRequired(state), [state]);
@@ -3234,7 +3255,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   });
 
   const value: Ctx = {
-    state, toasts, notify: (kind, message) => { if (!isRemoteAuth || viewEpoch === scopeRef.current.epoch) notify(kind, message); }, dismissToast, theme, toggleTheme, plans, dataSource, isLocalStockDemo, demoStorageIssue, demoStoragePending, isServerStock: serverStock, plansError,
+    state, toasts, notify: (kind, message) => { if (!isRemoteAuth || viewEpoch === scopeRef.current.epoch) notify(kind, message); }, dismissToast, theme, toggleTheme, themeName, setTheme, plans, dataSource, isLocalStockDemo, demoStorageIssue, demoStoragePending, isServerStock: serverStock, plansError,
     subscriptionAccess, subscriptionStatus, subscriptionError, canWriteSubscription, refreshSubscriptionAccess,
     subscriptionRequests, subscriptionRequestsError, refreshSubscriptionRequests, decideSubscriptionRequest,
     onboarding, missing,

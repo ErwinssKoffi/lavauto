@@ -51,6 +51,7 @@ Réglages complémentaires :
 - **Bordure par défaut** : Tailwind 4 utilise `currentColor` ; une règle `@layer base { *, ::before, ::after, ::backdrop { border-color: var(--color-base-300); } }` rétablit une bordure thématique pour les simples `border`.
 - **`--page-bg`** : fond applicatif volontairement distinct de `base-100` pour conserver la profondeur visuelle d'origine.
 - **Ajustements hors couche** : DaisyUI 5 émet ses composants dans la couche `utilities`, donc une règle `@layer components` serait perdante. Trois règles volontairement **non calquées** (donc prioritaires) ajustent le texte des `btn-sm` (`--fontsize: .875rem`), le rayon des badges (pastille `999px`) et la capitalisation des en-têtes de tableaux.
+- **Sélecteur de thème** (`src/components/ThemeSwitcher.tsx`) : menu de la topbar listant les deux thèmes WashGuard puis les 35 thèmes DaisyUI. Chaque ligne porte son propre `data-theme`, donc les pastilles montrent les couleurs réelles du thème proposé. Persistance `localStorage` : `washguard.theme.name` (thème exact) et `washguard.theme` (`dark`/`light`, conservé pour la compatibilité et le script inline de `index.html`). La bascule rapide soleil/lune ne revient qu'aux thèmes WashGuard.
 - **`@theme`** : police `Inter` (`--font-sans`) et animation `--animate-fade-in` (keyframes `fadeIn`).
 - **`@import "tailwindcss" source(none)` + `@source`** : seuls `index.html` et `src/**/*.{ts,tsx}` produisent des classes (ni la documentation ni les tests ne gonflent le CSS).
 - `darkMode: 'class'` n'existe plus : la classe `dark` reste posée pour compatibilité, mais la source de vérité est `data-theme`, synchronisée dans `store.tsx` et appliquée avant le premier rendu par `index.html`.
@@ -67,6 +68,8 @@ Seules règles globales restantes dans `src/index.css` : fond de page, `::select
 | `src/components/ConfirmDialog.tsx` | `ConfirmDialog` | `<dialog class="modal modal-open">`, `aria-modal`, focus piégé, **Échap**, clic fond, labels ARIA via `useId` | `Settings.tsx` |
 | `src/components/CommandPalette.tsx` | `CommandPalette` | `Ctrl/Cmd + K`, recherche insensible aux accents, ↑/↓, **Entrée qui navigue**, Échap, `kbd` DaisyUI | `AppShell` |
 | `src/components/Breadcrumbs.tsx` | `Breadcrumbs` | fil d'Ariane dérivé de l'URL courante, `aria-current="page"`, liens `link link-primary` | `AppShell` |
+| `src/components/ThemeSwitcher.tsx` | `ThemePicker`, `ThemeRow` | sélection parmi 37 thèmes, aperçu par `data-theme`, fermeture au clic extérieur et à Échap, `aria-expanded` / `aria-pressed` | `AppShell` (topbar) |
+| `src/lib/themes.ts` | `THEME_OPTIONS`, `isKnownTheme`, `themeScheme` | catalogue unique des thèmes (vérifié contre les fichiers de `node_modules/daisyui/theme` par `npm run check` et les tests unitaires) | store, sélecteur, contrôles |
 | `src/components/DataTable.tsx` | `DataTable<T>` | recherche `input input-bordered input-sm`, tri réel `aria-sort`, `table` DaisyUI, état vide explicite | `Commissions.tsx` |
 
 `Modal` et `ConfirmDialog` conservent une implémentation React (pas de `<dialog>` piloté par JS natif) pour garder le piège de focus et le retour d'Échap existants.
@@ -133,8 +136,8 @@ Responsive : sidebar desktop / drawer mobile, topbar qui tronque, tableaux `tabl
 | --- | --- |
 | `npm run typecheck` | ✅ 0 erreur (TS strict) |
 | `npm run lint` | ✅ 26 règles statiques |
-| `npm run check` | ✅ **243 contrôles OK / 0 KO** (dont le rendu des 15 écrans en JSDOM) |
-| `npm run test:unit` | ✅ 283 tests / 33 fichiers |
+| `npm run check` | ✅ **248 contrôles OK / 0 KO** (dont le rendu des 15 écrans en JSDOM) |
+| `npm run test:unit` | ✅ 288 tests / 34 fichiers |
 | `npm run build` | ✅ build Vite + PWA (39 entrées pré-cachées) · CSS 192,3 kB / gzip 30,2 kB |
 
 Le contrôle « thème » de `scripts/check.cjs` vérifie désormais : `:focus-visible` et `prefers-reduced-motion` toujours présents, `@import "tailwindcss"`, les plugins `daisyui` et `daisyui/theme` (exactement deux thèmes), les variables `--color-*`, `@theme` et `--animate-fade-in`, et **l'absence** de toute classe `.wg-` ou variable `--wg-` résiduelle dans `src/` (garde-fou sur chaque fichier `.ts`/`.tsx`/`.css`).

@@ -485,6 +485,20 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     Boolean(pkg.dependencies.jspdf) && Boolean(pkg.dependencies.zod) && Boolean(pkg.devDependencies['pdfjs-dist']) &&
     String(pkg.dependencies.recharts).startsWith('^2.') &&
     String(pkg.dependencies['react-router-dom']).startsWith('^7.'));
+  check('sélecteur de thème : catalogue complet, persisté et branché dans le shell', (() => {
+    const themesSrc = read('src/lib/themes.ts');
+    const names = [...themesSrc.matchAll(/name: '([a-z0-9-]+)'/g)].map((m) => m[1]);
+    const installed = fs.readdirSync(path.join(ROOT, 'node_modules/daisyui/theme'))
+      .filter((file) => file.endsWith('.css'))
+      .map((file) => file.replace(/\.css$/, ''));
+    return names.length === installed.length + 2 &&
+      installed.every((name) => names.includes(name)) &&
+      names.includes('washguard') && names.includes('washguard-dark') &&
+      themesSrc.includes("export const DEFAULT_THEME = 'washguard-dark'") &&
+      shellSrc.includes('<ThemePicker />') &&
+      read('src/lib/store.tsx').includes("localStorage.setItem('washguard.theme.name'") &&
+      html.includes("localStorage.getItem('washguard.theme.name')");
+  })());
   check('plus aucune classe ni variable wg-* dans les sources React', (() => {
     const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
       const full = path.join(dir, entry.name);
@@ -560,6 +574,37 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
       check('recherche globale : Entrée navigue vers l’écran cible', w.location.pathname === '/app/caisse', w.location.pathname);
     }
     check('recherche globale : 0 erreur console', errs.length === 0, (errs[0] || '').slice(0, 140));
+    dom.window.close();
+  }
+  {
+    const { dom, w } = makeDom('/app/tableau-de-bord', base());
+    const errs = await mount(acode, w);
+    const click = (el) => el.dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true, view: w }));
+    const pickerButton = () => w.document.querySelector('button[aria-label="Choisir un thème"]');
+    const rows = () => [...w.document.querySelectorAll('button[data-theme]')];
+    check('sélecteur de thème : bouton présent dans la topbar, 0 erreur console',
+      Boolean(pickerButton()) && errs.length === 0, (errs[0] || '').slice(0, 140));
+    if (pickerButton()) {
+      click(pickerButton());
+      await wait(120);
+      check('sélecteur de thème : les 37 thèmes sont proposés', rows().length === 37, String(rows().length));
+      const target = rows().find((row) => row.getAttribute('data-theme') === 'dracula');
+      if (target) click(target);
+      await wait(140);
+      check('sélecteur de thème : thème appliqué, persisté et schéma synchronisé',
+        w.document.documentElement.getAttribute('data-theme') === 'dracula' &&
+        w.localStorage.getItem('washguard.theme.name') === 'dracula' &&
+        w.localStorage.getItem('washguard.theme') === 'dark' &&
+        w.document.documentElement.classList.contains('dark'));
+      click(pickerButton());
+      await wait(100);
+      const light = rows().find((row) => row.getAttribute('data-theme') === 'washguard');
+      if (light) click(light);
+      await wait(140);
+      check('sélecteur de thème : retour immédiat au thème WashGuard clair',
+        w.document.documentElement.getAttribute('data-theme') === 'washguard' &&
+        !w.document.documentElement.classList.contains('dark'));
+    }
     dom.window.close();
   }
   {

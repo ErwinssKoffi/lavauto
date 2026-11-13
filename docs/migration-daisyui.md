@@ -90,8 +90,8 @@
 | --- | --- |
 | `npm run typecheck` | ✅ 0 erreur |
 | `npm run lint` | ✅ 26 règles |
-| `npm run check` | ✅ 243 OK / 0 KO |
-| `npm run test:unit` | ✅ 283 tests / 33 fichiers |
+| `npm run check` | ✅ 248 OK / 0 KO |
+| `npm run test:unit` | ✅ 288 tests / 34 fichiers |
 | `npm run build` | ✅ build Vite + PWA |
 
 ## 8. Différences visuelles connues (assumées)
@@ -155,6 +155,25 @@ Trois ajustements restent **hors couche** (donc prioritaires sur la couche `util
 | --- | --- |
 | `npm run typecheck` | ✅ 0 erreur |
 | `npm run lint` | ✅ 26 règles |
-| `npm run check` | ✅ 243 OK / 0 KO |
-| `npm run test:unit` | ✅ 283 tests / 33 fichiers |
+| `npm run check` | ✅ 248 OK / 0 KO |
+| `npm run test:unit` | ✅ 288 tests / 34 fichiers |
 | `npm run build` | ✅ Vite + PWA · CSS 192,3 kB / gzip 30,2 kB |
+
+
+---
+
+## 10. Sélecteur de thème
+
+`themes: all` rend les 35 thèmes intégrés disponibles : ils sont exposés dans la topbar par `src/components/ThemeSwitcher.tsx`.
+
+| Élément | Détail |
+| --- | --- |
+| Catalogue | `src/lib/themes.ts` : `WASHGUARD_THEMES` (2) + `DAISY_THEMES` (35), `DEFAULT_THEME = 'washguard-dark'`, `isKnownTheme`, `themeScheme` |
+| Source de vérité | `data-theme` sur `<html>`, écrit par le store ; la classe `dark` reste maintenue pour compatibilité |
+| Persistance | `washguard.theme.name` (nom exact du thème) + `washguard.theme` (`dark`/`light`) ; l'ancienne clé seule reste lue si la nouvelle est absente |
+| Premier rendu | `index.html` applique `washguard.theme.name` avant tout script (aucun flash), avec repli sur `washguard-dark` |
+| Aperçu | chaque ligne du menu porte `data-theme="<thème>"` : les pastilles affichent la vraie palette, sans image |
+| Accessibilité | bouton `aria-expanded`, lignes `aria-pressed`, fermeture au clic extérieur et sur Échap |
+| Garde-fous | `npm run check` compare `themes.ts` aux fichiers `node_modules/daisyui/theme/*.css` et rejoue l'ouverture du menu, ses 37 entrées, l'application d'un thème, sa persistance et le retour au WashGuard clair ; `tests/unit/themes.test.ts` vérifie l'unicité, l'ordre et les libellés |
+
+La bascule rapide soleil/lune reste volontairement limitée aux deux thèmes WashGuard : un thème exotique sélectionné n'empêche pas de revenir en un clic au thème de la marque.

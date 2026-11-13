@@ -20,9 +20,13 @@
       (function () {
         try {
           var saved = localStorage.getItem('washguard.theme');
+          var name = localStorage.getItem('washguard.theme.name');
           var light = saved === 'light';
           document.documentElement.classList.toggle('dark', !light);
-          document.documentElement.setAttribute('data-theme', light ? 'washguard' : 'washguard-dark');
+          document.documentElement.setAttribute(
+            'data-theme',
+            typeof name === 'string' && /^[a-z0-9-]+$/.test(name) ? name : (light ? 'washguard' : 'washguard-dark'),
+          );
         } catch (e) { /* stockage indisponible : thème sombre par défaut */ }
       })();
     </script>
