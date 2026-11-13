@@ -43,7 +43,7 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact = fa
               role="dialog"
               aria-modal="true"
               aria-label="Installer WashGuard sur iOS"
-              className="card w-full max-w-sm bg-base-100 p-5 shadow-xl"
+              className="card w-full max-w-sm bg-base-100 p-5 shadow-e3"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between border-b border-base-300 pb-3">
@@ -90,7 +90,7 @@ export const OfflineIndicator: React.FC = () => {
     <div
       role="status"
       aria-live="polite"
-      className="fixed bottom-4 left-4 z-[110] flex max-w-[calc(100vw-2rem)] items-center gap-2 rounded-xl border border-warning/40 bg-warning/95 px-3.5 py-2 text-xs font-semibold text-base-content shadow-xl backdrop-blur-md"
+      className="fixed bottom-4 left-4 z-[110] flex max-w-[calc(100vw-2rem)] items-center gap-2 rounded-xl border border-warning/40 bg-warning/95 px-3.5 py-2 text-xs font-semibold text-base-content shadow-e3 backdrop-blur-md"
     >
       <FiWifiOff size={15} className="shrink-0" />
       <span>Hors ligne — Pages essentielles et dernières données disponibles en cache</span>

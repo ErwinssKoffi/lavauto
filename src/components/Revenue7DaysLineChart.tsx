@@ -22,7 +22,7 @@ export default function Revenue7DaysLineChart({ data }: { data: DayChartPoint[] 
       const point = payload[0].payload as DayChartPoint;
       return (
         <div
-          className="rounded-xl border p-3 shadow-xl backdrop-blur-md"
+          className="rounded-xl border p-3 shadow-e3 backdrop-blur-md"
           style={{
             background: 'var(--color-base-100)',
             color: 'var(--color-base-content)',

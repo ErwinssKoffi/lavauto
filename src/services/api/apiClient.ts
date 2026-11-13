@@ -50,6 +50,16 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   } else if (!res.ok) {
     const text = await res.text().catch(() => '');
     throw new HttpClientError(res.status, 'http_error', text || `Erreur serveur (${res.status}).`, undefined, res.status >= 500 ? 'unknown' : 'rejected');
+  } else if (res.status !== 204) {
+    // 2xx sans JSON : c'est le cas d'une route `/api/...` absente, servie par le
+    // repli SPA de l'hébergeur (index.html en 200). Renvoyer `null` ferait
+    // planter l'appelant sur `res.plans` — « Cannot read properties of null » —
+    // au lieu de dire clairement que l'API n'est pas là.
+    throw new HttpClientError(
+      res.status, 'invalid_response',
+      `Réponse inattendue (${res.status}) : contenu non JSON. L’API doit être servie sur /api de cette origine.`,
+      undefined, 'unknown',
+    );
   }
 
   if (!res.ok) {

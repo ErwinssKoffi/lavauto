@@ -16,7 +16,7 @@ const POINTS = [
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   const { authKind } = useStore();
   return (
-    <div className="flex min-h-screen bg-base-100 text-base-content">
+    <div className="flex min-h-screen bg-base-200 text-base-content">
       {/* Formulaire */}
       <div className="flex w-full flex-col lg:w-[54%] xl:w-1/2">
         <header className="flex h-16 items-center justify-between px-6 sm:px-10">
@@ -24,7 +24,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <Link to="/" className="text-xs font-semibold text-base-content/60 hover:text-primary">← Retour à l’accueil</Link>
         </header>
         <div className="flex flex-1 items-center justify-center px-6 py-8 sm:px-10 lg:px-16">
-          <div className="w-full max-w-[460px] animate-fade-in">{children}</div>
+          <div className="w-full max-w-[460px] animate-fade-in rounded-2xl border border-base-300 bg-base-100 p-6 shadow-e1 sm:p-8">{children}</div>
         </div>
         <footer className="px-6 pb-6 text-center text-[11px] text-base-content/60 sm:px-10">
           © {new Date().getFullYear()} WashGuard · Montants en FCFA · Dates jj/mm/aaaa

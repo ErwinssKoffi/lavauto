@@ -14,7 +14,7 @@ import { Link } from 'react-router-dom';
 export function Logo({ compact = false, light = false }: { compact?: boolean; light?: boolean }) {
   return (
     <div className="flex items-center gap-2.5 select-none">
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-linear-to-br from-primary via-primary to-secondary shadow-lg shadow-primary/20">
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-linear-to-br from-primary via-primary to-secondary shadow-e2">
         <svg viewBox="0 0 24 24" className="h-5 w-5 text-primary-content" fill="currentColor" aria-hidden>
           <path d="M12 2.5c.4 0 .75.26.87.64l1.05 3.35a3 3 0 0 1 1.59.92l3.4-.85a.9.9 0 0 1 1.03 1.27l-1.6 3.12a3 3 0 0 1 0 1.9l1.6 3.12a.9.9 0 0 1-1.03 1.27l-3.4-.85a3 3 0 0 1-1.59.92l-1.05 3.35a.9.9 0 0 1-1.74 0l-1.05-3.35a3 3 0 0 1-1.59-.92l-3.4.85A.9.9 0 0 1 5.06 15.9l1.6-3.12a3 3 0 0 1 0-1.9l-1.6-3.12A.9.9 0 0 1 6.09 6.5l3.4.85a3 3 0 0 1 1.59-.92l1.05-3.35A.9.9 0 0 1 12 2.5Z" />
           <circle cx="12" cy="12" r="2.6" fill="var(--color-primary-content)" />
@@ -33,7 +33,7 @@ export function Card({ children, className = '', padded = true, onClick, id }: {
   // `border` sans couleur explicite : la bordure prend `borderColor.DEFAULT`
   // du thème Tailwind (base-300 du thème actif), ce qui reste sensible au
   // clair/sombre et laisse les surcharges `border-*-500/30` fonctionner.
-  return <div id={id} onClick={onClick} className={`card bg-base-100 border shadow-xl ${padded ? 'p-5' : ''} ${className}`}>{children}</div>;
+  return <div id={id} onClick={onClick} className={`card bg-base-100 border border-base-300 shadow-e1 ${padded ? 'p-5' : ''} ${className}`}>{children}</div>;
 }
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: React.ReactNode }) {
@@ -114,11 +114,11 @@ export function StatCard({ label, value, hint, icon, accent, sparkline }: {
   sparkline?: React.ReactNode;
 }) {
   return (
-    <Card className="flex h-full flex-col justify-between gap-3">
+    <Card className="relative flex h-full flex-col justify-between gap-3 overflow-hidden before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-linear-to-r before:from-primary/70 before:via-primary/20 before:to-transparent">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-base-content/60">{label}</p>
-          <p className="mt-2 truncate text-xl font-bold tracking-tight sm:text-2xl">{value}</p>
+          <p className="mt-2 truncate text-xl font-bold tracking-tight tabular-nums sm:text-2xl">{value}</p>
           {hint && <p className="mt-1 truncate text-xs text-base-content/60">{hint}</p>}
         </div>
         {icon && (
@@ -250,7 +250,7 @@ export function ToastHost() {
       {toasts.map((t) => (
         <div
           key={t.id}
-          className={`card pointer-events-auto flex-row animate-fade-in items-start gap-3 bg-base-100 p-3.5 text-sm shadow-xl ${t.kind === 'error' ? 'border-error/40' : t.kind === 'success' ? 'border-success/40' : 'border-base-300'}`}
+          className={`card pointer-events-auto flex-row animate-fade-in items-start gap-3 bg-base-100 p-3.5 text-sm shadow-e3 ${t.kind === 'error' ? 'border-error/40' : t.kind === 'success' ? 'border-success/40' : 'border-base-300'}`}
         >
           <span className={`mt-0.5 ${t.kind === 'error' ? 'text-error' : t.kind === 'success' ? 'text-success' : 'text-primary'}`}>
             {t.kind === 'error' ? <FiAlertCircle /> : t.kind === 'success' ? <FiCheck /> : <FiInfo />}

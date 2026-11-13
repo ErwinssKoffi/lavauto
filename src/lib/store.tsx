@@ -578,8 +578,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [themeName, setThemeName] = useState<string>(() => {
     try {
       const savedName = localStorage.getItem('washguard.theme.name');
-      // Une préférence enregistrée par une génération antérieure (avant le
-      // passage à cupcake) est ignorée une seule fois.
+      // Une préférence enregistrée par une génération antérieure (avant la
+      // Signature Edition) est ignorée une seule fois.
       const versioned = localStorage.getItem('washguard.theme.v') === THEME_PREFERENCE_VERSION;
       return versioned && isKnownTheme(savedName) ? savedName : DEFAULT_THEME;
     } catch { return DEFAULT_THEME; }
@@ -1119,8 +1119,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, [adapter, serverSubscription, authReady, identity?.isPlatformAdmin, beginRequest]);
 
   // Paire clair/sombre mémorisée : la bascule rapide alterne entre les derniers
-  // thèmes clair et sombre choisis (cupcake / dim par défaut), et non plus entre
-  // les deux thèmes de la marque.
+  // thèmes clair et sombre choisis (washguard / washguard-dark par défaut).
   const themePair = useRef<{ light: string; dark: string }>({
     light: DEFAULT_LIGHT_THEME,
     dark: DEFAULT_DARK_THEME,
@@ -1159,7 +1158,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, [rememberTheme]);
 
   // Bascule rapide clair/sombre : elle revient au dernier thème clair (ou
-  // sombre) utilisé, avec cupcake / dim comme valeurs par défaut.
+  // sombre) utilisé, avec washguard / washguard-dark comme valeurs par défaut.
   const toggleTheme = useCallback(() => {
     setThemeName((current) => {
       const target = themeScheme(current) === 'dark' ? themePair.current.light : themePair.current.dark;

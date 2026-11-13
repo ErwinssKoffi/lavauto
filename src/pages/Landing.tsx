@@ -47,7 +47,7 @@ export default function Landing() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'lavages' | 'caisse' | 'stock' | 'commissions'>('caisse');
   return (
-    <div className="min-h-screen bg-base-100 text-base-content antialiased selection:bg-primary selection:text-primary-content">
+    <div className="min-h-screen bg-base-200 text-base-content antialiased selection:bg-primary selection:text-primary-content">
       {/* ── Top Announcement Banner ────────────────────────────────────────── */}
       <div className="border-b border-primary/20 bg-linear-to-r from-base-200 via-base-200 to-base-300 px-4 py-2 text-center text-xs font-medium text-primary">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/20 px-2.5 py-0.5 font-bold text-primary">
@@ -57,10 +57,10 @@ export default function Landing() {
       </div>
 
       {/* ── Main Navigation ──────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 border-b border-base-300/80 bg-base-100/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 border-b border-base-300/80 bg-base-200/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link to="/" className="flex items-center gap-2.5">
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-linear-to-br from-primary via-primary to-secondary text-primary-content shadow-lg shadow-primary/25">
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-linear-to-br from-primary via-primary to-secondary text-primary-content shadow-e2">
               <FiDroplet size={22} className="stroke-[2.5]" />
             </span>
             <div className="leading-tight">
@@ -83,13 +83,13 @@ export default function Landing() {
           <div className="flex items-center gap-3">
             <Link
               to="/connexion"
-              className="rounded-lg px-3.5 py-2 text-sm font-semibold text-base-content/90 transition hover:bg-base-300 hover:text-base-content"
+              className="rounded-lg px-3.5 py-2 text-sm font-semibold text-base-content/90 transition hover:bg-base-200 hover:text-base-content"
             >
               Connexion
             </Link>
             <Link
               to="/inscription"
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-content shadow-lg shadow-primary/20 transition hover:bg-primary focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2 focus:ring-offset-slate-950"
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-content shadow-e2 transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2 focus:ring-offset-base-100"
             >
               Inscription
               <FiArrowRight size={15} />
@@ -126,14 +126,14 @@ export default function Landing() {
             <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
               <Link
                 to="/inscription"
-                className="inline-flex items-center gap-2.5 rounded-xl bg-linear-to-r from-primary to-secondary px-6 py-3.5 text-base font-bold text-primary-content shadow-xl shadow-primary/25 transition hover:from-primary hover:to-secondary"
+                className="inline-flex items-center gap-2.5 rounded-xl bg-linear-to-r from-primary to-secondary px-6 py-3.5 text-base font-bold text-primary-content shadow-e3 transition hover:brightness-110"
               >
                 Créer mon compte
                 <FiArrowRight size={18} />
               </Link>
               <Link
                 to="/connexion"
-                className="inline-flex items-center gap-2 rounded-xl border border-base-300 bg-base-200/80 px-6 py-3.5 text-base font-semibold text-base-content/90 backdrop-blur transition hover:bg-base-300 hover:text-base-content"
+                className="inline-flex items-center gap-2 rounded-xl border border-base-300 bg-base-100/80 px-6 py-3.5 text-base font-semibold text-base-content/90 backdrop-blur transition hover:bg-base-200 hover:text-base-content"
               >
                 <FiPlay size={16} className="text-primary" />
                 Se connecter
@@ -154,7 +154,7 @@ export default function Landing() {
           </div>
 
           {/* ── Hero Operational Showcase (No fictitious figures) ──────────── */}
-          <div className="relative mt-14 overflow-hidden rounded-2xl border border-base-300 bg-base-200/90 shadow-2xl backdrop-blur-xl">
+          <div className="relative mt-14 overflow-hidden rounded-2xl border border-base-300 bg-base-100/90 shadow-e3 backdrop-blur-xl">
             <div className="grid items-stretch lg:grid-cols-5">
               <div className="relative min-h-[260px] overflow-hidden lg:col-span-2">
                 <img
@@ -163,7 +163,7 @@ export default function Landing() {
                   className="h-full w-full object-cover"
                 />
                 <div className="absolute inset-0 bg-linear-to-t from-neutral via-neutral/40 to-transparent lg:bg-linear-to-r lg:from-transparent lg:to-neutral" />
-                <div className="absolute bottom-4 left-4 right-4 rounded-xl border border-base-300 bg-base-100/90 p-3.5 backdrop-blur">
+                <div className="absolute bottom-4 left-4 right-4 rounded-xl border border-base-300 bg-base-200/90 p-3.5 backdrop-blur">
                   <p className="text-[11px] font-bold tracking-wider text-primary uppercase">Architecture Station</p>
                   <p className="mt-1 text-xs text-base-content/90">
                     Chaque opération est horodatée, attribuée à un employé et vérifiée côté serveur avant enregistrement.
@@ -183,7 +183,7 @@ export default function Landing() {
                 </div>
 
                 <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                  <div className="rounded-xl border border-base-300 bg-base-100/60 p-4">
+                  <div className="rounded-xl border border-base-300 bg-base-200/60 p-4">
                     <div className="flex items-center gap-2 text-xs font-bold text-primary">
                       <FiTruck size={15} /> 1. Mise en route contrôlée
                     </div>
@@ -192,7 +192,7 @@ export default function Landing() {
                     </p>
                   </div>
 
-                  <div className="rounded-xl border border-base-300 bg-base-100/60 p-4">
+                  <div className="rounded-xl border border-base-300 bg-base-200/60 p-4">
                     <div className="flex items-center gap-2 text-xs font-bold text-success">
                       <FiLock size={15} /> 2. Caisse & canaux séparés
                     </div>
@@ -201,7 +201,7 @@ export default function Landing() {
                     </p>
                   </div>
 
-                  <div className="rounded-xl border border-base-300 bg-base-100/60 p-4">
+                  <div className="rounded-xl border border-base-300 bg-base-200/60 p-4">
                     <div className="flex items-center gap-2 text-xs font-bold text-warning">
                       <FiBox size={15} /> 3. Stocks & coût moyen (PUMP)
                     </div>
@@ -210,7 +210,7 @@ export default function Landing() {
                     </p>
                   </div>
 
-                  <div className="rounded-xl border border-base-300 bg-base-100/60 p-4">
+                  <div className="rounded-xl border border-base-300 bg-base-200/60 p-4">
                     <div className="flex items-center gap-2 text-xs font-bold text-accent">
                       <FiUsers size={15} /> 4. Équipe, RBAC & reçus PDF
                     </div>
@@ -226,29 +226,29 @@ export default function Landing() {
       </section>
 
       {/* ── Payment Methods Trust Bar ────────────────────────────────────── */}
-      <section className="border-y border-base-300/80 bg-base-200/50 py-8">
+      <section className="border-y border-base-300/80 bg-base-100/50 py-8">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <p className="text-center text-xs font-semibold tracking-wider text-base-content/60 uppercase">
             Enregistrez vos encaissements par moyen de paiement
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-8 sm:gap-14 text-sm font-bold text-base-content/80">
-            <div className="flex items-center gap-2 rounded-xl border border-base-300 bg-base-100/60 px-4 py-2">
+            <div className="flex items-center gap-2 rounded-xl border border-base-300 bg-base-200/60 px-4 py-2">
               <span className="h-2.5 w-2.5 rounded-full bg-primary" />
               <span>Wave Côte d’Ivoire</span>
             </div>
-            <div className="flex items-center gap-2 rounded-xl border border-base-300 bg-base-100/60 px-4 py-2">
+            <div className="flex items-center gap-2 rounded-xl border border-base-300 bg-base-200/60 px-4 py-2">
               <span className="h-2.5 w-2.5 rounded-full bg-orange-500" />
               <span>Orange Money CI</span>
             </div>
-            <div className="flex items-center gap-2 rounded-xl border border-base-300 bg-base-100/60 px-4 py-2">
+            <div className="flex items-center gap-2 rounded-xl border border-base-300 bg-base-200/60 px-4 py-2">
               <span className="h-2.5 w-2.5 rounded-full bg-yellow-400" />
               <span>MTN Mobile Money</span>
             </div>
-            <div className="flex items-center gap-2 rounded-xl border border-base-300 bg-base-100/60 px-4 py-2">
+            <div className="flex items-center gap-2 rounded-xl border border-base-300 bg-base-200/60 px-4 py-2">
               <span className="h-2.5 w-2.5 rounded-full bg-success" />
               <span>Espèces physiques</span>
             </div>
-            <div className="flex items-center gap-2 rounded-xl border border-base-300 bg-base-100/60 px-4 py-2">
+            <div className="flex items-center gap-2 rounded-xl border border-base-300 bg-base-200/60 px-4 py-2">
               <span className="h-2.5 w-2.5 rounded-full bg-accent" />
               <span>Carte bancaire & Virement</span>
             </div>
@@ -274,7 +274,7 @@ export default function Landing() {
 
           <div className="mt-14 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
             {/* Pillar 1 */}
-            <div className="rounded-2xl border border-base-300 bg-base-200/60 p-7 transition hover:border-primary/40">
+            <div className="rounded-2xl border border-base-300 bg-base-100/60 p-7 transition hover:border-primary/40">
               <span className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
                 <FiTruck size={24} />
               </span>
@@ -285,7 +285,7 @@ export default function Landing() {
             </div>
 
             {/* Pillar 2 */}
-            <div className="rounded-2xl border border-base-300 bg-base-200/60 p-7 transition hover:border-success/40">
+            <div className="rounded-2xl border border-base-300 bg-base-100/60 p-7 transition hover:border-success/40">
               <span className="grid h-12 w-12 place-items-center rounded-xl bg-success/10 text-success">
                 <FiLock size={24} />
               </span>
@@ -296,7 +296,7 @@ export default function Landing() {
             </div>
 
             {/* Pillar 3 */}
-            <div className="rounded-2xl border border-base-300 bg-base-200/60 p-7 transition hover:border-warning/40">
+            <div className="rounded-2xl border border-base-300 bg-base-100/60 p-7 transition hover:border-warning/40">
               <span className="grid h-12 w-12 place-items-center rounded-xl bg-warning/10 text-warning">
                 <FiBox size={24} />
               </span>
@@ -307,7 +307,7 @@ export default function Landing() {
             </div>
 
             {/* Pillar 4 */}
-            <div className="rounded-2xl border border-base-300 bg-base-200/60 p-7 transition hover:border-accent/40">
+            <div className="rounded-2xl border border-base-300 bg-base-100/60 p-7 transition hover:border-accent/40">
               <span className="grid h-12 w-12 place-items-center rounded-xl bg-accent/10 text-accent">
                 <FiUsers size={24} />
               </span>
@@ -318,7 +318,7 @@ export default function Landing() {
             </div>
 
             {/* Pillar 5 */}
-            <div className="rounded-2xl border border-base-300 bg-base-200/60 p-7 transition hover:border-secondary/40">
+            <div className="rounded-2xl border border-base-300 bg-base-100/60 p-7 transition hover:border-secondary/40">
               <span className="grid h-12 w-12 place-items-center rounded-xl bg-secondary/10 text-secondary">
                 <FiAward size={24} />
               </span>
@@ -329,7 +329,7 @@ export default function Landing() {
             </div>
 
             {/* Pillar 6 */}
-            <div className="rounded-2xl border border-base-300 bg-base-200/60 p-7 transition hover:border-rose-500/40">
+            <div className="rounded-2xl border border-base-300 bg-base-100/60 p-7 transition hover:border-rose-500/40">
               <span className="grid h-12 w-12 place-items-center rounded-xl bg-rose-500/10 text-rose-400">
                 <FiBarChart2 size={24} />
               </span>
@@ -343,7 +343,7 @@ export default function Landing() {
       </section>
 
       {/* ── Interactive Workflow Demonstrator ───────────────────────────── */}
-      <section id="caisse-stock" className="border-t border-base-300/80 bg-base-200/30 py-20 sm:py-28">
+      <section id="caisse-stock" className="border-t border-base-300/80 bg-base-100/30 py-20 sm:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h2 className="text-xs font-bold tracking-widest text-primary uppercase">
@@ -358,39 +358,39 @@ export default function Landing() {
           </div>
 
           <div className="mt-10 flex justify-center">
-            <div className="inline-flex rounded-xl border border-base-300 bg-base-100 p-1.5 text-xs font-semibold">
+            <div className="inline-flex rounded-xl border border-base-300 bg-base-200 p-1.5 text-xs font-semibold">
               <button
                 type="button"
                 onClick={() => setActiveTab('caisse')}
-                className={`rounded-lg px-4 py-2 transition ${activeTab === 'caisse' ? 'bg-primary text-primary-content' : 'text-base-content/60 hover:text-primary-content'}`}
+                className={`rounded-lg px-4 py-2 transition ${activeTab === 'caisse' ? 'bg-primary/12 font-bold text-primary' : 'text-base-content/60 hover:bg-base-100 hover:text-base-content'}`}
               >
                 1. Caisse & Rapprochement
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab('stock')}
-                className={`rounded-lg px-4 py-2 transition ${activeTab === 'stock' ? 'bg-primary text-primary-content' : 'text-base-content/60 hover:text-primary-content'}`}
+                className={`rounded-lg px-4 py-2 transition ${activeTab === 'stock' ? 'bg-primary/12 font-bold text-primary' : 'text-base-content/60 hover:bg-base-100 hover:text-base-content'}`}
               >
                 2. Alertes Stock Critiques
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab('lavages')}
-                className={`rounded-lg px-4 py-2 transition ${activeTab === 'lavages' ? 'bg-primary text-primary-content' : 'text-base-content/60 hover:text-primary-content'}`}
+                className={`rounded-lg px-4 py-2 transition ${activeTab === 'lavages' ? 'bg-primary/12 font-bold text-primary' : 'text-base-content/60 hover:bg-base-100 hover:text-base-content'}`}
               >
                 3. File de Lavages & Fiche
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab('commissions')}
-                className={`rounded-lg px-4 py-2 transition ${activeTab === 'commissions' ? 'bg-primary text-primary-content' : 'text-base-content/60 hover:text-primary-content'}`}
+                className={`rounded-lg px-4 py-2 transition ${activeTab === 'commissions' ? 'bg-primary/12 font-bold text-primary' : 'text-base-content/60 hover:bg-base-100 hover:text-base-content'}`}
               >
                 4. Commissions Laveurs
               </button>
             </div>
           </div>
 
-          <div className="mt-8 rounded-2xl border border-base-300 bg-base-100 p-6 sm:p-10">
+          <div className="mt-8 rounded-2xl border border-base-300 bg-base-200 p-6 sm:p-10">
             {activeTab === 'caisse' && (
               <div className="grid items-center gap-8 lg:grid-cols-2">
                 <div>
@@ -424,25 +424,25 @@ export default function Landing() {
                     </Link>
                   </div>
                 </div>
-                <div className="rounded-xl border border-base-300 bg-base-200/90 p-5 text-xs">
+                <div className="rounded-xl border border-base-300 bg-base-100/90 p-5 text-xs">
                   <div className="flex items-center justify-between border-b border-base-300 pb-3">
                     <span className="font-bold text-base-content/90">Règles de clôture serveur</span>
                     <span className="rounded bg-success/20 px-2 py-0.5 text-[10px] font-bold text-success">IMMUABLE</span>
                   </div>
                   <div className="mt-3 space-y-2.5 text-base-content/80">
-                    <div className="flex justify-between rounded-lg bg-base-100/60 px-3 py-2">
+                    <div className="flex justify-between rounded-lg bg-base-200/60 px-3 py-2">
                       <span>1. Fond d’ouverture</span>
                       <span className="font-semibold text-base-content">Déclaré à la prise de poste</span>
                     </div>
-                    <div className="flex justify-between rounded-lg bg-base-100/60 px-3 py-2">
+                    <div className="flex justify-between rounded-lg bg-base-200/60 px-3 py-2">
                       <span>2. Mouvements espèces</span>
                       <span className="font-semibold text-success">+ Encaissements − Dépenses</span>
                     </div>
-                    <div className="flex justify-between rounded-lg bg-base-100/60 px-3 py-2">
+                    <div className="flex justify-between rounded-lg bg-base-200/60 px-3 py-2">
                       <span>3. Comptage physique</span>
                       <span className="font-semibold text-primary">Saisi par le caissier</span>
                     </div>
-                    <div className="flex justify-between rounded-lg bg-base-100/60 px-3 py-2">
+                    <div className="flex justify-between rounded-lg bg-base-200/60 px-3 py-2">
                       <span>4. Relevé de clôture</span>
                       <span className="font-semibold text-base-content">Écart archivé sans réécriture</span>
                     </div>
@@ -483,7 +483,7 @@ export default function Landing() {
                     </Link>
                   </div>
                 </div>
-                <div className="rounded-xl border border-base-300 bg-base-200/90 p-5 text-xs">
+                <div className="rounded-xl border border-base-300 bg-base-100/90 p-5 text-xs">
                   <div className="mb-4 flex items-center justify-between border-b border-base-300 pb-3">
                     <span className="font-bold text-base-content">Cycle complet des achats & stocks</span>
                     <span className="rounded-full bg-warning/20 px-2 py-0.5 text-[10px] font-bold text-warning">
@@ -491,15 +491,15 @@ export default function Landing() {
                     </span>
                   </div>
                   <div className="space-y-2.5 text-base-content/80">
-                    <div className="rounded-lg border border-base-300 bg-base-100/60 p-3">
+                    <div className="rounded-lg border border-base-300 bg-base-200/60 p-3">
                       <p className="font-bold text-base-content">Commande fournisseur → Réception partielle ou totale</p>
                       <p className="mt-1 text-[11px] text-base-content/60">Une commande ne crédite le stock qu’à la réception physique validée.</p>
                     </div>
-                    <div className="rounded-lg border border-base-300 bg-base-100/60 p-3">
+                    <div className="rounded-lg border border-base-300 bg-base-200/60 p-3">
                       <p className="font-bold text-base-content">Alertes de seuil en direct</p>
                       <p className="mt-1 text-[11px] text-base-content/60">Détection immédiate des consommables en rupture ou sous le seuil critique.</p>
                     </div>
-                    <div className="rounded-lg border border-base-300 bg-base-100/60 p-3">
+                    <div className="rounded-lg border border-base-300 bg-base-200/60 p-3">
                       <p className="font-bold text-base-content">Certification périodique des coûts</p>
                       <p className="mt-1 text-[11px] text-base-content/60">Rapprochement des factures d’achat et des consommations valorisées.</p>
                     </div>
@@ -540,25 +540,25 @@ export default function Landing() {
                     </Link>
                   </div>
                 </div>
-                <div className="rounded-xl border border-base-300 bg-base-200/90 p-5 text-xs">
+                <div className="rounded-xl border border-base-300 bg-base-100/90 p-5 text-xs">
                   <div className="flex items-center justify-between border-b border-base-300 pb-3 font-bold text-base-content">
                     <span>Statuts d’une fiche de lavage</span>
                     <span className="text-primary">Tarifs figés serveur</span>
                   </div>
                   <div className="mt-3 space-y-2.5 text-base-content/80">
-                    <div className="flex justify-between rounded-lg bg-base-100/60 px-3 py-2">
+                    <div className="flex justify-between rounded-lg bg-base-200/60 px-3 py-2">
                       <span>En attente / Affecté</span>
                       <span className="text-base-content/60">Prise en charge & équipe</span>
                     </div>
-                    <div className="flex justify-between rounded-lg bg-base-100/60 px-3 py-2">
+                    <div className="flex justify-between rounded-lg bg-base-200/60 px-3 py-2">
                       <span>En cours</span>
                       <span className="text-primary">Exécution sur poste</span>
                     </div>
-                    <div className="flex justify-between rounded-lg bg-base-100/60 px-3 py-2">
+                    <div className="flex justify-between rounded-lg bg-base-200/60 px-3 py-2">
                       <span>Contrôle qualité → Prêt</span>
                       <span className="text-success">Inspection avant remise</span>
                     </div>
-                    <div className="flex justify-between rounded-lg bg-base-100/60 px-3 py-2">
+                    <div className="flex justify-between rounded-lg bg-base-200/60 px-3 py-2">
                       <span>Livré · Reçu FCFA</span>
                       <span className="font-semibold text-base-content">Impression & export PDF</span>
                     </div>
@@ -599,21 +599,21 @@ export default function Landing() {
                     </Link>
                   </div>
                 </div>
-                <div className="rounded-xl border border-base-300 bg-base-200/90 p-5 text-xs">
+                <div className="rounded-xl border border-base-300 bg-base-100/90 p-5 text-xs">
                   <div className="flex items-center justify-between border-b border-base-300 pb-3 font-bold text-base-content">
                     <span>Validation des relevés</span>
                     <span className="text-success">Export CSV paie</span>
                   </div>
                   <div className="mt-3 space-y-2.5 text-base-content/80">
-                    <div className="rounded-lg bg-base-100/60 p-3">
+                    <div className="rounded-lg bg-base-200/60 p-3">
                       <p className="font-bold text-base-content">1. Aperçu en direct sur lavages terminés</p>
                       <p className="mt-1 text-[11px] text-base-content/60">Les fiches annulées ou en cours sont automatiquement exclues.</p>
                     </div>
-                    <div className="rounded-lg bg-base-100/60 p-3">
+                    <div className="rounded-lg bg-base-200/60 p-3">
                       <p className="font-bold text-base-content">2. Création & validation de période</p>
                       <p className="mt-1 text-[11px] text-base-content/60">Le relevé validé fige la base, le taux appliqué et le montant dû.</p>
                     </div>
-                    <div className="rounded-lg bg-base-100/60 p-3">
+                    <div className="rounded-lg bg-base-200/60 p-3">
                       <p className="font-bold text-base-content">3. Traçabilité des règlements</p>
                       <p className="mt-1 text-[11px] text-base-content/60">Chaque paie enregistrée conserve sa référence et son horodatage.</p>
                     </div>
@@ -641,7 +641,7 @@ Essai de 14 jours avec tous les modules. Standard et Premium nécessitent une de
           </div>
 
           {plansError ? (
-            <div role="alert" className="mt-14 rounded-2xl border border-warning/30 bg-base-200/60 p-6 text-center">
+            <div role="alert" className="mt-14 rounded-2xl border border-warning/30 bg-base-100/60 p-6 text-center">
               <p className="font-bold text-base-content">Formules et tarifs indisponibles</p>
               <p className="mt-2 text-sm text-base-content/60">Aucun prix local n’est présenté à la place des tarifs indisponibles. Veuillez réessayer plus tard.</p>
             </div>
@@ -656,8 +656,8 @@ Essai de 14 jours avec tous les modules. Standard et Premium nécessitent une de
                   key={plan.id}
                   className={`relative flex flex-col justify-between rounded-2xl border p-8 transition ${
  isPopular
- ? 'border-primary bg-linear-to-b from-primary/10 via-base-100 to-base-100 shadow-2xl shadow-primary/20'
- : 'border-base-300 bg-base-200/60 hover:border-base-300'
+ ? 'border-primary bg-linear-to-b from-primary/10 via-base-100 to-base-100 shadow-e3 shadow-primary/20'
+ : 'border-base-300 bg-base-100/60 hover:border-base-300'
  }`}
                 >
                   {isPopular && (
@@ -697,8 +697,8 @@ Essai de 14 jours avec tous les modules. Standard et Premium nécessitent une de
                       to={`/inscription?plan=${encodeURIComponent(plan.id)}`}
                       className={`block w-full rounded-xl py-3 text-center text-sm font-bold transition ${
  isPopular
- ? 'bg-primary text-primary-content shadow-lg shadow-primary/25 hover:bg-primary'
- : 'border border-base-300 bg-base-300 text-base-content hover:bg-base-300'
+ ? 'bg-primary text-primary-content shadow-e2 hover:brightness-110'
+ : 'border border-base-300 bg-base-100 text-base-content hover:bg-base-200'
  }`}
                     >
                       {plan.id === 'essai' ? 'Commencer l’essai' : `Choisir ${plan.name}`}
@@ -730,7 +730,7 @@ Essai de 14 jours avec tous les modules. Standard et Premium nécessitent une de
               return (
                 <div
                   key={index}
-                  className="rounded-xl border border-base-300 bg-base-200/60 transition hover:border-base-300"
+                  className="rounded-xl border border-base-300 bg-base-100/60 transition hover:border-base-300"
                 >
                   <button
                     type="button"
@@ -767,14 +767,14 @@ Essai de 14 jours avec tous les modules. Standard et Premium nécessitent une de
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <Link
               to="/inscription"
-              className="inline-flex items-center gap-2 rounded-xl bg-linear-to-r from-primary to-secondary px-7 py-3.5 text-base font-bold text-primary-content shadow-xl shadow-primary/25 transition hover:from-primary hover:to-secondary"
+              className="inline-flex items-center gap-2 rounded-xl bg-linear-to-r from-primary to-secondary px-7 py-3.5 text-base font-bold text-primary-content shadow-e3 transition hover:brightness-110"
             >
               Créer mon espace
               <FiArrowRight size={18} />
             </Link>
             <Link
               to="/connexion"
-              className="inline-flex items-center gap-2 rounded-xl border border-base-300 bg-base-200 px-6 py-3.5 text-base font-semibold text-base-content/90 transition hover:bg-base-300 hover:text-base-content"
+              className="inline-flex items-center gap-2 rounded-xl border border-base-300 bg-base-100 px-6 py-3.5 text-base font-semibold text-base-content/90 transition hover:bg-base-200 hover:text-base-content"
             >
               Se connecter
             </Link>
@@ -783,7 +783,7 @@ Essai de 14 jours avec tous les modules. Standard et Premium nécessitent une de
       </section>
 
       {/* ── Footer ──────────────────────────────────────────────────────── */}
-      <footer className="border-t border-base-300 bg-base-100 py-12 text-xs text-base-content/60">
+      <footer className="border-t border-base-300 bg-base-200 py-12 text-xs text-base-content/60">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex flex-wrap items-center justify-between gap-6">
             <div className="flex items-center gap-2.5">

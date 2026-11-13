@@ -20,11 +20,11 @@ describe('catalogue de thèmes DaisyUI', () => {
     expect(THEME_OPTIONS).toHaveLength(37);
   });
 
-  it('n’a aucun doublon et applique cupcake par défaut', () => {
+  it('n’a aucun doublon et applique la Signature sombre par défaut', () => {
     const names = THEME_OPTIONS.map((t) => t.name);
     expect(new Set(names).size).toBe(names.length);
-    expect(DEFAULT_THEME).toBe('cupcake');
-    expect(themeScheme(DEFAULT_THEME)).toBe('light');
+    expect(DEFAULT_THEME).toBe('washguard-dark');
+    expect(themeScheme(DEFAULT_THEME)).toBe('dark');
     expect(isKnownTheme(DEFAULT_THEME)).toBe(true);
   });
 
@@ -37,9 +37,9 @@ describe('catalogue de thèmes DaisyUI', () => {
   });
 
   it('fournit une paire clair/sombre pour la bascule rapide', () => {
-    expect(DEFAULT_LIGHT_THEME).toBe('cupcake');
-    expect(DEFAULT_DARK_THEME).toBe('dim');
-    expect(DEFAULT_THEME).toBe(DEFAULT_LIGHT_THEME);
+    expect(DEFAULT_LIGHT_THEME).toBe('washguard');
+    expect(DEFAULT_DARK_THEME).toBe('washguard-dark');
+    expect(DEFAULT_THEME).toBe(DEFAULT_DARK_THEME);
     expect(themeScheme(DEFAULT_LIGHT_THEME)).toBe('light');
     expect(themeScheme(DEFAULT_DARK_THEME)).toBe('dark');
     expect(isKnownTheme(DEFAULT_DARK_THEME)).toBe(true);

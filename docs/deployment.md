@@ -21,6 +21,19 @@
 | `VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` | absents | **GitHub Secrets** |
 | `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` | `.env.local` ignoré | **GitHub Variables** (ou Secrets) |
 
+### Aperçu statique : construire en `local`
+
+`vite.config.ts` force `import.meta.env.VITE_DATA_SOURCE = 'api'` quand la variable n'est pas définie (défaut de production). Sur un hébergement **sans backend** (aperçu Arena, `vite preview`, ou un `dist/` servi par un simple serveur statique), l'application appelle alors `/api/plans`, reçoit le repli SPA (`index.html` en 200) et affichait jusqu'ici `Formules indisponibles : Cannot read properties of null (reading 'plans')`.
+
+Deux garde-fous ont été ajoutés en plus de la bonne commande de build :
+
+| Garde-fou | Comportement |
+| --- | --- |
+| `apiFetch()` (`src/services/api/apiClient.ts`) | une réponse 2xx **non JSON** (hors `204`) lève `HttpClientError(…, 'invalid_response', …)` au lieu de renvoyer `null` — plus de `TypeError` opaque côté écran |
+| `ApiDataAdapter.listPlans()` | valide `{ plans: Plan[] }` et lève `invalid_payload` si la charge utile est illisible, sans jamais alimenter le cache partagé avec `null` |
+
+Pour un aperçu sans API : `VITE_DATA_SOURCE=local npm run build && npx vite preview`. En production Vercel, `VITE_DATA_SOURCE=local` est déjà défini sur le projet ; les prix de la vitrine ne sont **jamais** remplacés par le catalogue local quand la base échoue (règle conservée).
+
 ### Serveur Node `api` — variables d'environnement
 
 Le mode `VITE_DATA_SOURCE=api` démarre `server.ts` (Express + PGlite). Deux variables conditionnent sa sûreté :

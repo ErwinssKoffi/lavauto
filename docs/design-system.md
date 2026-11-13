@@ -1,4 +1,4 @@
-# 02 — Design system & UX (Tailwind 4 + DaisyUI 5, thèmes WashGuard)
+# 02 — Design system & UX (Tailwind 4 + DaisyUI 5, Signature Edition)
 
 **Statut :** migration DaisyUI **terminée**. Le système maison `wg-*` a été entièrement remplacé : plus aucune classe `wg-*` ni variable `--wg-*` n'existe dans `src/`. Les 16 écrans, leurs URL, leurs rôles et leurs textes sont inchangés.
 
@@ -25,43 +25,77 @@ Références : [architecture-audit.md](architecture-audit.md) · [architecture-t
 
 ---
 
-## 2. Thèmes DaisyUI (`src/index.css`, CSS-first)
+## 2. Thèmes DaisyUI (`src/index.css`, CSS-first) — Signature Edition
 
-Deux thèmes personnalisés remplacent les anciens tokens CSS, déclarés avec le plugin `@plugin "daisyui/theme"` et appliqués via `data-theme` sur `<html>` :
+Deux thèmes personnalisés portent l'identité, déclarés avec `@plugin "daisyui/theme"` et appliqués via `data-theme` sur `<html>` :
 
-| Thème | `data-theme` | Usage |
+| Thème | `data-theme` | Rôle |
 | --- | --- | --- |
-| WashGuard clair | `washguard` | palette historique claire (`base-100 #ffffff`, texte `#0f172a`) |
-| WashGuard sombre | `washguard-dark` | palette historique sombre (`base-100 #101b2d`, texte `#e9f0fb`) — cible de la bascule rapide |
-| **Cupcake** | `cupcake` | thème intégré DaisyUI, **thème par défaut de tout le projet** (`--default` + `--prefersdark`) |
-| **Dim** | `dim` | pendant sombre de la bascule rapide (`DEFAULT_DARK_THEME`), pour rester dans une esthétique douce |
+| **Signature sombre** | `washguard-dark` | **thème par défaut du projet** (`DEFAULT_THEME`, `default: true`, `prefersdark: true`) : page `#080f1b`, carte `#0d1929`, bordure `#1e3049`, texte `#e6eefb`, cyan `#22d3ee` |
+| **Signature clair** | `washguard` | pendant clair de la bascule (`DEFAULT_LIGHT_THEME`) : page `#f4f8fc`, carte `#ffffff`, bordure `#dde6f2`, texte `#0a1526`, cyan profond `#0e7490` |
+| 35 thèmes intégrés | `cupcake`, `dim`, `nord`, `dracula`… | toujours sélectionnables dans le menu de la topbar, **jamais utilisés par défaut** |
 
-`@plugin "daisyui" { themes: cupcake --default --prefersdark, washguard-dark, washguard, abyss, …, wireframe; }` : **liste explicite** des 37 thèmes (35 intégrés + les 2 WashGuard), plutôt que `themes: all`.
+`@plugin "daisyui" { themes: cupcake, washguard-dark, washguard, abyss, …, wireframe; }` : **liste explicite** des 37 thèmes (35 intégrés + les 2 WashGuard), plutôt que `themes: all`.
 
-Pourquoi pas `all` : dans `daisyui/functions/pluginOptionsHandler.js`, la branche `themes === "all"` réserve `:where(:root)` au thème `light` et `prefers-color-scheme: dark` au thème `dark`, **sans lire** les clés `default:` / `prefersdark:` des blocs `@plugin "daisyui/theme"`. La racine du document appartenait donc à `light`, et le repli sombre à `dark` — deux palettes qui ne sont pas celles de la marque. Avec la liste explicite, nos clés sont appliquées : `:where(:root),[data-theme=washguard-dark]{…}` et `@media (prefers-color-scheme: dark){:root:not([data-theme]){…washguard-dark…}}`.
+Pourquoi pas `all` : dans `daisyui/functions/pluginOptionsHandler.js`, la branche `themes === "all"` réserve `:where(:root)` au thème `light` et `prefers-color-scheme: dark` au thème `dark`, **sans lire** les clés `default:` / `prefersdark:` des blocs `@plugin "daisyui/theme"`. Avec la liste explicite, ce sont nos clés qui s'appliquent : `:where(:root),[data-theme=washguard-dark]{…}` et `@media (prefers-color-scheme: dark){:root:not([data-theme]){…}}`. Le thème sombre de la marque tient donc la racine du document — auparavant c'était `cupcake`, hérité de la génération précédente.
 
-**cupcake est le thème de tout le projet** : `<html>` porte `data-theme="cupcake"` avant tout script, `DEFAULT_THEME` vaut `'cupcake'`, et les clés `--default` + `--prefersdark` lui donnent `:where(:root)` et le repli `prefers-color-scheme`. Coût mesuré : 188,6 kB de CSS (29,0 kB gzip).
+Coût mesuré : 37 thèmes compilés, CSS 190,1 kB (29,3 kB gzip) — moins de 2 kB de plus que la génération précédente.
+
+### Échelle de surfaces : une seule profondeur
+
+| Niveau | Token / classe | Usage |
+| --- | --- | --- |
+| Page | `base-200` (`body`) | fond de l'application, des écrans d'auth et de la vitrine |
+| Carte, panneau, popover | `base-100` + `border border-base-300` | `Card`, `modal-box`, `dropdown-content`, tiroirs, `DataTable` |
+| Séparateur, rail | `base-300` | filets, séparateurs de listes, contour des champs |
+| Texte | `base-content`, `base-content/70`, `/60` | titres, corps, légendes |
+
+Le fond de page est **toujours un cran plus profond** que la carte : `body` porte `background-color: var(--color-base-200)` et un halo `radial-gradient(120% 70% at 50% -25%, primary 10%, transparent 62%)` fixé (`background-attachment: fixed`). Le halo est dérivé de `primary`, il suit donc les 37 thèmes sans aucune couleur codée en dur. Aucune page ne redéfinit son propre fond : les écrans `/app`, l'authentification et la vitrine partagent la même échelle.
+
+### Élévations nommées (`shadow-e1` → `shadow-e3`)
+
+Trois ombres déclarées dans `@theme`, donc disponibles comme utilitaires Tailwind et **thémées** (`color-mix` sur `--color-neutral`, jamais du noir pur) :
+
+| Utilitaire | Définition | Usage |
+| --- | --- | --- |
+| `shadow-e1` | `0 1px 2px -1px color-mix(in oklab, neutral 55%, transparent)` | carte, `StatCard`, ligne de tableau posée |
+| `shadow-e2` | `0 14px 30px -18px …60% + 0 1px 2px -1px …45%` | menu déroulant, bannière, bouton principal |
+| `shadow-e3` | `0 30px 60px -30px …75% + 0 2px 6px -2px …50%` | palette `Ctrl/Cmd + K`, tiroir, toast, carte mise en avant |
+
+`shadow-lg` / `shadow-xl` / `shadow-2xl` ont été **retirés** de `src/` : une seule échelle, trois crans, aucun mélange.
+
+### Cyan : action et état actif uniquement
+
+Le bleu nuit et le cyan restent les couleurs de marque, mais leur emploi est désormais restreint :
+
+- **Action** : `btn-primary` / `bg-primary text-primary-content` pour l'action principale d'un écran (enregistrer, encaisser, s'inscrire). Un seul pavé cyan plein visible à la fois.
+- **État actif** : `bg-primary/10` (ou `/12`) + `font-semibold text-primary`, avec un **rail de 3 px** en `before:` sur la navigation latérale. Plus de pavé cyan dans la nav, la palette de commandes ni les onglets de la vitrine.
+- **Emphase** : `text-primary` pour les liens, libellés de KPI et valeurs clés ; halos et dégradés plafonnés à 10–20 % d'opacité.
+- **Interdit** : `bg-primary` en fond de section, de ligne de tableau ou d'onglet inactif ; `shadow-primary` en halo large sur du texte.
+
+Conséquence mesurable : `bg-primary` plein passe de 16 à 13 occurrences (boutons et CTA uniquement), `shadow-primary` de 9 à 2.
 
 | Variable DaisyUI 5 | Rôle | Ancien token |
 | --- | --- | --- |
-| `--color-primary` / `-content` | accent unique | `--wg-accent` |
-| `--color-base-100/200/300` | surface, panneau, bordure | `--wg-surface`, `--wg-surface-2`, `--wg-border` |
+| `--color-primary` / `-content` | accent unique (action, état actif) | `--wg-accent` |
+| `--color-secondary`, `--color-accent` | dégradés d'identité, filets de `StatCard` | — |
+| `--color-base-100/200/300` | surface, page, bordure | `--wg-surface`, `--wg-surface-2`, `--wg-border` |
 | `--color-base-content` (`/60` = secondaire) | texte | `--wg-text`, `--wg-muted` |
 | `--color-success/warning/error` | états métier | `--wg-success`, `--wg-warn`, `--wg-danger` |
-| `--radius-box/field/selector` | rayons (1 rem / 0,75 rem / 0,75 rem) | `--wg-radius*` |
+| `--radius-box/field/selector` | rayons (0,875 rem / 0,625 rem / 0,5 rem) | `--wg-radius*` |
 | `--size-field: 0.3rem` | densité : `0,3 × 8 = 2,4 rem` pour `btn-sm`/`input-sm`/`select-sm` | hauteurs `wg-btn`/`wg-input` |
 | `--border`, `--depth`, `--noise` | épaisseur de bordure, profondeur d'ombre, grain | — |
 
 Réglages complémentaires :
 
 - **Bordure par défaut** : Tailwind 4 utilise `currentColor` ; une règle `@layer base { *, ::before, ::after, ::backdrop { border-color: var(--color-base-300); } }` rétablit une bordure thématique pour les simples `border`.
-- **Fond applicatif** : `body { background: color-mix(in oklab, var(--color-base-100) 94%, #000) }` — légèrement plus profond que la surface des cartes, et **dérivé du thème actif** : les 37 thèmes sont donc respectés sans aucune couleur codée en dur (l'ancienne variable `--page-bg` figée sur deux valeurs a été supprimée).
 - **Ajustements hors couche** : DaisyUI 5 émet ses composants dans la couche `utilities`, donc une règle `@layer components` serait perdante. Trois règles volontairement **non calquées** (donc prioritaires) ajustent le texte des `btn-sm` (`--fontsize: .875rem`), le rayon des badges (pastille `999px`) et la capitalisation des en-têtes de tableaux.
-- **Sélecteur de thème** (`src/components/ThemeSwitcher.tsx`) : menu de la topbar listant les deux thèmes WashGuard puis les 35 thèmes DaisyUI ; la pastille active est celui des 37 qui est en cours (cupcake par défaut). Chaque ligne porte son propre `data-theme`, donc les pastilles montrent les couleurs réelles du thème proposé. Champ de **recherche** (insensible aux accents : « lofi » trouve `Lo-Fi`), navigation par **flèches haut/bas**, `Échap` referme et rend le focus au bouton, thème actif amené à l'écran à l'ouverture. Persistance `localStorage` : `washguard.theme.name` (thème exact), `washguard.theme` (`dark`/`light`, conservé pour la compatibilité et le script inline de `index.html`), `washguard.theme.light` / `.dark` (paire de la bascule) et `washguard.theme.v` (version de préférence). La bascule rapide soleil/lune alterne entre le **dernier thème clair** et le **dernier thème sombre** utilisés (cupcake / dim par défaut, mémorisés dans `washguard.theme.light` et `washguard.theme.dark`).
-- **Barre du navigateur mobile** : à chaque changement de thème, le store recopie `--color-base-100` du thème actif dans `<meta name="theme-color">`.
-- **`@theme`** : police `Inter` (`--font-sans`) et animation `--animate-fade-in` (keyframes `fadeIn`).
+- **Caractère typographique** : `Inter` en `--font-sans`, `tabular-nums` sur les chiffres de `StatCard` (alignement des montants FCFA), titres `font-bold tracking-tight`, en-têtes de tableaux capitalisés en `text-[11px] uppercase tracking-wider`.
+- **Sélecteur de thème** (`src/components/ThemeSwitcher.tsx`) : menu de la topbar listant les deux thèmes WashGuard puis les 35 thèmes DaisyUI ; la pastille active est celui des 37 qui est en cours (Signature sombre par défaut). Chaque ligne porte son propre `data-theme`, donc les pastilles montrent les couleurs réelles du thème proposé. Champ de **recherche** (insensible aux accents : « lofi » trouve `Lo-Fi`), navigation par **flèches haut/bas**, `Échap` referme et rend le focus au bouton, thème actif amené à l'écran à l'ouverture. Persistance `localStorage` : `washguard.theme.name` (thème exact), `washguard.theme` (`dark`/`light`, conservé pour la compatibilité et le script inline de `index.html`), `washguard.theme.light` / `.dark` (paire de la bascule) et `washguard.theme.v` (version de préférence, `'3'`). La bascule rapide soleil/lune alterne entre le **dernier thème clair** et le **dernier thème sombre** utilisés (`washguard` ↔ `washguard-dark` par défaut).
+- **Barre du navigateur mobile** : `index.html` fixe `theme-color` sur `#080f1b` (Signature sombre) ; à chaque changement de thème, le store recopie `--color-base-100` du thème actif.
+- **`@theme`** : police `Inter` (`--font-sans`), animation `--animate-fade-in` (keyframes `fadeIn`) et les trois ombres `--shadow-e1/e2/e3`.
 - **`@import "tailwindcss" source(none)` + `@source`** : seuls `index.html` et `src/**/*.{ts,tsx}` produisent des classes (ni la documentation ni les tests ne gonflent le CSS).
-- `darkMode: 'class'` n'existe plus : la classe `dark` reste posée pour compatibilité, mais la source de vérité est `data-theme`, synchronisée dans `store.tsx` et appliquée avant le premier rendu par `index.html`.
+- `darkMode: 'class'` n'existe plus : la classe `dark` reste posée pour compatibilité (`<html class="dark">` par défaut), mais la source de vérité est `data-theme`, synchronisée dans `store.tsx` et appliquée avant le premier rendu par `index.html`.
 
 Seules règles globales restantes dans `src/index.css` : fond de page, `::selection`, anneau `:focus-visible`, barres de défilement, `prefers-reduced-motion` et les styles du **reçu imprimable**, volontairement isolés du thème.
 
