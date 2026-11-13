@@ -139,7 +139,7 @@ export default function Fidelisation() {
           })}>Attribuer les points</button>
         </Card>
         {state.loyaltyCards.length === 0 ? <Card><EmptyState icon={<FiUserCheck />} title="Aucune carte" description="Créez un programme puis inscrivez un client." /></Card> : (
-          <Card className="lg:col-span-2 !p-0 overflow-hidden">
+          <Card className="lg:col-span-2 p-0! overflow-hidden">
             <div className="p-4 text-sm font-bold">Cartes & mouvements</div>
             <div className="overflow-x-auto"><table className="table min-w-[620px]">
               <thead><tr><th>Carte</th><th>Client</th><th>Solde</th><th>Statut</th></tr></thead>
@@ -201,7 +201,7 @@ export default function Fidelisation() {
               result.duplicate ? 'Déjà consommé : aucun double.' : result.consumed ? `Il reste ${result.remaining} lavage(s).` : (result.reason ?? 'Aucun forfait actif.'));
           })}>Consommer</button>
         </Card>
-        <Card className="!p-0 overflow-hidden">
+        <Card className="p-0! overflow-hidden">
           <div className="p-4 text-sm font-bold">Forfaits clients</div>
           {state.customerPackages.length === 0 ? <EmptyState icon={<FiPackage />} title="Aucun forfait vendu" description="Vendez un forfait dans sa fenêtre de validité." /> : (
             <div className="overflow-x-auto"><table className="table min-w-[620px]">
@@ -250,7 +250,7 @@ export default function Fidelisation() {
             setApply({ washId: '', code: '', idempotencyKey: key('promo') });
           })}>Appliquer</button>
         </Card>
-        <Card className="lg:col-span-2 !p-0 overflow-hidden">
+        <Card className="lg:col-span-2 p-0! overflow-hidden">
           <div className="p-4 text-sm font-bold">Promotions & usages</div>
           {state.promotions.length === 0 ? <EmptyState icon={<FiPercent />} title="Aucune promotion" description="Les codes restent inactifs hors de leur fenêtre de validité." /> : (
             <div className="overflow-x-auto"><table className="table min-w-[620px]">
@@ -284,7 +284,7 @@ export default function Fidelisation() {
             setNotif({ targetId: '', templateKey: 'package_expiry', idempotencyKey: key('notif') }); notify('success', 'Notification en attente, aucun envoi.');
           })}><FiSend /> Mettre en attente</button>
         </Card>
-        <Card className="!p-0 overflow-hidden">
+        <Card className="p-0! overflow-hidden">
           <div className="p-4 text-sm font-bold">File d’attente</div>
           {state.notificationOutbox.length === 0 ? <EmptyState icon={<FiGift />} title="File CRM vide" description="Aucune notification CRM ; aucun fournisseur ni envoi simulé pour cette file." /> : (
             <div className="overflow-x-auto"><table className="table min-w-[620px]">
@@ -294,7 +294,7 @@ export default function Fidelisation() {
                   <td className="font-bold">{n.templateKey}</td>
                   <td>{n.channel}</td>
                   <td><Badge tone={n.status === 'pending' ? 'warn' : 'neutral'}>{n.status}</Badge></td>
-                  <td>{n.status === 'pending' && <button className="btn btn-sm !py-1 !px-2 text-xs" disabled={!canOperate} onClick={() => safe(async () => {
+                  <td>{n.status === 'pending' && <button className="btn btn-sm py-1! px-2! text-xs" disabled={!canOperate} onClick={() => safe(async () => {
                     await cancelPendingNotification(n.id); notify('info', 'Notification annulée.');
                   })}>Annuler</button>}</td>
                 </tr>

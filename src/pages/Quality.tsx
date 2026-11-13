@@ -158,7 +158,7 @@ export default function Quality() {
           <div className="mb-4 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-sm font-bold"><FiDatabase /> Pagination serveur</div>
             <button
-              className="btn btn-sm !py-2"
+              className="btn btn-sm py-2!"
               disabled={!serverReady}
               onClick={() => { setPageError(null); fetchWashesPage(limit, pageIndex * limit).then(setPage).catch((e: unknown) => setPageError(e instanceof Error ? e.message : 'Erreur')); }}
             >
@@ -197,8 +197,8 @@ export default function Quality() {
                 </table>
               </div>
               <div className="mt-4 flex gap-2">
-                <button className="btn btn-sm !py-2" disabled={pageIndex === 0} onClick={() => setPageIndex((n) => Math.max(0, n - 1))}>Précédent</button>
-                <button className="btn btn-sm !py-2" disabled={!page.hasMore} onClick={() => setPageIndex((n) => n + 1)}>Suivant</button>
+                <button className="btn btn-sm py-2!" disabled={pageIndex === 0} onClick={() => setPageIndex((n) => Math.max(0, n - 1))}>Précédent</button>
+                <button className="btn btn-sm py-2!" disabled={!page.hasMore} onClick={() => setPageIndex((n) => n + 1)}>Suivant</button>
               </div>
             </>
           )}

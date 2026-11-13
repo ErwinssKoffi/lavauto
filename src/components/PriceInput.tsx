@@ -22,7 +22,7 @@ export function PriceInput({ serviceId, categoryId, label, value }: {
     finally { inFlight.current = false; setBusy(false); }
   };
   return <input type="number" min="0" step="500" placeholder="—" aria-label={label}
-    className="input input-bordered input-sm !w-32" disabled={busy || !canWriteSubscription} value={draft}
+    className="input input-sm w-32!" disabled={busy || !canWriteSubscription} value={draft}
     onChange={(event) => setDraft(event.target.value)} onBlur={() => { void save(); }}
     onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} />;
 }

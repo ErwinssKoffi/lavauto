@@ -40,7 +40,7 @@ export default function ConfirmEmail() {
       {state === 'done' && (
         <div className="mt-6 space-y-4">
           <Alert kind="success">Adresse e-mail confirmée. Vous pouvez maintenant vous connecter.</Alert>
-          <Link to="/connexion?confirmed=1" className="btn btn-sm btn-primary w-full !py-3">
+          <Link to="/connexion?confirmed=1" className="btn btn-sm btn-primary w-full py-3!">
             <FiCheckCircle aria-hidden="true" /> Se connecter <FiArrowRight aria-hidden="true" />
           </Link>
         </div>
@@ -61,7 +61,7 @@ export default function ConfirmEmail() {
           <p className="text-xs leading-relaxed text-slate-500">
             Aucune donnée n’a été modifiée. Demandez un nouveau lien depuis la page de connexion, ou connectez-vous si votre adresse est déjà confirmée.
           </p>
-          <Link to="/connexion" className="btn btn-sm btn-primary w-full !py-3">Retour à la connexion <FiArrowRight aria-hidden="true" /></Link>
+          <Link to="/connexion" className="btn btn-sm btn-primary w-full py-3!">Retour à la connexion <FiArrowRight aria-hidden="true" /></Link>
         </div>
       )}
 

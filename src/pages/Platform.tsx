@@ -116,7 +116,7 @@ export default function Platform() {
       <Card className="mt-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-bold">Demandes de formule en attente</h2>
-          {connected && <button className="btn btn-sm !px-2 !py-1 text-xs" disabled={decisionBusy} onClick={() => { void safe(refreshSubscriptionRequests); }}><FiRefreshCw /> Relire les demandes</button>}
+          {connected && <button className="btn btn-sm px-2! py-1! text-xs" disabled={decisionBusy} onClick={() => { void safe(refreshSubscriptionRequests); }}><FiRefreshCw /> Relire les demandes</button>}
         </div>
         {!connected ? <Alert kind="info">Démonstration locale : aucune demande réelle n’est transmise et aucune validation administrateur n’est simulée.</Alert>
           : subscriptionRequestsError ? <Alert kind="danger">Demandes indisponibles : {subscriptionRequestsError}</Alert>
@@ -133,7 +133,7 @@ export default function Platform() {
       <Card className="mt-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-bold">Entreprises clientes</h2>
-          <button className="btn btn-sm !px-2 !py-1 text-xs" onClick={() => void safe(async () => { await refreshPlatform(); })}>
+          <button className="btn btn-sm px-2! py-1! text-xs" onClick={() => void safe(async () => { await refreshPlatform(); })}>
             <FiRefreshCw /> Actualiser
           </button>
         </div>
@@ -165,7 +165,7 @@ export default function Platform() {
                       <td>{c.quota.quotaExceeded ? <Badge tone="danger">Dépassé</Badge>
                         : quotaUnavailable ? <Badge tone="warn">Limite indisponible</Badge> : <Badge tone="success">OK</Badge>}</td>
                       <td>
-                        <button className="btn btn-sm !px-2 !py-1 text-xs"
+                        <button className="btn btn-sm px-2! py-1! text-xs"
                           onClick={() => void safe(async () => {
                             await setCompanySuspended({ companyId: c.companyId, suspended: !c.suspended });
                           })}>
@@ -225,7 +225,7 @@ export default function Platform() {
         <Card>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-bold">Usage et quotas du mois</h2>
-            <button className="btn btn-sm !px-2 !py-1 text-xs" onClick={() => void safe(async () => {
+            <button className="btn btn-sm px-2! py-1! text-xs" onClick={() => void safe(async () => {
               await refreshUsageCounters(quotaMonthStartISO());
             })}><FiRefreshCw /> Recalculer les compteurs</button>
           </div>

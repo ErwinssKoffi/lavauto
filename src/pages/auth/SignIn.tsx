@@ -101,10 +101,10 @@ export default function SignIn() {
               aria-invalid={emailError ? true : undefined}
               aria-describedby={emailError ? 'email-error' : undefined}
               className={`w-full rounded-xl border bg-slate-50 py-3 pl-10 pr-4 text-sm outline-none transition focus:bg-white focus:ring-4 ${
-                emailError
-                  ? 'border-red-300 focus:border-red-500 focus:ring-red-100'
-                  : 'border-slate-200 focus:border-sky-500 focus:ring-sky-100'
-              }`}
+ emailError
+ ? 'border-red-300 focus:border-red-500 focus:ring-red-100'
+ : 'border-slate-200 focus:border-sky-500 focus:ring-sky-100'
+ }`}
               placeholder="proprietaire@mastation.ci"
             />
           </div>
@@ -126,7 +126,7 @@ export default function SignIn() {
 
         {error && <div className="text-xs"><Alert kind="danger">{error}</Alert></div>}
 
-        <button type="submit" disabled={!canSubmit} className="btn btn-sm btn-primary w-full !py-3 disabled:opacity-60">
+        <button type="submit" disabled={!canSubmit} className="btn btn-sm btn-primary w-full py-3! disabled:opacity-60">
           {busy ? 'Connexion…' : 'Se connecter'} <FiArrowRight aria-hidden="true" />
         </button>
       </form>

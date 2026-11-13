@@ -71,7 +71,7 @@ export function DataTable<T>({
           <FiSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-base-content/60" aria-hidden="true" />
           <input
             type="search"
-            className="input input-bordered input-sm w-full !pl-9"
+            className="input input-sm w-full pl-9!"
             aria-label={searchPlaceholder}
             placeholder={searchPlaceholder}
             value={query}

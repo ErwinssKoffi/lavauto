@@ -1,27 +1,145 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss" source(none);
 
-/* ─── Thème WashGuard ──────────────────────────────────────────────────────
-   DaisyUI est désormais la seule source de vérité visuelle : les thèmes
-   `washguard` (clair) et `washguard-dark` (sombre) sont déclarés dans
-   tailwind.config.js et appliqués via `data-theme` sur <html>.
-   Ne restent ici que les règles globales qui ne relèvent pas des composants :
-   fond de page, sélection, focus clavier, barres de défilement, mouvement
-   réduit et le reçu imprimable (volontairement isolé du thème).            */
+/* Détection explicite des sources : seuls le HTML d'entrée et le code de
+   l'application produisent des classes (la documentation et les tests ne
+   gonflent pas le CSS). */
+@source "../index.html";
+@source "./**/*.{ts,tsx}";
 
-/* Fond applicatif : volontairement distinct de `base-100` (surface des
-   cartes) pour conserver la profondeur visuelle d'origine. */
+/* ─── DaisyUI 5 (Tailwind 4, configuration CSS-first) ─────────────────────
+   Deux thèmes seulement sont embarqués : `washguard` (clair) et
+   `washguard-dark` (sombre, thème par défaut). Aucun thème intégré n'est
+   inclus (`themes: false`) pour ne pas alourdir le CSS. Le basculement se
+   fait via `data-theme` sur <html>, synchronisé dans store.tsx.            */
+@plugin "daisyui" {
+  themes: false;
+  logs: false;
+}
+
+@plugin "daisyui/theme" {
+  name: "washguard";
+  default: false;
+  prefersdark: false;
+  color-scheme: light;
+
+  --color-base-100: #ffffff;
+  --color-base-200: #f1f5f9;
+  --color-base-300: #e2e8f0;
+  --color-base-content: #0f172a;
+  --color-primary: #0284c7;
+  --color-primary-content: #ffffff;
+  --color-secondary: #0ea5e9;
+  --color-secondary-content: #ffffff;
+  --color-accent: #22d3ee;
+  --color-accent-content: #083344;
+  --color-neutral: #0f172a;
+  --color-neutral-content: #e9f0fb;
+  --color-info: #0284c7;
+  --color-info-content: #ffffff;
+  --color-success: #15803d;
+  --color-success-content: #ffffff;
+  --color-warning: #b45309;
+  --color-warning-content: #ffffff;
+  --color-error: #b91c1c;
+  --color-error-content: #ffffff;
+
+  --radius-selector: 0.75rem;
+  --radius-field: 0.75rem;
+  --radius-box: 1rem;
+  /* Densité WashGuard : 0,3 rem × 8 = 2,4 rem pour btn-sm / input-sm / select-sm. */
+  --size-field: 0.3rem;
+  --size-selector: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+  name: "washguard-dark";
+  default: true;
+  prefersdark: false;
+  color-scheme: dark;
+
+  --color-base-100: #101b2d;
+  --color-base-200: #16243a;
+  --color-base-300: #22314b;
+  --color-base-content: #e9f0fb;
+  --color-primary: #38bdf8;
+  --color-primary-content: #04121e;
+  --color-secondary: #0ea5e9;
+  --color-secondary-content: #04121e;
+  --color-accent: #22d3ee;
+  --color-accent-content: #04121e;
+  --color-neutral: #16243a;
+  --color-neutral-content: #e9f0fb;
+  --color-info: #38bdf8;
+  --color-info-content: #04121e;
+  --color-success: #4ade80;
+  --color-success-content: #04121e;
+  --color-warning: #fbbf24;
+  --color-warning-content: #04121e;
+  --color-error: #f87171;
+  --color-error-content: #04121e;
+
+  --radius-selector: 0.75rem;
+  --radius-field: 0.75rem;
+  --radius-box: 1rem;
+  --size-field: 0.3rem;
+  --size-selector: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+@theme {
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --animate-fade-in: fadeIn 0.32s ease both;
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
+/* Fond applicatif : volontairement distinct de `base-100` (surface des cartes)
+   pour conserver la profondeur visuelle d'origine. */
 :root,
 [data-theme='washguard'] {
   --page-bg: #f4f7fb;
-  color-scheme: light;
 }
 
 [data-theme='washguard-dark'] {
   --page-bg: #080f1d;
-  color-scheme: dark;
+}
+
+/* Bordure par défaut alignée sur `base-300` du thème actif : un simple
+   `border` reste donc sensible au thème clair/sombre (Tailwind 4 utilise
+   `currentColor` par défaut). */
+@layer base {
+  *, ::before, ::after, ::backdrop {
+    border-color: var(--color-base-300);
+  }
+}
+
+/* ─── Densité et détails WashGuard appliqués aux primitives DaisyUI ───────
+   DaisyUI 5 émet ses composants dans la couche `utilities` : une règle
+   placée en `@layer components` serait donc silencieusement perdre. Ces
+   trois ajustements restent volontairement HORS couche (le non-calque a la
+   priorité sur toutes les couches nommées) pour retrouver le contrat
+   visuel d'origine. Aucun composant n'est remplacé.                       */
+/* Boutons : texte de 14 px conservé (DaisyUI met 12 px en `btn-sm`). */
+.btn.btn-sm {
+  --fontsize: 0.875rem;
+}
+/* Badges en pastille, comme avant la migration. */
+.badge {
+  border-radius: 999px;
+}
+/* En-têtes de tableaux : capitales espacées. */
+.table :where(thead) {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 html, body, #root { min-height: 100%; }
@@ -29,47 +147,26 @@ html, body, #root { min-height: 100%; }
 body {
   margin: 0;
   background: var(--page-bg);
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   font-feature-settings: 'kern', 'tnum';
 }
 
-/* ─── Densité WashGuard appliquée aux primitives DaisyUI ──────────────────
-   Les contrôles de terrain doivent garder leur hauteur d'origine (~38 px) :
-   on aligne donc les variantes `-sm` de DaisyUI sur l'ancienne métrique
-   plutôt que d'ajouter une classe de hauteur sur chaque écran. Aucun
-   composant n'est remplacé : seules les dimensions sont ajustées.          */
-@layer components {
-  .btn.btn-sm {
-    height: 2.4rem;
-    min-height: 2.4rem;
-  }
-  .input.input-sm,
-  .select.select-sm {
-    height: 2.4rem;
-  }
-  .textarea.textarea-sm {
-    min-height: 2.4rem;
-  }
-  /* En-têtes de tableaux : capitales espacées, comme le tableau d'origine. */
-  .table :where(thead) {
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-  }
+::selection {
+  background: color-mix(in oklab, var(--color-primary) 18%, transparent);
+  color: var(--color-base-content);
 }
-
-::selection { background: oklch(var(--p) / 0.18); color: oklch(var(--bc)); }
 
 /* Anneau de focus visible au clavier uniquement (accessibilité clavier). */
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
-  outline: 2px solid oklch(var(--p));
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: oklch(var(--b3));
+  background: var(--color-base-300);
   border-radius: 999px;
   border: 3px solid transparent;
   background-clip: content-box;

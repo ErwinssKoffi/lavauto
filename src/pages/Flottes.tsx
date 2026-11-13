@@ -161,7 +161,7 @@ export default function Flottes() {
           })}>Mettre en attente</button>
         </Card>
 
-        <Card className="!p-0 overflow-hidden">
+        <Card className="p-0! overflow-hidden">
           <div className="p-4 text-sm font-bold">Contrats & créances</div>
           {state.fleetContracts.length === 0 ? <EmptyState icon={<FiBriefcase />} title="Aucun contrat" description="Créez une flotte puis son contrat." /> : (
             <div className="overflow-x-auto"><table className="table min-w-[620px]">
@@ -179,7 +179,7 @@ export default function Flottes() {
           </table></div>}
         </Card>
 
-        <Card className="lg:col-span-2 !p-0 overflow-hidden">
+        <Card className="lg:col-span-2 p-0! overflow-hidden">
           <div className="p-4 text-sm font-bold">Véhicules & file</div>
           {state.fleetVehicles.length === 0 && state.notificationOutbox.filter((n) => n.fleetId).length === 0
             ? <EmptyState icon={<FiTruck />} title="Aucun rattachement" description="Rattachez un véhicule à une flotte pour le suivre ici." />

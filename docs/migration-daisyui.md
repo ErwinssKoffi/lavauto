@@ -1,6 +1,7 @@
 # Migration DaisyUI — journal et table de correspondance
 
-**Objectif :** remplacer intégralement le design system maison `wg-*` par DaisyUI 4, sans casser les 16 écrans, leurs URL, leurs rôles ni leurs textes.
+**Objectif :** remplacer intégralement le design system maison `wg-*` par DaisyUI, sans casser les 16 écrans, leurs URL, leurs rôles ni leurs textes.
+**État final :** DaisyUI **5.8** sur **Tailwind 4.3**, configuration CSS-first (`@plugin`). La première étape de la migration s'est faite sur DaisyUI 4/Tailwind 3 ; la montée de version est décrite au §9.
 **Référence de conception :** [design-system.md](design-system.md).
 
 ---
@@ -44,7 +45,7 @@
 | `wg-overlay` | `bg-black/60 backdrop-blur-sm` | |
 | `wg-skeleton` | `skeleton` | |
 | `wg-gradient` | `bg-gradient-to-br from-sky-600 via-sky-500 to-cyan-400` | |
-| `wg-fade-in` | `animate-fade-in` | keyframes dans `tailwind.config.js` |
+| `wg-fade-in` | `animate-fade-in` | `--animate-fade-in` dans `@theme` |
 | `wg-scroll-thin` | `[scrollbar-width:thin]` | + barres globales dans `index.css` |
 | `wg-nav-item(-active/-soon)` | classes Tailwind composées dans `AppShell` | actif : `bg-primary text-primary-content` |
 | `wg-topbar` | `bg-base-100/90 backdrop-blur-xl` | |
@@ -101,3 +102,57 @@
 - Cartes : ombre `shadow-xl` DaisyUI au lieu de l'ombre maison à deux niveaux.
 
 Ces écarts sont typographiques et restent dans le même contrat de couleurs, de densité et de hiérarchie visuelle.
+
+
+---
+
+## 9. Montée de version Tailwind 4 + DaisyUI 5
+
+Décidée après la première migration (DaisyUI 4 / Tailwind 3), pour utiliser la syntaxe demandée : `@import "tailwindcss"` + `@plugin "daisyui"`.
+
+### 9.1 Pile et fichiers de configuration
+
+| Avant | Après |
+| --- | --- |
+| `tailwind.config.js` (`content`, `theme.extend`, `plugins`, `daisyui.themes`) | `src/index.css` en CSS-first : `@import "tailwindcss" source(none)`, `@source`, `@plugin "daisyui"`, `@plugin "daisyui/theme"`, `@theme` |
+| `postcss.config.js` + `postcss` + `autoprefixer` | `@tailwindcss/vite` (plugin Vite), préfixage intégré — les trois ont été supprimés |
+| `darkMode: 'class'` | `data-theme` seul (la classe `dark` reste posée pour compatibilité `<html class="dark">`) |
+| `daisyui@4.12.24` | `daisyui@5.8.0` |
+| `borderColor.DEFAULT` (thème Tailwind) | `@layer base { *, ::before, ::after, ::backdrop { border-color: var(--color-base-300) } }` |
+
+### 9.2 Thèmes
+
+`@plugin "daisyui" { themes: false; }` puis deux blocs `@plugin "daisyui/theme"` (`washguard`, `washguard-dark` avec `default: true`). Les tokens deviennent `--color-*`, `--radius-*`, `--size-field`, `--border`, `--depth`, `--noise`. Aucun thème intégré n'est embarqué.
+
+### 9.3 Ruptures de classes corrigées
+
+| DaisyUI 4 / Tailwind 3 | DaisyUI 5 / Tailwind 4 | Volume |
+| --- | --- | --- |
+| `input-bordered`, `select-bordered`, `textarea-bordered` | supprimées (`input`/`select`/`textarea` ont une bordure native) | 19 |
+| `tabs-boxed` | `tabs-box` | 1 |
+| `!px-2.5` (modificateur préfixé) | `px-2.5!` (modificateur suffixé) | 114 tokens |
+| `bg-gradient-to-br` | `bg-linear-to-br` | 18 |
+| `rounded-sm`, `shadow-sm`, `blur-sm` | `rounded-xs`, `shadow-xs`, `blur-xs` | 3 |
+| largeur implicite des champs (`width: 100%` en v4) | `width: clamp(3rem, 20rem, 100%)` en v5 → `w-full` explicite ajouté | 4 fichiers |
+
+Le remplacement du modificateur important a été fait **uniquement dans les littéraux de classes** : un premier passage sur tout le fichier avait réécrit des négations JS (`|| !canWriteSubscription` → `canWriteSubscription!`), détecté puis annulé avant commit.
+
+### 9.4 Densité portée par le thème
+
+Plus besoin de surcharger les hauteurs : `--size-field: 0.3rem` dans les deux thèmes donne `0,3 × 8 = 2,4 rem` pour `btn-sm`, `input-sm`, `select-sm`, `textarea-sm` (DaisyUI 5 calcule `--size` à partir de ce token).
+
+Trois ajustements restent **hors couche** (donc prioritaires sur la couche `utilities` où DaisyUI 5 place ses composants) : `--fontsize` des `btn-sm` (14 px), rayon des badges (pastille 999 px) et capitalisation des en-têtes de tableaux.
+
+### 9.5 Sources et poids du CSS
+
+`@import "tailwindcss" source(none)` + `@source "../index.html"` + `@source "./**/*.{ts,tsx}"` : la documentation et les tests ne produisent plus de classes. Résultat : **148,7 kB** de CSS (23,3 kB gzip), contre 125 kB en Tailwind 3 (le runtime de base de Tailwind 4 est plus complet).
+
+### 9.6 Validation après montée de version
+
+| Commande | Résultat |
+| --- | --- |
+| `npm run typecheck` | ✅ 0 erreur |
+| `npm run lint` | ✅ 26 règles |
+| `npm run check` | ✅ 243 OK / 0 KO |
+| `npm run test:unit` | ✅ 283 tests / 33 fichiers |
+| `npm run build` | ✅ Vite + PWA |

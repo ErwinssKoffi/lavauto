@@ -80,9 +80,9 @@ export default function Settings() {
             {hours.map((h, i) => (
               <div key={h.day} className="flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-xs">
                 <span className="w-20 font-bold">{h.day}</span>
-                <input type="time" className="input input-bordered input-sm !w-28 !py-1" disabled={h.closed} value={h.open} onChange={(e) => setLocalHours((hs) => hs.map((x, idx) => idx === i ? { ...x, open: e.target.value } : x))} />
+                <input type="time" className="input input-sm w-28! py-1!" disabled={h.closed} value={h.open} onChange={(e) => setLocalHours((hs) => hs.map((x, idx) => idx === i ? { ...x, open: e.target.value } : x))} />
                 <span className="text-base-content/60">→</span>
-                <input type="time" className="input input-bordered input-sm !w-28 !py-1" disabled={h.closed} value={h.close} onChange={(e) => setLocalHours((hs) => hs.map((x, idx) => idx === i ? { ...x, close: e.target.value } : x))} />
+                <input type="time" className="input input-sm w-28! py-1!" disabled={h.closed} value={h.close} onChange={(e) => setLocalHours((hs) => hs.map((x, idx) => idx === i ? { ...x, close: e.target.value } : x))} />
                 <label className="text-base-content/60 ml-auto flex items-center gap-1.5"><input type="checkbox" className="accent-sky-500" checked={h.closed} onChange={(e) => setLocalHours((hs) => hs.map((x, idx) => idx === i ? { ...x, closed: e.target.checked } : x))} /> Fermé</label>
               </div>
             ))}
@@ -178,7 +178,7 @@ export default function Settings() {
                               type="number"
                               min="0"
                               disabled={!canWriteSubscription}
-                              className="input input-bordered input-sm !py-1 !text-xs font-bold"
+                              className="input input-sm py-1! text-xs! font-bold w-full"
                               defaultValue={p.reorderLevel}
                               onBlur={(e) => { const value = readNumber(e.target.value); if (value !== p.reorderLevel) void safe(() => updateStockThreshold(p.id, value)); }}
                               onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}

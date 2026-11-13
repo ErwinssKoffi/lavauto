@@ -26,8 +26,8 @@ export function PasswordStrengthMeter({ password, id }: { password: string; id?:
           <span
             key={step}
             className={`h-1.5 flex-1 rounded-full transition-colors ${
-              step <= strength.score ? TONE_BAR[strength.tone] : 'bg-slate-200'
-            }`}
+ step <= strength.score ? TONE_BAR[strength.tone] : 'bg-slate-200'
+ }`}
           />
         ))}
       </div>

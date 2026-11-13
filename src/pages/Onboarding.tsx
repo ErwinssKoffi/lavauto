@@ -76,9 +76,9 @@ function HoursForm() {
         {hours.map((h, i) => (
           <div key={h.day} className="flex flex-wrap items-center gap-3 rounded-xl border px-3 py-2.5">
             <span className="w-24 text-xs font-bold">{h.day}</span>
-            <input type="time" className="input input-bordered input-sm !w-32" value={h.open} disabled={h.closed} onChange={(e) => update(i, { open: e.target.value })} />
+            <input type="time" className="input input-sm w-32!" value={h.open} disabled={h.closed} onChange={(e) => update(i, { open: e.target.value })} />
             <span className="text-base-content/60 text-xs">→</span>
-            <input type="time" className="input input-bordered input-sm !w-32" value={h.close} disabled={h.closed} onChange={(e) => update(i, { close: e.target.value })} />
+            <input type="time" className="input input-sm w-32!" value={h.close} disabled={h.closed} onChange={(e) => update(i, { close: e.target.value })} />
             <label className="text-base-content/60 ml-auto flex cursor-pointer items-center gap-2 text-xs">
               <input type="checkbox" checked={h.closed} onChange={(e) => update(i, { closed: e.target.checked })} className="accent-sky-500" /> Fermé
             </label>
@@ -105,7 +105,7 @@ function CategoriesForm() {
         {CATEGORY_SUGGESTIONS.map((s) => <button key={s} className="badge badge-sm hover:badge badge-primary" onClick={() => add(s)}><FiPlus /> {s}</button>)}
       </div>
       <div className="mt-4 flex gap-2">
-        <input className="input input-bordered input-sm" placeholder="Nom d’une catégorie" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), add(name))} />
+        <input className="input input-sm w-full" placeholder="Nom d’une catégorie" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), add(name))} />
         <button className="btn btn-sm btn-primary" onClick={() => add(name)}><FiPlus /> Ajouter</button>
       </div>
       <div className="mt-5 space-y-2">
@@ -115,7 +115,7 @@ function CategoriesForm() {
             <FiTruck className="text-sky-400" />
             <span className="flex-1 font-medium">{c.name}</span>
             <Badge tone={c.active ? 'success' : 'neutral'}>{c.active ? 'Active' : 'Désactivée'}</Badge>
-            <button className="btn btn-sm !px-2 !py-1 text-xs" onClick={() => { void safe(() => toggleCategory(c.id)); }}>{c.active ? 'Désactiver' : 'Activer'}</button>
+            <button className="btn btn-sm px-2! py-1! text-xs" onClick={() => { void safe(() => toggleCategory(c.id)); }}>{c.active ? 'Désactiver' : 'Activer'}</button>
             <button className="text-base-content/60 hover:text-red-400" onClick={() => { void safe(() => removeCategory(c.id)); }} aria-label="Supprimer"><FiTrash2 size={15} /></button>
           </div>
         ))}
@@ -141,8 +141,8 @@ function ServicesForm() {
         {SERVICE_SUGGESTIONS.map((s) => <button key={s} className="badge badge-sm hover:badge badge-primary" onClick={() => add(s)}><FiPlus /> {s}</button>)}
       </div>
       <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-        <input className="input input-bordered input-sm" placeholder="Nom de la prestation" value={name} onChange={(e) => setName(e.target.value)} />
-        <input className="input input-bordered input-sm" placeholder="Description (facultative)" value={desc} onChange={(e) => setDesc(e.target.value)} />
+        <input className="input input-sm w-full" placeholder="Nom de la prestation" value={name} onChange={(e) => setName(e.target.value)} />
+        <input className="input input-sm w-full" placeholder="Description (facultative)" value={desc} onChange={(e) => setDesc(e.target.value)} />
         <button className="btn btn-sm btn-primary" onClick={() => add(name)}><FiPlus /> Ajouter</button>
       </div>
       <div className="mt-5 space-y-2">
@@ -151,7 +151,7 @@ function ServicesForm() {
           <div key={v.id} className="flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm">
             <div className="min-w-0 flex-1"><p className="font-medium">{v.name}</p>{v.description && <p className="text-base-content/60 truncate text-xs">{v.description}</p>}</div>
             <Badge tone={v.active ? 'success' : 'neutral'}>{v.active ? 'Active' : 'Désactivée'}</Badge>
-            <button className="btn btn-sm !px-2 !py-1 text-xs" onClick={() => { void safe(() => updateService(v.id, { active: !v.active })); }}>{v.active ? 'Désactiver' : 'Activer'}</button>
+            <button className="btn btn-sm px-2! py-1! text-xs" onClick={() => { void safe(() => updateService(v.id, { active: !v.active })); }}>{v.active ? 'Désactiver' : 'Activer'}</button>
             <button className="text-base-content/60 hover:text-red-400" onClick={() => { void safe(() => removeService(v.id)); }} aria-label="Supprimer"><FiTrash2 size={15} /></button>
           </div>
         ))}
@@ -318,7 +318,7 @@ function ActivationForm() {
               <p key={s.id} className="text-base-content/60 text-xs">· {s.name} — grille enregistrée</p>
             ))}
           </div>
-          <button className="btn btn-sm btn-primary mt-6 !px-6 !py-3" disabled={!canWriteSubscription || blockers.length > 0}
+          <button className="btn btn-sm btn-primary mt-6 px-6! py-3!" disabled={!canWriteSubscription || blockers.length > 0}
             onClick={() => { void safe(async () => { await activateStation(); setTimeout(() => navigate('/app/tableau-de-bord'), 900); }); }}>
             <FiLock /> Activer la station
           </button>
@@ -413,7 +413,7 @@ export default function Onboarding() {
       </Card>
 
       <div className="grid gap-5 lg:grid-cols-[340px_1fr]">
-        <Card className="!p-3">
+        <Card className="p-3!">
           <div className="max-h-[720px] space-y-0.5 overflow-y-auto pr-1">
             {onboarding.map((step: OnboardingStep, i) => {
               const selected = step.id === active.id;

@@ -164,7 +164,7 @@ export default function Employees() {
       </Alert></div>}
       {employeeReadWarning && <div role="alert" className="mb-5"><Alert kind="warn">
         {employeeReadWarning} Les états affichés peuvent être périmés.{' '}
-        <button type="button" className="btn btn-sm !px-2 !py-1" disabled={busy} onClick={() => { void reloadEmployees(); }}>
+        <button type="button" className="btn btn-sm px-2! py-1!" disabled={busy} onClick={() => { void reloadEmployees(); }}>
           {busy ? 'Actualisation en cours…' : 'Actualiser les comptes et invitations'}
         </button>
       </Alert></div>}
@@ -176,7 +176,7 @@ export default function Employees() {
       </Alert></div>}
       {unconfirmedRevocation && <div role="alert" className="mb-5"><Alert kind="warn">
         {unconfirmedRevocation.message}{' '}
-        <button type="button" className="btn btn-sm !px-2 !py-1"
+        <button type="button" className="btn btn-sm px-2! py-1!"
           disabled={busy || !recoveryReady || !canWriteSubscription || Boolean(employeeReadWarning) || Boolean(unconfirmedInvitation) || Boolean(unconfirmedAccountUpdate) || !canInvite || !canDisable
             || !invitations.some((invitation) => invitation.id === unconfirmedRevocation.id)}
           onClick={() => setRevokeTarget(unconfirmedRevocation.id)}>Reprendre la même révocation</button>
@@ -184,7 +184,7 @@ export default function Employees() {
       <div className="mb-5"><Alert kind="info">Chaque nouvel employé reçoit une invitation et définit son propre mot de passe ; un mot de passe oublié se réinitialise uniquement via un lien sécurisé à usage unique.</Alert></div>
       {authKind === 'local' && <div className="mb-5"><Alert kind="warn">Mode stockage navigateur : aucun e-mail n’est envoyé sans serveur connecté.</Alert></div>}
 
-      <Card className="!p-0 overflow-hidden">
+      <Card className="p-0! overflow-hidden">
         <div className="overflow-x-auto">
           <table className="table min-w-[620px]">
             <thead><tr>
@@ -206,7 +206,7 @@ export default function Employees() {
                     <td>{washes.length} lavage(s) · {formatFCFA(washes.reduce((sum, w) => sum + w.total, 0))}</td>
                     <td>
                       {isLocalStockDemo || (dataSource === 'api' && canManage) ? <>
-                        <input key={`${u.id}:${u.commissionRateOverride ?? ''}`} type="number" min="0" max="100" placeholder="Barème station" className="input input-bordered input-sm !w-28 !py-1 text-xs"
+                        <input key={`${u.id}:${u.commissionRateOverride ?? ''}`} type="number" min="0" max="100" placeholder="Barème station" className="input input-sm w-28! py-1! text-xs"
                           disabled={!canEditEmployees || busy} defaultValue={u.commissionRateOverride ?? ''}
                           onBlur={(e) => {
                             const rate = e.target.value === '' ? null : Number(e.target.value);
@@ -221,10 +221,10 @@ export default function Employees() {
                     <td><Badge tone={u.active ? 'success' : 'danger'}>{u.active ? 'Actif' : 'Désactivé'}</Badge></td>
                     <td>
                       <div className="flex gap-1.5">
-                        {canReset && <button className="btn btn-sm !px-2 !py-1 text-[11px]" disabled={!canEditEmployees || busy} title="Envoyer un lien de réinitialisation" onClick={() => { setResetLink(null); setResetTarget(u.id); }}><FiKey /></button>}
-                        {canManage && u.role !== 'proprietaire' && <button className="btn btn-sm !px-2 !py-1 text-[11px]" disabled={!canEditEmployees || busy} title="Rôle, état et stations" onClick={() => openEdit(u.id)}><FiSettings /></button>}
+                        {canReset && <button className="btn btn-sm px-2! py-1! text-[11px]" disabled={!canEditEmployees || busy} title="Envoyer un lien de réinitialisation" onClick={() => { setResetLink(null); setResetTarget(u.id); }}><FiKey /></button>}
+                        {canManage && u.role !== 'proprietaire' && <button className="btn btn-sm px-2! py-1! text-[11px]" disabled={!canEditEmployees || busy} title="Rôle, état et stations" onClick={() => openEdit(u.id)}><FiSettings /></button>}
                         {canDisable && u.role !== 'proprietaire' && (
-                          <button className="btn btn-sm !px-2 !py-1 text-[11px]" disabled={!canEditEmployees || busy} title={u.active ? 'Désactiver' : 'Activer'}
+                          <button className="btn btn-sm px-2! py-1! text-[11px]" disabled={!canEditEmployees || busy} title={u.active ? 'Désactiver' : 'Activer'}
                             onClick={() => safe(() => updateUser({ userId: u.id, active: !u.active }))}>
                             {u.active ? <FiUserX /> : <FiUserCheck />}
                           </button>
@@ -254,7 +254,7 @@ export default function Employees() {
                     <td>{formatDate(i.expiresAt)}</td>
                     <td><Badge tone={i.revokedAt ? 'danger' : i.acceptedAt ? 'success' : 'warn'}>{i.revokedAt ? 'Révoquée' : i.acceptedAt ? 'Acceptée' : 'En attente'}</Badge></td>
                     <td>{!i.acceptedAt && !i.revokedAt && canInvite && canDisable && (
-                      <button className="btn btn-sm !px-2 !py-1 text-[11px]" disabled={!canEditEmployees || busy} title="Révoquer" onClick={() => setRevokeTarget(i.id)}><FiTrash2 /></button>
+                      <button className="btn btn-sm px-2! py-1! text-[11px]" disabled={!canEditEmployees || busy} title="Révoquer" onClick={() => setRevokeTarget(i.id)}><FiTrash2 /></button>
                     )}</td>
                   </tr>
                 ))}</tbody>

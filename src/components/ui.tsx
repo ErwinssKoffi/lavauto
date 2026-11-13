@@ -9,12 +9,12 @@ import { Link } from 'react-router-dom';
 // Ces composants exposent la même API qu'avant la migration : les pages n'ont
 // pas changé. Toute l'apparence vient des classes DaisyUI (btn, card, input,
 // badge, alert, modal, tabs, table…) et des thèmes `washguard` /
-// `washguard-dark` déclarés dans tailwind.config.js.
+// `washguard-dark` déclarés dans src/index.css (configuration CSS-first).
 
 export function Logo({ compact = false, light = false }: { compact?: boolean; light?: boolean }) {
   return (
     <div className="flex items-center gap-2.5 select-none">
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-sky-600 via-sky-500 to-cyan-400 shadow-lg shadow-sky-500/20">
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-linear-to-br from-sky-600 via-sky-500 to-cyan-400 shadow-lg shadow-sky-500/20">
         <svg viewBox="0 0 24 24" className="h-5 w-5 text-white" fill="currentColor" aria-hidden>
           <path d="M12 2.5c.4 0 .75.26.87.64l1.05 3.35a3 3 0 0 1 1.59.92l3.4-.85a.9.9 0 0 1 1.03 1.27l-1.6 3.12a3 3 0 0 1 0 1.9l1.6 3.12a.9.9 0 0 1-1.03 1.27l-3.4-.85a3 3 0 0 1-1.59.92l-1.05 3.35a.9.9 0 0 1-1.74 0l-1.05-3.35a3 3 0 0 1-1.59-.92l-3.4.85A.9.9 0 0 1 5.06 15.9l1.6-3.12a3 3 0 0 1 0-1.9l-1.6-3.12A.9.9 0 0 1 6.09 6.5l3.4.85a3 3 0 0 1 1.59-.92l1.05-3.35A.9.9 0 0 1 12 2.5Z" />
           <circle cx="12" cy="12" r="2.6" fill="#0284c7" />
@@ -68,7 +68,7 @@ export function Input({ label, hint, id, className = '', ...props }: InputProps)
   return (
     <div className={className}>
       {label && <Label htmlFor={inputId}>{label}</Label>}
-      <input className="input input-bordered input-sm w-full" id={inputId} {...props}
+      <input className="input input-sm w-full" id={inputId} {...props}
         value={props.type === 'number' && typeof props.value === 'number' && Number.isNaN(props.value) ? '' : props.value} />
       {hint && <p className="mt-1 text-xs text-base-content/60">{hint}</p>}
     </div>
@@ -82,7 +82,7 @@ export function Select({ label, hint, id, className = '', children, ...props }: 
   return (
     <div className={className}>
       {label && <Label htmlFor={inputId}>{label}</Label>}
-      <select className="select select-bordered select-sm w-full" id={inputId} {...props}>{children}</select>
+      <select className="select select-sm w-full" id={inputId} {...props}>{children}</select>
       {hint && <p className="mt-1 text-xs text-base-content/60">{hint}</p>}
     </div>
   );
@@ -95,7 +95,7 @@ export function Textarea({ label, id, className = '', ...props }: TextareaProps)
   return (
     <div className={className}>
       {label && <Label htmlFor={inputId}>{label}</Label>}
-      <textarea className="textarea textarea-bordered textarea-sm w-full" id={inputId} rows={3} {...props} />
+      <textarea className="textarea textarea-sm w-full" id={inputId} rows={3} {...props} />
     </div>
   );
 }
@@ -168,7 +168,7 @@ export function Modal({ open, onClose, title, children, wide = false }: { open: 
       <div className={`modal-box p-5 ${wide ? 'max-w-3xl' : 'max-w-lg'}`}>
         <div className="mb-4 flex items-center justify-between border-b border-base-300 pb-4">
           <h3 id={titleId} className="text-base font-bold">{title}</h3>
-          <button type="button" className="btn btn-ghost btn-sm !px-2.5" onClick={onClose} aria-label="Fermer"><FiX size={18} /></button>
+          <button type="button" className="btn btn-ghost btn-sm px-2.5!" onClick={onClose} aria-label="Fermer"><FiX size={18} /></button>
         </div>
         {children}
       </div>
@@ -179,7 +179,7 @@ export function Modal({ open, onClose, title, children, wide = false }: { open: 
 
 export function Tabs<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: { id: T; label: string }[] }) {
   return (
-    <div role="tablist" className="tabs tabs-boxed">
+    <div role="tablist" className="tabs tabs-box">
       {options.map((o) => (
         <button
           key={o.id}

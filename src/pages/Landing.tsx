@@ -49,7 +49,7 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 antialiased selection:bg-sky-500 selection:text-white">
       {/* ── Top Announcement Banner ────────────────────────────────────────── */}
-      <div className="border-b border-sky-500/20 bg-gradient-to-r from-sky-950 via-slate-900 to-indigo-950 px-4 py-2 text-center text-xs font-medium text-sky-200">
+      <div className="border-b border-sky-500/20 bg-linear-to-r from-sky-950 via-slate-900 to-indigo-950 px-4 py-2 text-center text-xs font-medium text-sky-200">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-500/20 px-2.5 py-0.5 font-bold text-sky-300">
           Nouveau
         </span>{' '}
@@ -60,7 +60,7 @@ export default function Landing() {
       <header className="sticky top-0 z-50 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link to="/" className="flex items-center gap-2.5">
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-sky-400 via-sky-500 to-blue-600 text-white shadow-lg shadow-sky-500/25">
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-linear-to-br from-sky-400 via-sky-500 to-blue-600 text-white shadow-lg shadow-sky-500/25">
               <FiDroplet size={22} className="stroke-[2.5]" />
             </span>
             <div className="leading-tight">
@@ -112,7 +112,7 @@ export default function Landing() {
 
             <h1 className="mt-6 text-4xl font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl">
               Suivez votre caisse.{' '}
-              <span className="bg-gradient-to-r from-sky-400 via-blue-400 to-indigo-300 bg-clip-text text-transparent">
+              <span className="bg-linear-to-r from-sky-400 via-blue-400 to-indigo-300 bg-clip-text text-transparent">
                 Pilotez vos lavages, vos stocks et vos équipes.
               </span>
             </h1>
@@ -126,7 +126,7 @@ export default function Landing() {
             <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
               <Link
                 to="/inscription"
-                className="inline-flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 px-6 py-3.5 text-base font-bold text-white shadow-xl shadow-sky-500/25 transition hover:from-sky-400 hover:to-blue-500"
+                className="inline-flex items-center gap-2.5 rounded-xl bg-linear-to-r from-sky-500 to-blue-600 px-6 py-3.5 text-base font-bold text-white shadow-xl shadow-sky-500/25 transition hover:from-sky-400 hover:to-blue-500"
               >
                 Créer mon compte
                 <FiArrowRight size={18} />
@@ -162,7 +162,7 @@ export default function Landing() {
                   alt="Station de lavage automobile équipée"
                   className="h-full w-full object-cover"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent lg:bg-gradient-to-r lg:from-transparent lg:to-slate-900" />
+                <div className="absolute inset-0 bg-linear-to-t from-slate-950 via-slate-950/40 to-transparent lg:bg-linear-to-r lg:from-transparent lg:to-slate-900" />
                 <div className="absolute bottom-4 left-4 right-4 rounded-xl border border-white/10 bg-slate-950/80 p-3.5 backdrop-blur">
                   <p className="text-[11px] font-bold tracking-wider text-sky-400 uppercase">Architecture Station</p>
                   <p className="mt-1 text-xs text-slate-200">
@@ -655,13 +655,13 @@ Essai de 14 jours avec tous les modules. Standard et Premium nécessitent une de
                 <div
                   key={plan.id}
                   className={`relative flex flex-col justify-between rounded-2xl border p-8 transition ${
-                    isPopular
-                      ? 'border-sky-500 bg-gradient-to-b from-sky-950/40 via-slate-900 to-slate-950 shadow-2xl shadow-sky-500/20'
-                      : 'border-slate-800 bg-slate-900/60 hover:border-slate-700'
-                  }`}
+ isPopular
+ ? 'border-sky-500 bg-linear-to-b from-sky-950/40 via-slate-900 to-slate-950 shadow-2xl shadow-sky-500/20'
+ : 'border-slate-800 bg-slate-900/60 hover:border-slate-700'
+ }`}
                 >
                   {isPopular && (
-                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-sky-500 to-blue-600 px-4 py-1 text-xs font-bold text-white shadow-md">
+                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-linear-to-r from-sky-500 to-blue-600 px-4 py-1 text-xs font-bold text-white shadow-md">
                       Formule Standard
                     </div>
                   )}
@@ -696,10 +696,10 @@ Essai de 14 jours avec tous les modules. Standard et Premium nécessitent une de
                     <Link
                       to={`/inscription?plan=${encodeURIComponent(plan.id)}`}
                       className={`block w-full rounded-xl py-3 text-center text-sm font-bold transition ${
-                        isPopular
-                          ? 'bg-sky-500 text-white shadow-lg shadow-sky-500/25 hover:bg-sky-400'
-                          : 'border border-slate-700 bg-slate-800 text-white hover:bg-slate-700'
-                      }`}
+ isPopular
+ ? 'bg-sky-500 text-white shadow-lg shadow-sky-500/25 hover:bg-sky-400'
+ : 'border border-slate-700 bg-slate-800 text-white hover:bg-slate-700'
+ }`}
                     >
                       {plan.id === 'essai' ? 'Commencer l’essai' : `Choisir ${plan.name}`}
                     </Link>
@@ -756,7 +756,7 @@ Essai de 14 jours avec tous les modules. Standard et Premium nécessitent une de
       </section>
 
       {/* ── Final Call to Action ────────────────────────────────────────── */}
-      <section className="relative overflow-hidden border-t border-slate-800 bg-gradient-to-b from-sky-950/40 via-slate-950 to-slate-950 py-20 text-center">
+      <section className="relative overflow-hidden border-t border-slate-800 bg-linear-to-b from-sky-950/40 via-slate-950 to-slate-950 py-20 text-center">
         <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl font-black text-white sm:text-4xl lg:text-5xl">
             Prêt à transformer la gestion de votre station de lavage ?
@@ -767,7 +767,7 @@ Essai de 14 jours avec tous les modules. Standard et Premium nécessitent une de
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <Link
               to="/inscription"
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 px-7 py-3.5 text-base font-bold text-white shadow-xl shadow-sky-500/25 transition hover:from-sky-400 hover:to-blue-500"
+              className="inline-flex items-center gap-2 rounded-xl bg-linear-to-r from-sky-500 to-blue-600 px-7 py-3.5 text-base font-bold text-white shadow-xl shadow-sky-500/25 transition hover:from-sky-400 hover:to-blue-500"
             >
               Créer mon espace
               <FiArrowRight size={18} />

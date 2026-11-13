@@ -1,8 +1,8 @@
-# 02 — Design system & UX (DaisyUI + thèmes WashGuard)
+# 02 — Design system & UX (Tailwind 4 + DaisyUI 5, thèmes WashGuard)
 
 **Statut :** migration DaisyUI **terminée**. Le système maison `wg-*` a été entièrement remplacé : plus aucune classe `wg-*` ni variable `--wg-*` n'existe dans `src/`. Les 16 écrans, leurs URL, leurs rôles et leurs textes sont inchangés.
 
-**Dépendance ajoutée :** `daisyui@4.12.24` (devDependency, compatible Tailwind 3). Aucun autre paquet UI (ni shadcn/ui, ni Radix, ni Headless UI) n'a été installé.
+**Pile :** `tailwindcss@4` + `@tailwindcss/vite@4` + `daisyui@5`, en **configuration CSS-first** (`src/index.css`). Aucun autre paquet UI (ni shadcn/ui, ni Radix, ni Headless UI) n'a été installé. `tailwind.config.js`, `postcss.config.js`, `postcss` et `autoprefixer` ont été supprimés.
 
 Journal de migration et table de correspondance : [migration-daisyui.md](migration-daisyui.md).
 
@@ -17,7 +17,7 @@ Références : [architecture-audit.md](architecture-audit.md) · [architecture-t
 | Hiérarchie par la surface, pas par la couleur | cartes sur `bg-base-100`, panneaux imbriqués sur `bg-base-200`, bordures `border-base-300`, ombres `shadow-xl` |
 | Un seul accent | le bleu WashGuard devient `primary` du thème ; `success` / `warning` / `error` restent réservés aux états métier |
 | Densité lisible sur le terrain | variantes `btn-sm` / `input-sm` / `select-sm` / `badge-sm` pour conserver la densité d'origine |
-| Mouvement discret | `animate-fade-in` (320 ms, défini dans `tailwind.config.js`), transitions 150–200 ms, **désactivables** via `prefers-reduced-motion` |
+| Mouvement discret | `animate-fade-in` (320 ms, déclaré dans `@theme` de `src/index.css`), transitions 150–200 ms, **désactivables** via `prefers-reduced-motion` |
 | Le clavier compte | anneau `:focus-visible` global, fil d'Ariane, `aria-sort`, `aria-expanded`, piège de focus, `Ctrl/Cmd + K` |
 | Pas de maquette morte | chaque composant reste branché sur un écran existant et couvert par `npm run check` |
 
@@ -25,34 +25,37 @@ Références : [architecture-audit.md](architecture-audit.md) · [architecture-t
 
 ---
 
-## 2. Thèmes DaisyUI (`tailwind.config.js`)
+## 2. Thèmes DaisyUI (`src/index.css`, CSS-first)
 
-Deux thèmes personnalisés remplacent les anciens tokens CSS. Ils sont appliqués via `data-theme` sur `<html>` :
+Deux thèmes personnalisés remplacent les anciens tokens CSS, déclarés avec le plugin `@plugin "daisyui/theme"` et appliqués via `data-theme` sur `<html>` :
 
 | Thème | `data-theme` | Usage |
 | --- | --- | --- |
 | WashGuard clair | `washguard` | palette historique claire (`base-100 #ffffff`, texte `#0f172a`) |
-| WashGuard sombre | `washguard-dark` | palette historique sombre (`base-100 #101b2d`, texte `#e9f0fb`) — **thème par défaut** (`darkTheme`) |
+| WashGuard sombre | `washguard-dark` | palette historique sombre (`base-100 #101b2d`, texte `#e9f0fb`) — **thème par défaut** (`default: true`) |
 
-| Variable DaisyUI | Rôle | Ancien token |
+`@plugin "daisyui" { themes: false; }` désactive les 35 thèmes intégrés : seuls les deux thèmes WashGuard sont embarqués.
+
+| Variable DaisyUI 5 | Rôle | Ancien token |
 | --- | --- | --- |
-| `--p` / `--pc` | accent unique | `--wg-accent` |
-| `--b1` / `--b2` / `--b3` | surface, panneau, bordure | `--wg-surface`, `--wg-surface-2`, `--wg-border` |
-| `--bc` | texte principal (`/60` = texte secondaire) | `--wg-text`, `--wg-muted` |
-| `--su`, `--wa`, `--er` | états métier | `--wg-success`, `--wg-warn`, `--wg-danger` |
-| `--rounded-box/btn/field/badge` | rayons (1 rem / 0,75 rem / 999 px) | `--wg-radius*` |
-| `--padding-card` | 1,25 rem | padding des cartes |
+| `--color-primary` / `-content` | accent unique | `--wg-accent` |
+| `--color-base-100/200/300` | surface, panneau, bordure | `--wg-surface`, `--wg-surface-2`, `--wg-border` |
+| `--color-base-content` (`/60` = secondaire) | texte | `--wg-text`, `--wg-muted` |
+| `--color-success/warning/error` | états métier | `--wg-success`, `--wg-warn`, `--wg-danger` |
+| `--radius-box/field/selector` | rayons (1 rem / 0,75 rem / 0,75 rem) | `--wg-radius*` |
+| `--size-field: 0.3rem` | densité : `0,3 × 8 = 2,4 rem` pour `btn-sm`/`input-sm`/`select-sm` | hauteurs `wg-btn`/`wg-input` |
+| `--border`, `--depth`, `--noise` | épaisseur de bordure, profondeur d'ombre, grain | — |
 
 Réglages complémentaires :
 
-- `borderColor.DEFAULT` = `oklch(var(--b3))` : un simple `border` reste sensible au thème, comme l'ancienne règle globale. Les surcharges `!border-amber-500/40` continuent de fonctionner.
-- `--page-bg` (`src/index.css`) : fond applicatif volontairement distinct de `base-100` pour conserver la profondeur visuelle d'origine.
-- **Densité** : `src/index.css` réaligne les variantes `-sm` de DaisyUI sur la métrique d'origine (2,4 rem au lieu de 2 rem pour `btn-sm`, `input-sm`, `select-sm` et `textarea-sm`) et recapitalise les en-têtes de tableaux (`.table thead`, 0,06 em). Aucun composant n'est modifié : seules les dimensions changent, pour que les 16 écrans gardent leur lisibilité de terrain.
-- `darkMode: 'class'` est conservé ; `store.tsx` synchronise à la fois la classe `dark` et `data-theme`, et `index.html` applique le thème **avant** le premier rendu (aucun flash).
+- **Bordure par défaut** : Tailwind 4 utilise `currentColor` ; une règle `@layer base { *, ::before, ::after, ::backdrop { border-color: var(--color-base-300); } }` rétablit une bordure thématique pour les simples `border`.
+- **`--page-bg`** : fond applicatif volontairement distinct de `base-100` pour conserver la profondeur visuelle d'origine.
+- **Ajustements hors couche** : DaisyUI 5 émet ses composants dans la couche `utilities`, donc une règle `@layer components` serait perdante. Trois règles volontairement **non calquées** (donc prioritaires) ajustent le texte des `btn-sm` (`--fontsize: .875rem`), le rayon des badges (pastille `999px`) et la capitalisation des en-têtes de tableaux.
+- **`@theme`** : police `Inter` (`--font-sans`) et animation `--animate-fade-in` (keyframes `fadeIn`).
+- **`@import "tailwindcss" source(none)` + `@source`** : seuls `index.html` et `src/**/*.{ts,tsx}` produisent des classes (ni la documentation ni les tests ne gonflent le CSS).
+- `darkMode: 'class'` n'existe plus : la classe `dark` reste posée pour compatibilité, mais la source de vérité est `data-theme`, synchronisée dans `store.tsx` et appliquée avant le premier rendu par `index.html`.
 
 Seules règles globales restantes dans `src/index.css` : fond de page, `::selection`, anneau `:focus-visible`, barres de défilement, `prefers-reduced-motion` et les styles du **reçu imprimable**, volontairement isolés du thème.
-
----
 
 ## 3. Composants réels
 
@@ -116,7 +119,7 @@ Responsive : sidebar desktop / drawer mobile, topbar qui tronque, tableaux `tabl
 | Exclu | Raison |
 | --- | --- |
 | shadcn/ui, Radix, Headless UI | DaisyUI couvre 100 % des besoins actuels sans runtime JS supplémentaire |
-| DaisyUI 5 | incompatible avec Tailwind 3 dans ce projet |
+| Thèmes DaisyUI intégrés (`themes: all`) | inutile ici : deux thèmes WashGuard suffisent et le CSS reste plus léger |
 | Remplacement de `react-icons` | aucune dépendance UI à remplacer, les icônes ne sont pas concernées |
 | Modification de `src/lib/store.tsx` (métier), `metrics.ts`, `format.ts`, `types.ts`, `plans.ts` | seule la synchronisation `data-theme` a été ajoutée au thème |
 | Découpage de `ui.tsx` | API publique gelée sur consigne explicite (TD-22) |
@@ -132,6 +135,6 @@ Responsive : sidebar desktop / drawer mobile, topbar qui tronque, tableaux `tabl
 | `npm run lint` | ✅ 26 règles statiques |
 | `npm run check` | ✅ **243 contrôles OK / 0 KO** (dont le rendu des 15 écrans en JSDOM) |
 | `npm run test:unit` | ✅ 283 tests / 33 fichiers |
-| `npm run build` | ✅ build Vite + PWA (39 entrées pré-cachées) |
+| `npm run build` | ✅ build Vite + PWA (39 entrées pré-cachées) · CSS 148,7 kB / gzip 23,3 kB |
 
-Le contrôle « thème » de `scripts/check.cjs` vérifie désormais : `:focus-visible` et `prefers-reduced-motion` toujours présents, DaisyUI déclaré en plugin, `darkTheme: 'washguard-dark'`, les thèmes `washguard` / `washguard-dark` complets, et **l'absence** de toute classe `.wg-` ou variable `--wg-` résiduelle dans `src/` (garde-fou sur chaque fichier `.ts`/`.tsx`/`.css`).
+Le contrôle « thème » de `scripts/check.cjs` vérifie désormais : `:focus-visible` et `prefers-reduced-motion` toujours présents, `@import "tailwindcss"`, les plugins `daisyui` et `daisyui/theme` (exactement deux thèmes), les variables `--color-*`, `@theme` et `--animate-fade-in`, et **l'absence** de toute classe `.wg-` ou variable `--wg-` résiduelle dans `src/` (garde-fou sur chaque fichier `.ts`/`.tsx`/`.css`).

@@ -248,7 +248,7 @@ export default function SignUp() {
           <div className="space-y-2 text-xs">
             <Alert kind="success">{notice}</Alert>
             {confirmUrl && (
-              <a href={confirmUrl} className="btn btn-sm btn-primary w-full !py-2.5">
+              <a href={confirmUrl} className="btn btn-sm btn-primary w-full py-2.5!">
                 Ouvrir le lien de confirmation <FiArrowRight aria-hidden="true" />
               </a>
             )}
@@ -266,7 +266,7 @@ export default function SignUp() {
         </div>
 
         <button type="submit" disabled={busy || !selectedAvailable}
-          className="btn btn-sm btn-primary w-full !py-3 disabled:opacity-60"
+          className="btn btn-sm btn-primary w-full py-3! disabled:opacity-60"
           aria-describedby={invalidCount > 0 ? 'signup-status' : undefined}>
           {busy ? 'Création…' : 'Créer mon espace'} <FiArrowRight aria-hidden="true" />
         </button>

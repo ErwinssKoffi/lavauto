@@ -420,7 +420,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     fs.existsSync(path.join(ROOT, 'src/pages/auth/ForgotPassword.tsx')) &&
     fs.existsSync(path.join(ROOT, 'src/pages/auth/ResetPassword.tsx')));
   check('langue fr + devise FCFA', html.includes('lang="fr"') && read('src/lib/format.ts').includes('FCFA'));
-  check('thème sombre par défaut / clair disponible', html.includes('class="dark"') && read('tailwind.config.js').includes("darkMode: 'class'") && read('src/main.tsx').includes("washguard.theme"));
+  check('thème sombre par défaut / clair disponible', html.includes('data-theme="washguard-dark"') && html.includes('class="dark"') && read('src/index.css').includes('@plugin "daisyui/theme"') && read('src/main.tsx').includes("washguard.theme"));
   check('photo unique pour les écrans auth', read('src/pages/auth/AuthLayout.tsx').includes('/images/lav-auto.jpeg') && fs.existsSync(path.join(ROOT,'public/images/lav-auto.jpeg')));
   check('client Supabase prêt, non branché', read('src/lib/supabase.ts').includes('isSupabaseConfigured') && fs.existsSync(path.join(ROOT,'.env.example')));
   check('plus aucun fichier CRA / template', !fs.existsSync(path.join(ROOT,'src/App.jsx')) && !fs.existsSync(path.join(ROOT,'public/index.html')) && !fs.existsSync(path.join(ROOT,'jsconfig.json')));
@@ -458,7 +458,6 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
   const uiSrc = read('src/components/ui.tsx');
   const navSrc = read('src/components/navigation.tsx');
   const shellSrc = read('src/components/AppShell.tsx');
-  const tailwindSrc = read('tailwind.config.js');
   const cssSrc = read('src/index.css');
   const pkg = JSON.parse(read('package.json'));
 
@@ -497,11 +496,14 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
       return !/\bwg-[a-z0-9-]+/.test(src) && !/var\(--wg-/.test(src);
     });
   })());
-  check('thème : DaisyUI configuré, thèmes clair/sombre, focus clavier et mouvement réduit',
+  check('thème : DaisyUI 5 configuré en CSS-first, thèmes clair/sombre, focus clavier et mouvement réduit',
     [':focus-visible','prefers-reduced-motion'].every((token) => cssSrc.includes(token)) &&
-    ['washguard-dark', 'primary', 'base-100'].every((token) => tailwindSrc.includes(token)) &&
-    /plugins:\s*\[\s*daisyui\s*\]/.test(tailwindSrc) &&
-    tailwindSrc.includes("darkTheme: 'washguard-dark'") &&
+    cssSrc.includes('@import "tailwindcss"') &&
+    /@plugin\s+"daisyui"\s*\{/.test(cssSrc) &&
+    (cssSrc.match(/@plugin\s+"daisyui\/theme"\s*\{/g) || []).length === 2 &&
+    cssSrc.includes('name: "washguard"') && cssSrc.includes('name: "washguard-dark"') &&
+    cssSrc.includes('--color-primary') && cssSrc.includes('--color-base-100') &&
+    /@theme\s*\{/.test(cssSrc) && cssSrc.includes('--animate-fade-in') &&
     !cssSrc.includes('.wg-'));
   check('états réels branchés : chargement, erreur, confirmation, tableau',
     read('src/App.tsx').includes('LoadingState') &&

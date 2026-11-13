@@ -231,7 +231,7 @@ export function AccountSecurity({ open, onClose }: { open: boolean; onClose: () 
             <p className="text-base-content/60 text-xs leading-relaxed">
               Chaque ligne est un appareil connecté. Fermer une session invalide son cookie immédiatement.
             </p>
-            <button type="button" className="btn btn-sm !px-3 !py-1.5 text-xs" onClick={() => { void loadSessions(); }} disabled={sessionsLoading}>
+            <button type="button" className="btn btn-sm px-3! py-1.5! text-xs" onClick={() => { void loadSessions(); }} disabled={sessionsLoading}>
               <FiRefreshCw aria-hidden="true" /> {sessionsLoading ? 'Lecture…' : 'Actualiser'}
             </button>
           </div>
@@ -271,7 +271,7 @@ export function AccountSecurity({ open, onClose }: { open: boolean; onClose: () 
                   </div>
                   <button
                     type="button"
-                    className="btn btn-sm btn-error btn-outline !px-3 !py-1.5 text-xs disabled:opacity-50"
+                    className="btn btn-sm btn-error btn-outline px-3! py-1.5! text-xs disabled:opacity-50"
                     disabled={revoking === session.id || authKind !== 'api'}
                     onClick={() => { void handleRevoke(session); }}
                   >
@@ -299,7 +299,7 @@ export function AccountSecurity({ open, onClose }: { open: boolean; onClose: () 
             <p className="text-base-content/60 text-xs leading-relaxed">
               Vingt derniers événements d’authentification de votre compte. Aucun mot de passe ni jeton n’y figure.
             </p>
-            <button type="button" className="btn btn-sm !px-3 !py-1.5 text-xs" onClick={() => { void loadActivity(); }} disabled={eventsLoading}>
+            <button type="button" className="btn btn-sm px-3! py-1.5! text-xs" onClick={() => { void loadActivity(); }} disabled={eventsLoading}>
               <FiRefreshCw aria-hidden="true" /> {eventsLoading ? 'Lecture…' : 'Actualiser'}
             </button>
           </div>

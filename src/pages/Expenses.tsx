@@ -53,7 +53,7 @@ export default function Expenses() {
       {state.expenses.length === 0 ? (
         <EmptyState icon={<FiAlertCircle />} title="Aucune dépense enregistrée" description="Les dépenses apparaîtront ici avec leur motif et leur moyen de paiement." />
       ) : (
-        <Card className="!p-0 overflow-hidden">
+        <Card className="p-0! overflow-hidden">
           <div className="overflow-x-auto">
             <table className="table min-w-[620px]">
               <thead><tr><th>Date</th><th>Catégorie</th><th>Motif</th><th>Fournisseur</th><th>Paiement</th><th>Montant</th><th>État</th><th /></tr></thead>

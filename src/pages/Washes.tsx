@@ -84,7 +84,7 @@ export default function Washes() {
         <div className="mb-3 flex items-center gap-2 text-sm font-bold"><FiClipboard /> File d’attente par statut</div>
         <div className="flex flex-wrap gap-2">
           {queue.map((q) => (
-            <button key={q.status} className="btn btn-sm !py-2" onClick={() => setStatusFilter(statusFilter === q.status ? 'tous' : q.status)}>
+            <button key={q.status} className="btn btn-sm py-2!" onClick={() => setStatusFilter(statusFilter === q.status ? 'tous' : q.status)}>
               <Badge tone={washStatusTone(q.status)}>{WASH_STATUS_LABELS[q.status]}</Badge>
               <span className="ml-1 font-bold">{q.count}</span>
             </button>
@@ -118,9 +118,9 @@ export default function Washes() {
         <div className="flex flex-wrap gap-3">
           <div className="relative min-w-[220px] flex-1">
             <FiSearch className="text-base-content/60 pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" />
-            <input className="input input-bordered input-sm !pl-9" placeholder="Rechercher une fiche, une plaque, un client…" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <input className="input input-sm pl-9! w-full" placeholder="Rechercher une fiche, une plaque, un client…" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
-          <select className="input input-bordered input-sm !w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}>
+          <select className="input input-sm w-auto!" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}>
             <option value="tous">Tous les statuts</option>
             {(Object.keys(WASH_STATUS_LABELS) as WashStatus[]).map((s) => <option key={s} value={s}>{WASH_STATUS_LABELS[s]}</option>)}
           </select>
@@ -130,7 +130,7 @@ export default function Washes() {
       {washes.length === 0 ? (
         <EmptyState icon={<FiTruck />} title="Aucune fiche de lavage" description="Les fiches enregistrées apparaîtront ici. Aucune donnée d’exemple n’est ajoutée." action={activated && allow('washes.create') ? <button className="btn btn-sm btn-primary" onClick={() => setCreateOpen(true)}><FiPlus /> Créer la première fiche</button> : undefined} />
       ) : (
-        <Card className="!p-0 overflow-hidden">
+        <Card className="p-0! overflow-hidden">
           <div className="overflow-x-auto">
             <table className="table min-w-[620px]">
               <thead><tr>
@@ -307,7 +307,7 @@ function CreateWashModal({ methods, onClose, onSubmit, onRetry }: {
                 <span className="min-w-0 flex-1 truncate font-medium">{s.name}</span>
                 <span className="text-base-content/60 shrink-0">{s.prices[categoryId] ? formatFCFA(s.prices[categoryId]) : 'Prix manquant'}</span>
                 {Object.prototype.hasOwnProperty.call(qty, s.id) && (
-                  <input type="number" min="1" className="input input-bordered input-sm !w-14 !px-2 !py-1" value={Number.isNaN(qty[s.id]) ? '' : qty[s.id]}
+                  <input type="number" min="1" className="input input-sm w-14! px-2! py-1!" value={Number.isNaN(qty[s.id]) ? '' : qty[s.id]}
                     onChange={(e) => setQty((q) => ({ ...q, [s.id]: readNumber(e.target.value) }))} />
                 )}
               </div>
@@ -440,9 +440,9 @@ function WashDetail({ washId, methods, onClose, onStatus, onAssign, onQuality, o
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <Card className="!p-3"><p className="text-base-content/60 text-[11px]">Total</p><p className="mt-1 font-bold">{formatFCFA(w.total)}</p></Card>
-        <Card className="!p-3"><p className="text-base-content/60 text-[11px]">Encaissé</p><p className="mt-1 font-bold">{formatFCFA(w.paid)}</p></Card>
-        <Card className="!p-3"><p className="text-base-content/60 text-[11px]">Reste à payer</p><p className="mt-1 font-bold">{formatFCFA(Math.max(0, w.total - w.paid))}</p></Card>
+        <Card className="p-3!"><p className="text-base-content/60 text-[11px]">Total</p><p className="mt-1 font-bold">{formatFCFA(w.total)}</p></Card>
+        <Card className="p-3!"><p className="text-base-content/60 text-[11px]">Encaissé</p><p className="mt-1 font-bold">{formatFCFA(w.paid)}</p></Card>
+        <Card className="p-3!"><p className="text-base-content/60 text-[11px]">Reste à payer</p><p className="mt-1 font-bold">{formatFCFA(Math.max(0, w.total - w.paid))}</p></Card>
       </div>
 
       <WhatsappWashPanel key={`${w.id}:${w.status}`} wash={w} />

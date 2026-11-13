@@ -82,7 +82,7 @@ export default function Clients() {
       <Card className="mb-5">
         <div className="relative">
           <FiSearch className="text-base-content/60 pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" />
-          <input className="input input-bordered input-sm !pl-9" placeholder="Rechercher par nom, téléphone, e-mail ou plaque…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <input className="input input-sm pl-9! w-full" placeholder="Rechercher par nom, téléphone, e-mail ou plaque…" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
       </Card>
 
@@ -95,7 +95,7 @@ export default function Clients() {
             return (
               <Card key={c.id} className="cursor-pointer transition hover:border-sky-500/50" onClick={() => setDetailId(c.id)}>
                 <div className="flex items-center gap-3">
-                  <span className="bg-gradient-to-br from-sky-600 via-sky-500 to-cyan-400 grid h-10 w-10 place-items-center rounded-xl text-sm font-bold text-white">{c.name.slice(0, 2).toUpperCase()}</span>
+                  <span className="bg-linear-to-br from-sky-600 via-sky-500 to-cyan-400 grid h-10 w-10 place-items-center rounded-xl text-sm font-bold text-white">{c.name.slice(0, 2).toUpperCase()}</span>
                   <div className="min-w-0"><p className="truncate text-sm font-bold">{c.name}</p><p className="text-base-content/60 truncate text-xs">{c.phone || 'Téléphone non renseigné'}</p></div>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-1.5">

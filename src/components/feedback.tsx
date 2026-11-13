@@ -12,7 +12,7 @@ export function LoadingState({ label = 'Chargement…', className = '' }: { labe
   return (
     <div className={`grid min-h-screen place-items-center ${className}`} role="status" aria-live="polite">
       <div className="flex flex-col items-center gap-3">
-        <span className="h-10 w-10 animate-pulse rounded-xl bg-gradient-to-br from-sky-600 via-sky-500 to-cyan-400" aria-hidden="true" />
+        <span className="h-10 w-10 animate-pulse rounded-xl bg-linear-to-br from-sky-600 via-sky-500 to-cyan-400" aria-hidden="true" />
         <p className="text-xs text-base-content/60">{label}</p>
       </div>
     </div>

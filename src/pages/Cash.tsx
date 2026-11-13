@@ -213,15 +213,15 @@ export default function Cash() {
 
         {open && (
           <div className="mb-4 grid gap-3 sm:grid-cols-3">
-            <Card className="!p-3">
+            <Card className="p-3!">
               <p className="text-base-content/60 text-[11px]">Fond de départ</p>
               <p className="mt-1 font-semibold">{formatFCFA(open.openingFloat)}</p>
             </Card>
-            <Card className="!p-3">
+            <Card className="p-3!">
               <p className="text-base-content/60 text-[11px]">Théorique attendu</p>
               <p className="mt-1 font-bold text-sky-400">{formatFCFA(theoretical)}</p>
             </Card>
-            <Card className="!p-3">
+            <Card className="p-3!">
               <p className="text-base-content/60 text-[11px]">Écart au comptage</p>
               <p className={`mt-1 font-bold ${counted - theoretical === 0 ? 'text-emerald-400' : counted - theoretical > 0 ? 'text-sky-400' : 'text-red-400'}`}>
                 {counted - theoretical > 0 ? '+' : ''}{formatFCFA(counted - theoretical)}

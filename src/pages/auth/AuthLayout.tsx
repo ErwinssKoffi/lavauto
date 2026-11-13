@@ -34,8 +34,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       {/* Panneau photo — dégradé sombre pour rester lisible même sur photo claire */}
       <div className="relative hidden overflow-hidden lg:block lg:w-[46%] xl:w-1/2">
         <img src="/images/lav-auto.jpeg" alt="Lavage d’un véhicule en cours dans une station" className="absolute inset-0 h-full w-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-br from-[#04121e]/90 via-[#0b2540]/75 to-sky-900/70" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#04121e]/95 via-transparent to-[#04121e]/40" />
+        <div className="absolute inset-0 bg-linear-to-br from-[#04121e]/90 via-[#0b2540]/75 to-sky-900/70" />
+        <div className="absolute inset-0 bg-linear-to-t from-[#04121e]/95 via-transparent to-[#04121e]/40" />
         <div className="relative flex h-full flex-col justify-between p-10 xl:p-14">
           <span className="inline-flex w-fit items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-white backdrop-blur">
             <FiShield /> Espace station

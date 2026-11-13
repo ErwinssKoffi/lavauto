@@ -20,7 +20,7 @@ export default function StockAlertBanner() {
   return (
     <div
       role="alert"
-      className="mb-5 overflow-hidden rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent text-xs"
+      className="mb-5 overflow-hidden rounded-xl border border-amber-500/30 bg-linear-to-r from-amber-500/10 via-amber-500/5 to-transparent text-xs"
     >
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
         <div className="flex items-center gap-3">
@@ -56,7 +56,7 @@ export default function StockAlertBanner() {
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            className="btn btn-sm !text-xs text-amber-300 hover:text-white"
+            className="btn btn-sm text-xs! text-amber-300 hover:text-white"
           >
             {expanded ? (
               <>
@@ -70,7 +70,7 @@ export default function StockAlertBanner() {
           </button>
           <Link
             to="/app/stock"
-            className="btn btn-sm !text-xs !bg-amber-500 hover:!bg-amber-400 !text-slate-950 font-bold"
+            className="btn btn-sm text-xs! bg-amber-500! hover:bg-amber-400! text-slate-950! font-bold"
           >
             Gérer le stock
           </Link>
@@ -108,10 +108,10 @@ export default function StockAlertBanner() {
                     </div>
                     <span
                       className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
-                        isRupture
-                          ? 'bg-red-500/20 text-red-300'
-                          : 'bg-amber-500/20 text-amber-300'
-                      }`}
+ isRupture
+ ? 'bg-red-500/20 text-red-300'
+ : 'bg-amber-500/20 text-amber-300'
+ }`}
                     >
                       {isRupture ? 'RUPTURE' : `${item.qtyOnHand} ${unit} restant(s)`}
                     </span>
@@ -126,8 +126,8 @@ export default function StockAlertBanner() {
                     <div className="mt-1 h-1.5 w-full rounded-full bg-slate-800">
                       <div
                         className={`h-1.5 rounded-full transition-all duration-300 ${
-                          isRupture ? 'bg-red-500 w-0' : 'bg-amber-400'
-                        }`}
+ isRupture ? 'bg-red-500 w-0' : 'bg-amber-400'
+ }`}
                         style={{ width: `${percent}%` }}
                       />
                     </div>

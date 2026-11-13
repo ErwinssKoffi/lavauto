@@ -61,7 +61,7 @@ export default function Subscription() {
     <div className="grid gap-5 lg:grid-cols-3">
       <Card className="lg:col-span-1">
         <div className="flex items-center justify-between gap-2"><p className="text-base-content/60 text-xs font-bold uppercase tracking-wide">Formule effective</p>
-          {connected && <button className="btn btn-sm !px-2 !py-1 text-xs" disabled={Boolean(busy)} onClick={() => {
+          {connected && <button className="btn btn-sm px-2! py-1! text-xs" disabled={Boolean(busy)} onClick={() => {
             setError(null); void refreshSubscriptionAccess().catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Lecture impossible.'));
           }}><FiRefreshCw /> Relire</button>}</div>
         <h2 className="mt-2 text-2xl font-extrabold">{sub?.planName ?? '—'}</h2>

@@ -68,8 +68,8 @@ export default function Services() {
               {cats.length === 0 && <span className="text-base-content/60 text-xs">Aucune catégorie</span>}
             </div>
             <div className="mt-4 flex flex-wrap gap-2 border-t pt-3">
-              <button className="btn btn-sm !px-2.5 !py-1.5 text-xs" disabled={!canWriteSubscription} onClick={() => { setEditId(s.id); setEditName(s.name); setEditDesc(s.description); }}><FiEdit3 /> Modifier</button>
-              <button className="btn btn-sm !px-2.5 !py-1.5 text-xs" disabled={!canWriteSubscription} onClick={() => { void safe(() => updateService(s.id, { active: !s.active })); }}>{s.active ? 'Désactiver' : 'Activer'}</button>
+              <button className="btn btn-sm px-2.5! py-1.5! text-xs" disabled={!canWriteSubscription} onClick={() => { setEditId(s.id); setEditName(s.name); setEditDesc(s.description); }}><FiEdit3 /> Modifier</button>
+              <button className="btn btn-sm px-2.5! py-1.5! text-xs" disabled={!canWriteSubscription} onClick={() => { void safe(() => updateService(s.id, { active: !s.active })); }}>{s.active ? 'Désactiver' : 'Activer'}</button>
               <button className="text-base-content/60 ml-auto hover:text-red-400" disabled={!canWriteSubscription} onClick={() => { void safe(async () => { await removeService(s.id); notify('info', 'Prestation retirée du catalogue.'); }); }} aria-label="Supprimer"><FiTrash2 size={15} /></button>
             </div>
           </Card>

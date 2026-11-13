@@ -101,7 +101,7 @@ src/
   main.tsx              thème initial + providers
   App.tsx               routes, garde de session et gardes de rôle
   types.ts              types métier (reflet des tables Supabase)
-  index.css             règles globales (fond, focus, reçu) ; thèmes DaisyUI dans tailwind.config.js
+  index.css             Tailwind 4 + thèmes DaisyUI 5 (CSS-first) + règles globales (fond, focus, reçu)
   lib/
     format.ts           FCFA, jj/mm/aaaa, export CSV
     metrics.ts          rapports, commissions, théorique de caisse

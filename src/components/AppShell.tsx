@@ -146,7 +146,7 @@ export default function AppShell() {
       <div className="shrink-0 border-t border-base-300 p-2">
         <div className="rounded-xl bg-base-200 p-2">
           <div className="flex items-center gap-2">
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-sky-600 via-sky-500 to-cyan-400 text-white" aria-hidden="true"><FiActivity size={15} /></span>
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-linear-to-br from-sky-600 via-sky-500 to-cyan-400 text-white" aria-hidden="true"><FiActivity size={15} /></span>
             {!collapsed && (
               <div className="min-w-0">
                 <p className="truncate text-xs font-bold">{stationName}</p>
@@ -158,7 +158,7 @@ export default function AppShell() {
         <button
           type="button"
           onClick={toggleCollapse}
-          className="btn btn-sm mt-2 hidden w-full !justify-center lg:inline-flex"
+          className="btn btn-sm mt-2 hidden w-full justify-center! lg:inline-flex"
           aria-label={collapsed ? 'Déplier la navigation' : 'Replier la navigation'}
           title={collapsed ? 'Déplier la navigation' : 'Replier la navigation'}
         >
@@ -199,7 +199,7 @@ export default function AppShell() {
             {identity && identity.stations.length > 1 && state.session?.stationId && (
               <label className="flex min-w-0 items-center gap-2 text-xs">
                 <span className="hidden text-base-content/60 xl:inline">Station</span>
-                <select aria-label="Station active" className="select select-bordered select-sm !w-auto max-w-[10rem] sm:max-w-[14rem]"
+                <select aria-label="Station active" className="select select-sm w-auto! max-w-[10rem] sm:max-w-[14rem]"
                   value={state.session.stationId} onChange={(event) => selectStation(event.target.value)}>
                   {identity.stations.map((station) => <option key={station.id} value={station.id}>{station.name}</option>)}
                 </select>
@@ -210,17 +210,17 @@ export default function AppShell() {
               <kbd className="hidden xl:inline-flex">Ctrl K</kbd>
             </button>
             <PWAInstallButton compact />
-            <button type="button" onClick={toggleTheme} className="btn btn-sm !px-2.5" aria-label="Changer de thème" title="Thème clair / sombre">
+            <button type="button" onClick={toggleTheme} className="btn btn-sm px-2.5!" aria-label="Changer de thème" title="Thème clair / sombre">
               {theme === 'dark' ? <FiSun size={16} /> : <FiMoon size={16} />}
             </button>
-            <a href="/#faq" className="btn btn-sm !px-2.5" title="Questions fréquentes" aria-label="Questions fréquentes"><FiHelpCircle size={16} /></a>
+            <a href="/#faq" className="btn btn-sm px-2.5!" title="Questions fréquentes" aria-label="Questions fréquentes"><FiHelpCircle size={16} /></a>
 
             {/* Cloche d'alertes stock en temps réel */}
             {can('inventory.view') && <div className="relative">
               <button
                 type="button"
                 onClick={() => setAlertsOpen((v) => !v)}
-                className={`btn btn-sm !px-2.5 relative ${state.stockAlerts.length > 0 ? '!text-amber-400' : ''}`}
+                className={`btn btn-sm px-2.5! relative ${state.stockAlerts.length > 0 ? 'text-amber-400!' : ''}`}
                 aria-label="Alertes stock"
                 title={state.stockAlerts.length > 0 ? `${state.stockAlerts.length} produit(s) sous le seuil critique` : 'Stock normal'}
               >
@@ -281,7 +281,7 @@ export default function AppShell() {
 
             <div className="relative">
               <button type="button" onClick={() => setMenuOpen((value) => !value)} className="flex items-center gap-2 rounded-xl px-2 py-1.5 hover:bg-sky-500/10" aria-expanded={menuOpen} aria-label="Menu du compte">
-                <span className="grid h-8 w-8 place-items-center rounded-lg text-xs font-bold text-white bg-gradient-to-br from-sky-600 via-sky-500 to-cyan-400">
+                <span className="grid h-8 w-8 place-items-center rounded-lg text-xs font-bold text-white bg-linear-to-br from-sky-600 via-sky-500 to-cyan-400">
                   {(state.session?.name ?? '?').split(' ').map((word) => word[0]).slice(0, 2).join('').toUpperCase()}
                 </span>
                 <div className="hidden text-left sm:block">
@@ -296,11 +296,11 @@ export default function AppShell() {
                     <p className="truncate text-[11px] text-base-content/60">{state.session?.email}</p>
                   </div>
                   <div className="my-1 border-t border-base-300" />
-                  <button type="button" className="btn btn-sm w-full !justify-start" onClick={() => { setMenuOpen(false); setSecurityOpen(true); }}><FiShield size={15} /> Sécurité du compte</button>
+                  <button type="button" className="btn btn-sm w-full justify-start!" onClick={() => { setMenuOpen(false); setSecurityOpen(true); }}><FiShield size={15} /> Sécurité du compte</button>
                   {(role === 'proprietaire' || role === 'gerant') && (
-                    <button type="button" className="btn btn-sm w-full !justify-start" onClick={() => { setMenuOpen(false); navigate('/app/parametres'); }}><FiSliders size={15} /> Paramètres</button>
+                    <button type="button" className="btn btn-sm w-full justify-start!" onClick={() => { setMenuOpen(false); navigate('/app/parametres'); }}><FiSliders size={15} /> Paramètres</button>
                   )}
-                  <button type="button" className="btn btn-sm btn-error btn-outline mt-1 w-full !justify-start" onClick={() => { void signOut().then(() => navigate('/')); }}><FiLogOut size={15} /> Se déconnecter</button>
+                  <button type="button" className="btn btn-sm btn-error btn-outline mt-1 w-full justify-start!" onClick={() => { void signOut().then(() => navigate('/')); }}><FiLogOut size={15} /> Se déconnecter</button>
                 </div>
               )}
             </div>
@@ -310,14 +310,14 @@ export default function AppShell() {
         <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
           {can('inventory.view') && <StockAlertBanner key={`${state.session?.userId}:${state.session?.stationId}`} />}
           {role !== 'super_admin' && subscriptionStatus === 'loading' && <div role="status" className="card mb-5 bg-base-100 px-4 py-3 text-xs shadow-xl">Vérification de l’abonnement ; les écritures ordinaires sont momentanément bloquées.</div>}
-          {role !== 'super_admin' && subscriptionStatus !== 'loading' && !canWriteSubscription && <div role="status" className="card mb-5 flex flex-row flex-wrap items-center justify-between gap-3 bg-base-100 px-4 py-3 text-xs shadow-xl !border-amber-500/40">
+          {role !== 'super_admin' && subscriptionStatus !== 'loading' && !canWriteSubscription && <div role="status" className="card mb-5 flex flex-row flex-wrap items-center justify-between gap-3 bg-base-100 px-4 py-3 text-xs shadow-xl border-amber-500/40!">
             <span><strong>{subscriptionAccess ? 'Abonnement en lecture seule.' : 'Abonnement non confirmé.'}</strong>{' '}
               {subscriptionAccess ? 'Les données restent consultables ; les écritures ordinaires sont bloquées jusqu’à validation. Après expiration, un retrait WhatsApp peut être demandé sous réserve des droits.' : `Les écritures ordinaires sont bloquées. ${subscriptionError ?? ''}`}</span>
             <span className="flex gap-3">{can('subscription.manage') && <NavLink to="/app/abonnement" className="link link-primary">Voir l’abonnement →</NavLink>}
               {((dataSource === 'supabase' && authKind === 'supabase') || (dataSource === 'api' && authKind === 'api')) && <button className="link link-primary" onClick={() => { void refreshSubscriptionAccess().catch(() => undefined); }}>Relire</button>}</span>
           </div>}
           {!state.station?.activated && role !== 'super_admin' && location.pathname !== '/app/mise-en-route' && (
-            <div className="card mb-5 flex flex-row flex-wrap items-center justify-between gap-3 bg-base-100 px-4 py-3 shadow-xl !border-amber-500/30">
+            <div className="card mb-5 flex flex-row flex-wrap items-center justify-between gap-3 bg-base-100 px-4 py-3 shadow-xl border-amber-500/30!">
               <div className="flex items-center gap-2 text-xs">
                 <span className="text-amber-400"><FiHelpCircle size={16} /></span>
                 <span><strong>Mise en route en cours.</strong> {missing.length} étape(s) obligatoire(s) manquante(s) — l’exploitation reste fermée.</span>

@@ -101,7 +101,7 @@ export default function Stock() {
 
       <div className="mb-5"><Tabs value={tab} onChange={setTab} options={TABS} /></div>
 
-      {tab === 'produits' && <Card className="!p-0 overflow-hidden">
+      {tab === 'produits' && <Card className="p-0! overflow-hidden">
         <div className="flex items-center justify-between p-4"><h2 className="text-sm font-bold">Niveaux et coût moyen pondéré</h2><Badge>{state.stockLevels.length} ligne(s)</Badge></div>
         {state.stockLevels.length === 0 ? <EmptyState icon={<FiPackage />} title="Aucun produit en stock" description="Créez un produit, puis une commande : la création n’incrémente jamais le stock." /> : (
           <div className="overflow-x-auto"><table className="table min-w-[620px]">
@@ -197,7 +197,7 @@ export default function Stock() {
         </table></div>}
       </Card>}
 
-      {tab === 'mouvements' && <Card className="!p-0 overflow-hidden">
+      {tab === 'mouvements' && <Card className="p-0! overflow-hidden">
         <div className="flex items-center justify-between p-4"><h2 className="text-sm font-bold">Journal des mouvements</h2><Badge>{state.stockMovements.length} écriture(s)</Badge></div>
         {state.stockMovements.length === 0 ? <EmptyState icon={<FiPackage />} title="Aucun mouvement" description="Les écritures apparaissent à la réception, à la consommation et à la clôture d’inventaire." /> : (
           <div className="overflow-x-auto"><table className="table min-w-[620px]">
