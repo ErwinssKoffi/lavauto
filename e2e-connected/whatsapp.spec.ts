@@ -1,6 +1,6 @@
 import { expect as baseExpect, test } from '@playwright/test';
 import type { WhatsappJournalEntry } from '../src/services/adapters/SupabaseWhatsappCommands';
-import { CATEGORY, COMPANY, EMAIL, OWNER, SERVICE, STATION, installFakeSupabase, signInFake, type Call } from './fixtures/mock-supabase';
+import { CATEGORY, COMPANY, EMAIL, OWNER, SERVICE, STATION, fakeExpiredTrialAccess, installFakeSupabase, signInFake, type Call } from './fixtures/mock-supabase';
 
 // Évite que les animations du navigateur sous charge retardent les clics ;
 // les assertions attendent réellement les réponses simulées, jamais un sleep.
@@ -16,17 +16,17 @@ const now = '2026-11-12T10:00:00.000Z';
 
 // Faux backend intercepté : il ne teste pas le SQL, n'appelle pas Meta et ne
 // crée aucune donnée distante. Le SQL et le worker sont testés séparément.
-function backend() {
-  let granted = false;
-  let source = '';
-  let state: 'none' | 'pending' | 'accepted' | 'delivered' = 'none';
+function backend(options: { granted?: boolean; pending?: boolean; manage?: boolean } = {}) {
+  let granted = options.granted ?? false;
+  let source = granted ? 'Accord explicite déjà enregistré' : '';
+  let state: 'none' | 'pending' | 'accepted' | 'delivered' | 'cancelled' = options.pending ? 'pending' : 'none';
   const handle = (call: Call) => {
     if (call.path === '/rest/v1/rpc/my_context') return { data: {
       authenticated: true, profileReady: true, active: true, userId: OWNER, email: EMAIL,
       fullName: 'Propriétaire', roleKey: 'owner', isPlatformAdmin: false, companyId: COMPANY,
       company: { id: COMPANY, name: 'Entreprise test', city: 'Abidjan', phone: '', currency_code: 'XOF', suspended: false, created_at: now },
       stations: [{ id: STATION, name: 'Station A', city: 'Abidjan', activated: true, logoPath: null }],
-      permissions: ['washes.view', 'customers.view', 'customers.manage', 'crm.view', 'notifications.view', 'notifications.enqueue'],
+      permissions: ['washes.view', 'customers.view', ...(options.manage === false ? [] : ['customers.manage']), 'crm.view', 'notifications.view', 'notifications.enqueue'],
     } };
     if (call.path === '/rest/v1/rpc/my_station_clients') return { data: [{
       id: CUSTOMER, stationId: STATION, name: 'Client Exemple', phone: '+2250700000000', plate: '', notes: '', createdAt: now,
@@ -47,14 +47,16 @@ function backend() {
       history: source ? [{ kind: granted ? 'granted' : 'revoked', phone: '+2250700000000', source, at: now, actor: 'Propriétaire' }] : [],
     } };
     if (call.path === '/rest/v1/rpc/save_customer_whatsapp_consent') {
-      granted = call.body.p_granted === true; source = String(call.body.p_source); return { data: AUTO };
+      granted = call.body.p_granted === true; source = String(call.body.p_source);
+      if (!granted && state === 'pending') state = 'cancelled';
+      return { data: AUTO };
     }
     if (call.path === '/rest/v1/rpc/my_wash_whatsapp_journal') {
       const entries: WhatsappJournalEntry[] = [{ id: AUTO, origin: 'automatic', status: 'blocked', reason: 'no_consent', providerMessageId: null, createdAt: now, updatedAt: now,
         events: [{ kind: 'blocked', reason: 'no_consent', at: now, providerAt: null }] }];
-      if (state !== 'none') entries.unshift({ id: MANUAL, origin: 'manual', status: state, reason: null,
-        providerMessageId: state === 'pending' ? null : 'wamid.simule', createdAt: now, updatedAt: now,
-        events: [{ kind: state, reason: null, at: now, providerAt: state === 'delivered' ? now : null }] });
+      if (state !== 'none') entries.unshift({ id: MANUAL, origin: 'manual', status: state, reason: state === 'cancelled' ? 'consent_revoked' : null,
+        providerMessageId: state === 'pending' || state === 'cancelled' ? null : 'wamid.simule', createdAt: now, updatedAt: now,
+        events: [{ kind: state, reason: state === 'cancelled' ? 'consent_revoked' : null, at: now, providerAt: state === 'delivered' ? now : null }] });
       return { data: entries };
     }
     if (call.path === '/rest/v1/rpc/enqueue_wash_whatsapp') {
@@ -108,7 +110,8 @@ test('WhatsApp simulé : consentement séparé, demande manuelle et statuts honn
   await again.getByLabel('Origine / preuve de l’accord ou du retrait *').fill('Retrait demandé par le client');
   await again.getByRole('button', { name: 'Retirer l’accord WhatsApp' }).click();
   await expect(again.getByText('Aucun accord actif')).toBeVisible();
-  await expect(again).toContainText('demandes non encore en cours sont annulées');
+  await expect(again).toContainText('demandes en attente non réclamées sont annulées');
+  await expect(again).toContainText('Une transmission déjà réclamée peut encore atteindre Meta');
 
   const calls = mock.calls.filter((call) => /whatsapp/.test(call.path));
   expect(calls.find((call) => call.path.endsWith('/save_customer_whatsapp_consent'))?.body).toEqual({
@@ -158,5 +161,117 @@ test('WhatsApp simulé : consentement relu après réponse invalide ou changemen
   expect(calls).toHaveLength(2);
   expect(calls[0].body.p_expected_phone).toBe('+2250700000000');
   expect(calls[1].body.p_expected_phone).toBeNull();
+  expect(mock.unexpected).toEqual([]); expect(mock.blocked).toEqual([]);
+});
+
+test('WhatsApp simulé : retrait avec preuve après expiration, sans nouvel accord ni envoi', async ({ page }) => {
+  const fake = backend({ granted: true, pending: true });
+  const mock = await installFakeSupabase(page, (call) => {
+    if (call.path === '/rest/v1/rpc/my_subscription_access') return { data: fakeExpiredTrialAccess() };
+    return fake.handle(call);
+  });
+  await signInFake(page);
+  await page.goto('/app/clients');
+  await page.getByText('Client Exemple', { exact: true }).click();
+  const client = page.getByRole('dialog', { name: 'Client Exemple' });
+  const panel = client.getByRole('region', { name: 'Consentement WhatsApp' });
+  await expect(client.getByRole('button', { name: 'Enregistrer la fiche' })).toBeDisabled();
+  await expect(panel.getByText('Accord enregistré', { exact: true })).toBeVisible();
+  await expect(panel).toContainText('Après expiration, vous pouvez demander le retrait');
+  await expect(panel).toContainText('Une transmission déjà réclamée ne peut pas être rappelée');
+  const proof = panel.getByLabel('Origine / preuve de l’accord ou du retrait *');
+  const revoke = panel.getByRole('button', { name: 'Retirer l’accord WhatsApp' });
+  await expect(proof).toBeEnabled();
+  await expect(revoke).toBeDisabled();
+  await proof.fill('abc');
+  await expect(revoke).toBeDisabled();
+  await proof.fill('Retrait explicitement demandé au comptoir');
+  await expect(revoke).toBeEnabled();
+  await revoke.click();
+  await expect(panel.getByText('Aucun accord actif')).toBeVisible();
+  await expect(panel).toContainText('demandes en attente non réclamées sont annulées');
+  await expect(panel).toContainText('Une transmission déjà réclamée peut encore atteindre Meta');
+  await expect(panel.getByRole('button', { name: 'Enregistrer l’accord WhatsApp' })).toBeDisabled();
+  await expect(panel.getByRole('checkbox', { name: /Je confirme que le client/ })).toBeDisabled();
+  await expect(proof).toBeDisabled();
+  await panel.getByText('Historique des accords et retraits').click();
+  await expect(panel).toContainText('Retrait explicitement demandé au comptoir');
+
+  await page.goto('/app/lavages');
+  await page.getByRole('row').filter({ hasText: 'L-2026' }).getByRole('button', { name: 'Détails →' }).click();
+  const journal = page.getByRole('dialog', { name: 'Fiche L-2026' }).getByRole('region', { name: 'Notifications WhatsApp' });
+  await expect(journal.getByText('Annulé avant envoi', { exact: true })).toBeVisible();
+  await expect(journal).toContainText('Accord retiré par le client.');
+  await expect(journal.getByRole('button', { name: 'Demander l’envoi WhatsApp' })).toBeDisabled();
+  const saves = mock.calls.filter((call) => call.path.endsWith('/save_customer_whatsapp_consent'));
+  expect(saves).toHaveLength(1);
+  expect(saves[0].body).toEqual({ p_customer_id: CUSTOMER, p_granted: false,
+    p_source: 'Retrait explicitement demandé au comptoir', p_expected_phone: null });
+  expect(mock.calls.filter((call) => call.path.endsWith('/enqueue_wash_whatsapp'))).toHaveLength(0);
+  expect(mock.unexpected).toEqual([]); expect(mock.blocked).toEqual([]);
+});
+
+test('WhatsApp simulé : sans permission de gestion, aucun retrait proposé après expiration', async ({ page }) => {
+  const fake = backend({ granted: true, manage: false });
+  const mock = await installFakeSupabase(page, (call) => {
+    if (call.path === '/rest/v1/rpc/my_subscription_access') return { data: fakeExpiredTrialAccess() };
+    return fake.handle(call);
+  });
+  await signInFake(page);
+  await page.goto('/app/clients');
+  await page.getByText('Client Exemple', { exact: true }).click();
+  const panel = page.getByRole('dialog', { name: 'Client Exemple' }).getByRole('region', { name: 'Consentement WhatsApp' });
+  await expect(panel.getByText('Accord enregistré', { exact: true })).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Retirer l’accord WhatsApp' })).toHaveCount(0);
+  await expect(panel.getByLabel('Origine / preuve de l’accord ou du retrait *')).toHaveCount(0);
+  expect(mock.calls.filter((call) => call.path.endsWith('/save_customer_whatsapp_consent'))).toHaveLength(0);
+  expect(mock.unexpected).toEqual([]); expect(mock.blocked).toEqual([]);
+});
+
+test('WhatsApp simulé : retrait à réponse perdue ne promet pas l’annulation avant vérification', async ({ page }) => {
+  const fake = backend({ granted: true, pending: true });
+  const mock = await installFakeSupabase(page, (call) => {
+    if (call.path === '/rest/v1/rpc/my_subscription_access') return { data: fakeExpiredTrialAccess() };
+    if (call.path === '/rest/v1/rpc/save_customer_whatsapp_consent') {
+      fake.handle(call); // Commit simulé mais réponse perdue : aucun SQL ni envoi réel.
+      return { status: 503, data: { message: 'Réponse perdue' } };
+    }
+    return fake.handle(call);
+  });
+  await signInFake(page);
+  await page.goto('/app/clients');
+  await page.getByText('Client Exemple', { exact: true }).click();
+  const panel = page.getByRole('dialog', { name: 'Client Exemple' }).getByRole('region', { name: 'Consentement WhatsApp' });
+  await expect(panel.getByText('Accord enregistré', { exact: true })).toBeVisible();
+  await panel.getByLabel('Origine / preuve de l’accord ou du retrait *').fill('Retrait demandé par téléphone');
+  await panel.getByRole('button', { name: 'Retirer l’accord WhatsApp' }).click();
+  await expect(panel).toContainText('Enregistrement non confirmé');
+  await expect(panel).toContainText('La demande peut encore être en cours');
+  await expect(panel).toContainText('contactez le support avant toute reprise des envois');
+  await expect(panel).not.toContainText('Accord retiré ;');
+  await expect(panel.getByRole('button', { name: 'Retirer l’accord WhatsApp' })).toHaveCount(0);
+  await panel.getByRole('button', { name: 'Actualiser le consentement' }).click();
+  await expect(panel.getByText('Aucun accord actif')).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Enregistrer l’accord WhatsApp' })).toBeDisabled();
+  expect(mock.calls.filter((call) => call.path.endsWith('/save_customer_whatsapp_consent'))).toHaveLength(1);
+  expect(mock.unexpected).toEqual([]); expect(mock.blocked).toEqual([]);
+});
+
+test('WhatsApp simulé : relecture d’abonnement indisponible ne bloque pas la demande de retrait', async ({ page }) => {
+  const fake = backend({ granted: true, pending: true });
+  const mock = await installFakeSupabase(page, (call) => {
+    if (call.path === '/rest/v1/rpc/my_subscription_access') return { status: 503, data: { message: 'Abonnement indisponible' } };
+    return fake.handle(call);
+  });
+  await signInFake(page);
+  await page.goto('/app/clients');
+  await page.getByText('Client Exemple', { exact: true }).click();
+  const panel = page.getByRole('dialog', { name: 'Client Exemple' }).getByRole('region', { name: 'Consentement WhatsApp' });
+  await expect(panel.getByText('Accord enregistré', { exact: true })).toBeVisible();
+  await panel.getByLabel('Origine / preuve de l’accord ou du retrait *').fill('Retrait demandé au comptoir');
+  await panel.getByRole('button', { name: 'Retirer l’accord WhatsApp' }).click();
+  await expect(panel.getByText('Aucun accord actif')).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Enregistrer l’accord WhatsApp' })).toBeDisabled();
+  expect(mock.calls.filter((call) => call.path.endsWith('/save_customer_whatsapp_consent'))).toHaveLength(1);
   expect(mock.unexpected).toEqual([]); expect(mock.blocked).toEqual([]);
 });

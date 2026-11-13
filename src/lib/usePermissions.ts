@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useStore } from './store';
 import type { Role } from '../types';
+import { filterPlanPermissions } from './subscription';
 
 // ─── Hook UI des permissions (Prompt 04) ─────────────────────────────────────
 // Il ne protège RIEN : les permissions viennent de `my_context()` (serveur)
@@ -18,9 +19,9 @@ export interface PermissionView {
 }
 
 export function usePermissions(): PermissionView {
-  const { identity } = useStore();
+  const { identity, subscriptionAccess } = useStore();
   return useMemo<PermissionView>(() => {
-    const permissions = identity?.permissions ?? [];
+    const permissions = filterPlanPermissions(identity?.permissions ?? [], subscriptionAccess, Boolean(identity?.isPlatformAdmin));
     return {
       role: identity?.role ?? null,
       permissions,
@@ -29,5 +30,5 @@ export function usePermissions(): PermissionView {
       canAny: (keys) => keys.some((key) => permissions.includes(key)),
       isPlatformAdmin: Boolean(identity?.isPlatformAdmin),
     };
-  }, [identity]);
+  }, [identity, subscriptionAccess]);
 }

@@ -9,7 +9,7 @@ import { Alert } from './ui';
 
 /** Même parcours privé dans Paramètres et dans la mise en route. */
 export function StationLogoEditor() {
-  const { state, dataSource, authKind, setStationLogoPath, notify } = useStore();
+  const { state, dataSource, authKind, setStationLogoPath, notify, canWriteSubscription } = useStore();
   const station = state.station;
   const session = state.session;
   const userId = session?.userId;
@@ -47,7 +47,7 @@ export function StationLogoEditor() {
   }
 
   async function upload() {
-    if (!serverReady || !station || !userId || !file || busy) return;
+    if (!serverReady || !canWriteSubscription || !station || !userId || !file || busy) return;
     const stationId = station.id;
     const operationScope = scope;
     setBusy('upload');
@@ -79,7 +79,7 @@ export function StationLogoEditor() {
   }
 
   async function remove() {
-    if (!serverReady || !station || !userId || busy) return;
+    if (!serverReady || !canWriteSubscription || !station || !userId || busy) return;
     const operationScope = scope;
     setBusy('remove');
     setError(null);
@@ -127,16 +127,16 @@ export function StationLogoEditor() {
         accept={LOGO_ACCEPT}
         aria-describedby={`${inputId}-hint`}
         className="block w-full text-xs text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-sky-500/15 file:px-3 file:py-2 file:font-semibold file:text-sky-300 disabled:opacity-50"
-        disabled={!serverReady || Boolean(busy)}
+        disabled={!serverReady || !canWriteSubscription || Boolean(busy)}
         onChange={selectFile}
       />
       {error && <p role="alert" className="mt-2 text-xs text-red-400">{error}</p>}
       <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" className="wg-btn wg-btn-primary" disabled={!serverReady || !file || Boolean(busy)} onClick={() => { void upload(); }}>
+        <button type="button" className="wg-btn wg-btn-primary" disabled={!serverReady || !canWriteSubscription || !file || Boolean(busy)} onClick={() => { void upload(); }}>
           <FiUpload /> {busy === 'upload' ? 'Enregistrement…' : 'Enregistrer le logo'}
         </button>
         {logoPath && serverReady && (
-          <button type="button" className="wg-btn wg-btn-ghost" disabled={Boolean(busy)} onClick={() => { void remove(); }}>
+          <button type="button" className="wg-btn wg-btn-ghost" disabled={!canWriteSubscription || Boolean(busy)} onClick={() => { void remove(); }}>
             <FiTrash2 /> {busy === 'remove' ? 'Retrait…' : 'Retirer le logo'}
           </button>
         )}

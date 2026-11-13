@@ -589,10 +589,11 @@ export interface ProfitabilityReport {
   collected: number;
   receivables: number;
   expenses: number;
-  purchases: number;
-  consumptions: number;
+  /** NULL lorsque le module stock ou ses données ne sont pas disponibles. */
+  purchases: number | null;
+  consumptions: number | null;
   commissions: number;
-  fixedCosts: number;
+  fixedCosts: number | null;
   partialBalance: number;
   grossMargin: number | null;
   result: number | null;
@@ -600,8 +601,8 @@ export interface ProfitabilityReport {
   label: string;
   missing: string[];
   definitions: Record<string, string>;
-  /** P07 : champs absents d'un rapport P06 conservés à NULL/0 par repli. */
-  operatingExpenses?: number;
+  /** NULL si le calcul hors achats de stock n'est pas disponible. */
+  operatingExpenses?: number | null;
   certified?: boolean;
   certifiedAt?: string | null;
   attestation?: string | null;
@@ -794,13 +795,18 @@ export interface StockValuation {
   lowStockAlerts: number;
 }
 
+export type PlanFeature = 'stock' | 'loyalty' | 'fleets' | 'consolidation' | 'audit';
+export type PlanFeatures = Record<PlanFeature, boolean>;
+
 export interface Plan {
   id: string;
   name: string;
   priceMonthly: number;
   trial: boolean;
   limits: { stations: number; employees: number; washesPerMonth: number };
+  /** Descriptions commerciales, distinctes des droits techniques ci-dessous. */
   features: string[];
+  entitlements?: PlanFeatures;
 }
 
 export interface Subscription {

@@ -16,7 +16,7 @@ La page décrit les fiches, la caisse, les canaux, le stock et les relevés sans
 
 ## Formules et tarifs
 
-En mode local, la vitrine utilise les formules locales de démonstration. En mode Supabase, elle attend les lignes actives et leurs limites depuis `plans` / `plan_limits`. Pendant le chargement, aucun prix local n’est affiché ; si la lecture échoue, si la table est vide ou si les données nécessaires sont invalides, un message explicite remplace les tarifs, sans repli fictif. Le même principe est appliqué à la lecture des formules dans l’écran Abonnement ; les informations d’abonnement courant et les notes de changement de cette page restent locales, non confirmées ni envoyées au serveur.
+En mode local, la vitrine utilise les formules locales de démonstration. En mode Supabase, elle attend les lignes actives, leurs limites et les droits techniques depuis `plans`, `plan_limits` et `plan_entitlements`. Pendant le chargement, aucun prix local n’est affiché ; si la lecture échoue, si la table est vide ou si les données nécessaires sont invalides, un message explicite remplace les tarifs, sans repli fictif. La page Abonnement lit la formule effective sur le serveur et transmet les demandes en mode connecté ; une validation administrateur est nécessaire. L’essai couvre tous les modules pendant 14 jours, mais une validation anticipée l’arrête immédiatement. Aucun paiement automatique n’est effectué. La démo ne transmet ni demande ni paiement. Ces fonctionnalités exigent les migrations locales jusqu’à `057` et ne sont pas déployées sur `lavauto` : voir [subscriptions.md](subscriptions.md).
 
 ## Vérifications
 

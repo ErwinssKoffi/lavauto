@@ -1,11 +1,12 @@
 import React from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Link, Navigate, Route, Routes } from 'react-router-dom';
 import { FiLock } from 'react-icons/fi';
 import AppShell from './components/AppShell';
 import { Alert, Badge, Card, ToastHost } from './components/ui';
 import { useStore } from './lib/store';
 import { usePermissions } from './lib/usePermissions';
 import { permissionForRoles } from './lib/permissionCatalog';
+import { permissionFeature } from './lib/subscription';
 import { LoadingState } from './components/feedback';
 import { ROLE_LABELS, type Role } from './types';
 
@@ -65,9 +66,19 @@ function SessionGate({ children }: { children: React.ReactNode }) {
 function RoleRoute({
   roles, permission, children,
 }: { roles: Role[]; permission?: string; children: React.ReactNode }) {
-  const { state } = useStore();
+  const { state, subscriptionStatus, subscriptionAccess } = useStore();
   const { role, can } = usePermissions();
   const required = permission ?? permissionForRoles(roles);
+  const feature = permissionFeature(required);
+  if (feature && subscriptionStatus === 'loading') return <LoadingState label="Vérification de la formule…" />;
+  if (feature && subscriptionAccess && !subscriptionAccess.features[feature] && state.session) return (
+    <Card className="flex items-start gap-3 border-amber-500/30"><FiLock className="mt-0.5 text-xl text-amber-400" />
+      <div><h2 className="text-sm font-bold">Module non inclus dans la formule active</h2>
+        <p className="wg-muted mt-1 text-xs">Les données existantes sont conservées. Une demande de formule ne change les droits qu’après validation administrateur.</p>
+        {can('subscription.manage') && <Link className="wg-link mt-3 inline-block text-xs" to="/app/abonnement">Comparer les formules →</Link>}
+      </div>
+    </Card>
+  );
   if (!state.session || !can(required)) {
     return (
       <Card className="flex items-start gap-3 border-red-500/30">
@@ -88,6 +99,19 @@ function RoleRoute({
   return <>{children}</>;
 }
 
+/** Les écrans qui éditent ou utilisent le catalogue attendent sa lecture serveur. */
+function StationSetupGate({ children }: { children: React.ReactNode }) {
+  const { setupStatus, setupError, refreshSetup } = useStore();
+  if (setupStatus === 'loading') return <LoadingState label="Lecture des réglages de la station…" />;
+  if (setupStatus === 'error') return (
+    <Card>
+      <Alert kind="warn">Réglages indisponibles : {setupError ?? 'lecture non confirmée'}. Aucune modification locale de remplacement n’est appliquée.</Alert>
+      <button className="wg-btn wg-btn-primary mt-4" onClick={() => { void refreshSetup().catch(() => undefined); }}>Relire et vérifier la station</button>
+    </Card>
+  );
+  return <>{children}</>;
+}
+
 function LandingRoute() {
   const { state } = useStore();
   if (state.session) {
@@ -101,7 +125,9 @@ function LandingRoute() {
 function AuthRoute({ children }: { children: React.ReactNode }) {
   const { state } = useStore();
   if (state.session) {
-    return <Navigate to={state.session.role === 'super_admin' ? '/app/plateforme' : '/app/tableau-de-bord'} replace />;
+    const destination = state.session.role === 'super_admin' ? '/app/plateforme'
+      : state.station?.activated ? '/app/tableau-de-bord' : '/app/mise-en-route';
+    return <Navigate to={destination} replace />;
   }
   return <>{children}</>;
 }
@@ -127,13 +153,13 @@ export default function App() {
         <Route path="/app" element={<AppRoute><AppShell /></AppRoute>}>
           <Route index element={<Navigate to="tableau-de-bord" replace />} />
           <Route path="tableau-de-bord" element={<RoleRoute roles={STAFF} permission="washes.view"><Dashboard /></RoleRoute>} />
-          <Route path="mise-en-route" element={<RoleRoute roles={MANAGERS} permission="settings.manage"><Onboarding /></RoleRoute>} />
-          <Route path="lavages" element={<RoleRoute roles={STAFF} permission="washes.view"><Washes /></RoleRoute>} />
-          <Route path="prestations" element={<RoleRoute roles={MANAGERS} permission="catalog.manage"><Services /></RoleRoute>} />
+          <Route path="mise-en-route" element={<RoleRoute roles={MANAGERS} permission="settings.manage"><StationSetupGate><Onboarding /></StationSetupGate></RoleRoute>} />
+          <Route path="lavages" element={<RoleRoute roles={STAFF} permission="washes.view"><StationSetupGate><Washes /></StationSetupGate></RoleRoute>} />
+          <Route path="prestations" element={<RoleRoute roles={MANAGERS} permission="catalog.manage"><StationSetupGate><Services /></StationSetupGate></RoleRoute>} />
           <Route path="clients" element={<RoleRoute roles={STAFF} permission="customers.view"><Clients /></RoleRoute>} />
           <Route path="employes" element={<RoleRoute roles={MANAGERS} permission="employees.manage"><Employees /></RoleRoute>} />
           <Route path="caisse" element={<RoleRoute roles={STAFF} permission="cash.open"><Cash /></RoleRoute>} />
-          <Route path="depenses" element={<RoleRoute roles={STAFF} permission="expenses.create"><Expenses /></RoleRoute>} />
+          <Route path="depenses" element={<RoleRoute roles={STAFF} permission="expenses.create"><StationSetupGate><Expenses /></StationSetupGate></RoleRoute>} />
           <Route path="rapports" element={<RoleRoute roles={MANAGERS} permission="reports.view"><Reports /></RoleRoute>} />
           <Route path="consolidation" element={<RoleRoute roles={MANAGERS} permission="analytics.view"><Consolidation /></RoleRoute>} />
           <Route path="commissions" element={<RoleRoute roles={MANAGERS} permission="commissions.view"><Commissions /></RoleRoute>} />
@@ -141,7 +167,7 @@ export default function App() {
           <Route path="consommations" element={<RoleRoute roles={MANAGERS} permission="inventory.consume"><Consumptions /></RoleRoute>} />
           <Route path="fidelisation" element={<RoleRoute roles={STAFF} permission="crm.view"><Fidelisation /></RoleRoute>} />
           <Route path="flottes" element={<RoleRoute roles={STAFF} permission="fleets.view"><Flottes /></RoleRoute>} />
-          <Route path="parametres" element={<RoleRoute roles={MANAGERS} permission="settings.manage"><Settings /></RoleRoute>} />
+          <Route path="parametres" element={<RoleRoute roles={MANAGERS} permission="settings.manage"><StationSetupGate><Settings /></StationSetupGate></RoleRoute>} />
           <Route path="abonnement" element={<RoleRoute roles={OWNER} permission="subscription.manage"><Subscription /></RoleRoute>} />
           <Route path="plateforme" element={<RoleRoute roles={PLATFORM} permission="platform.view"><Platform /></RoleRoute>} />
           <Route path="qualite" element={<RoleRoute roles={[...MANAGERS, ...PLATFORM]} permission="reports.view"><Quality /></RoleRoute>} />

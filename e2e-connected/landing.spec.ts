@@ -5,6 +5,7 @@ const dbPlan = {
   id: 'standard', name: 'Standard test', price_monthly_minor: 16000, currency_code: 'XOF', trial_days: 0,
   sort_order: 1, features: ['Avantage servi par la base'],
   plan_limits: [{ key: 'stations', value_int: 2 }, { key: 'employees', value_int: 12 }, { key: 'washes_per_month', value_int: 900 }],
+  plan_entitlements: ['stock', 'loyalty', 'fleets', 'consolidation', 'audit'].map((feature_key) => ({ feature_key, enabled: false })),
 };
 
 test('vitrine connectée simulée : chargement sans repli, tarif et limites du serveur, navigation réelle', async ({ page }) => {
@@ -29,8 +30,8 @@ test('vitrine connectée simulée : chargement sans repli, tarif et limites du s
   const pricing = page.locator('#tarifs');
   await expect(pricing).toContainText('16 000 FCFA');
   await expect(pricing).toContainText('2 station(s)');
-  await expect(pricing).toContainText('12 collaborateur(s)');
-  await expect(pricing).toContainText('Avantage servi par la base');
+  await expect(pricing).toContainText('12 comptes actifs');
+  await expect(pricing).toContainText('Non inclus');
   await expect(pricing).not.toContainText('15 000 FCFA');
   await expect(page.getByText('Aperçu d’une station — données fictives')).toBeVisible();
   await expect(page.getByText(/Témoignages Clients/)).toHaveCount(0);

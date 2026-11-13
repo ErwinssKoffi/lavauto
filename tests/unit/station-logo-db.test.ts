@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 // PostgreSQL local en mémoire : les schémas Auth/Storage ci-dessous simulent
 // leur surface SQL et leurs rôles. Les API Supabase distantes et leurs grants
 // réels doivent toujours être vérifiés séparément après le déploiement.
-describe('migrations 001–055 — PostgreSQL isolé', () => {
+describe('migrations 001–057 — PostgreSQL isolé', () => {
   it('vérifie les fonctions historiques puis WhatsApp en rollback', async () => {
     const db = new PGlite({ extensions: { pgcrypto } });
     try {
@@ -39,7 +39,7 @@ describe('migrations 001–055 — PostgreSQL isolé', () => {
       `);
       const migrationsDir = resolve('supabase/migrations');
       const files = readdirSync(migrationsDir).filter((name) => /^\d{3}_.*\.sql$/.test(name)).sort();
-      expect(files[files.length - 1]).toBe('055_shared_form_validation.sql');
+      expect(files[files.length - 1]).toBe('057_subscription_entitlements.sql');
       // Les anciens scripts mesurent le schéma historique à 052. Rejouer ces
       // contrôles avant d'ajouter les trois nouvelles tables de 053.
       for (const file of files.filter((name) => name < '053_')) {
@@ -86,7 +86,7 @@ describe('migrations 001–055 — PostgreSQL isolé', () => {
       expect((await db.query<{ count: number }>('SELECT count(*)::int AS count FROM public.wash_whatsapp_notifications')).rows[0].count).toBe(0);
       expect((await db.query<{ count: number }>('SELECT count(*)::int AS count FROM auth.users')).rows[0].count).toBe(0);
 
-      for (const file of files.filter((name) => name >= '054_')) {
+      for (const file of files.filter((name) => name >= '054_' && name < '057_')) {
         await db.exec(readFileSync(resolve(migrationsDir, file), 'utf8'));
         await db.query('INSERT INTO supabase_migrations.schema_migrations VALUES ($1)', [file.slice(0, 3)]);
       }
@@ -94,6 +94,36 @@ describe('migrations 001–055 — PostgreSQL isolé', () => {
       const stationChecks = stationResults.find((result) => result.fields.some((field) => field.name === 'label'))?.rows as { label: string; ok: boolean }[] | undefined;
       expect(stationChecks?.length).toBeGreaterThanOrEqual(25);
       expect(stationChecks?.filter((check) => !check.ok)).toEqual([]);
+      const setupResults = await db.exec(readFileSync(resolve('supabase/tests/station_setup_rollback.sql'), 'utf8'));
+      const setupChecks = setupResults.find((result) => result.fields.some((field) => field.name === 'label'))?.rows as { label: string; ok: boolean }[] | undefined;
+      expect(setupChecks?.length).toBeGreaterThanOrEqual(25);
+      expect(setupChecks?.filter((check) => !check.ok)).toEqual([]);
+      expect((await db.query<{ count: number }>('SELECT count(*)::int AS count FROM auth.users')).rows[0].count).toBe(0);
+      await db.exec(readFileSync(resolve(migrationsDir, '057_subscription_entitlements.sql'), 'utf8'));
+      const subscriptionResults = await db.exec(readFileSync(resolve('supabase/tests/subscription_entitlements_rollback.sql'), 'utf8'));
+      const subscriptionChecks = subscriptionResults.find((result) => result.fields.some((field) => field.name === 'label'))?.rows as { label: string; ok: boolean }[] | undefined;
+      expect(subscriptionChecks?.length).toBeGreaterThanOrEqual(20);
+      expect(subscriptionChecks?.filter((check) => !check.ok)).toEqual([]);
+      expect((await db.query<{ count: number }>('SELECT count(*)::int AS count FROM auth.users')).rows[0].count).toBe(0);
+      const guardResults = await db.exec(readFileSync(resolve('supabase/tests/subscription_guards_rollback.sql'), 'utf8'));
+      const guardChecks = guardResults.find((result) => result.fields.some((field) => field.name === 'label'))?.rows as { label: string; ok: boolean }[] | undefined;
+      expect(guardChecks?.length).toBeGreaterThanOrEqual(25);
+      expect(guardChecks?.filter((check) => !check.ok)).toEqual([]);
+      expect((await db.query<{ count: number }>('SELECT count(*)::int AS count FROM auth.users')).rows[0].count).toBe(0);
+      const expiredWhatsappResults = await db.exec(readFileSync(resolve('supabase/tests/whatsapp_expired_rollback.sql'), 'utf8'));
+      const expiredWhatsappChecks = expiredWhatsappResults.find((result) => result.fields.some((field) => field.name === 'label'))?.rows as { label: string; ok: boolean }[] | undefined;
+      expect(expiredWhatsappChecks?.length).toBeGreaterThanOrEqual(50);
+      expect(expiredWhatsappChecks?.filter((check) => !check.ok)).toEqual([]);
+      expect((await db.query<{ count: number }>('SELECT count(*)::int AS count FROM auth.users')).rows[0].count).toBe(0);
+      const identityResults = await db.exec(readFileSync(resolve('supabase/tests/identity_subscription_rollback.sql'), 'utf8'));
+      const identityChecks = identityResults.find((result) => result.fields.some((field) => field.name === 'label'))?.rows as { label: string; ok: boolean }[] | undefined;
+      expect(identityChecks?.length).toBeGreaterThanOrEqual(14);
+      expect(identityChecks?.filter((check) => !check.ok)).toEqual([]);
+      expect((await db.query<{ count: number }>('SELECT count(*)::int AS count FROM auth.users')).rows[0].count).toBe(0);
+      const revocationResults = await db.exec(readFileSync(resolve('supabase/tests/invitation_revocation_rollback.sql'), 'utf8'));
+      const revocationChecks = revocationResults.find((result) => result.fields.some((field) => field.name === 'label'))?.rows as { label: string; ok: boolean }[] | undefined;
+      expect(revocationChecks?.length).toBeGreaterThanOrEqual(15);
+      expect(revocationChecks?.filter((check) => !check.ok)).toEqual([]);
       expect((await db.query<{ count: number }>('SELECT count(*)::int AS count FROM auth.users')).rows[0].count).toBe(0);
     } finally {
       await db.close();

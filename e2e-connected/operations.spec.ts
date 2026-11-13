@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { CashClosure, CashMovement, CashSession, Wash } from '../src/types';
-import { CATEGORY, OWNER, SERVICE, STATION, emptyFinanceBoard, installFakeSupabase, signInFake, type Call } from './fixtures/mock-supabase';
+import { CATEGORY, OWNER, SERVICE, STATION, emptyFinanceBoard, fakeExpiredTrialAccess, installFakeSupabase, signInFake, type Call } from './fixtures/mock-supabase';
 
 const CASH = '11111111-aaaa-4111-8111-111111111111';
 const WASH = '22222222-aaaa-4222-8222-222222222222';
@@ -25,9 +25,14 @@ function operationsBackend() {
   let rejectNextCreate = false;
   let failReadAfterCreate = false;
   let failNextBoard = false;
+  let failFinanceAfterOpen = false;
+  let failNextFinance = false;
   const creations = new Map<string, { payload: string; id: string }>();
   const handle = (call: Call) => {
-    if (call.path === '/rest/v1/rpc/my_station_finance_board') return { data: { ...emptyFinanceBoard(), cashSessions: sessions, cashMovements: movements, cashClosures: closures } };
+    if (call.path === '/rest/v1/rpc/my_station_finance_board') {
+      if (failNextFinance) { failNextFinance = false; return { status: 503, data: { message: 'Finance indisponible en test' } }; }
+      return { data: { ...emptyFinanceBoard(), cashSessions: sessions, cashMovements: movements, cashClosures: closures } };
+    }
     if (call.path === '/rest/v1/rpc/my_station_wash_board') {
       if (failNextBoard) { failNextBoard = false; return { status: 503, data: { message: 'Lecture indisponible en test' } }; }
       return { data: washes };
@@ -38,6 +43,7 @@ function operationsBackend() {
         openingFloat: Number(call.body.p_opening_float_minor), closedAt: null, countedAmount: null,
         closedBy: null, status: 'ouverte', reopenReason: null, reopenedAt: null,
       });
+      if (failFinanceAfterOpen) { failFinanceAfterOpen = false; failNextFinance = true; }
       return { data: CASH };
     }
     if (call.path === '/rest/v1/rpc/create_wash_atomic') {
@@ -106,6 +112,7 @@ function operationsBackend() {
     loseNextResponse: () => { loseNextResponse = true; },
     rejectNextCreate: () => { rejectNextCreate = true; },
     failReadAfterCreate: () => { failReadAfterCreate = true; },
+    failFinanceAfterOpen: () => { failFinanceAfterOpen = true; },
   };
 }
 
@@ -370,6 +377,73 @@ test('migration 052 absente : erreur explicite, aucun repli vers les anciennes R
   expect(mock.calls.filter((call) => call.path === '/rest/v1/rpc/create_wash_atomic')).toHaveLength(1);
   expect(mock.calls.filter((call) => /\/rpc\/(create_wash_full|record_wash_payment_by_key)$/.test(call.path))).toEqual([]);
   expect(await page.evaluate((key) => sessionStorage.getItem(key), `washguard.pending-wash.v1:${OWNER}:${STATION}`)).toBeNull();
+  expect(mock.unexpected).toEqual([]);
+  expect(mock.blocked).toEqual([]);
+});
+
+test('caisse simulée : une relecture finance échouée ne résout pas la commande comme confirmée', async ({ page }) => {
+  test.setTimeout(60_000);
+  const backend = operationsBackend(); backend.failFinanceAfterOpen();
+  const fake = await installFakeSupabase(page, backend.handle);
+  await signInFake(page);
+  await page.goto('/app/caisse');
+  await page.getByRole('button', { name: 'Ouvrir la caisse', exact: true }).first().click();
+  const opening = page.getByRole('dialog', { name: 'Ouvrir la caisse' });
+  await opening.getByLabel('Fond de caisse (FCFA) *').fill('10000');
+  await opening.getByRole('button', { name: 'Ouvrir la caisse' }).click();
+  await expect(page.getByText(/Commande envoyée, mais relecture finance non confirmée/)).toBeVisible();
+  await expect(opening).toBeVisible();
+  expect(backend.sessions).toHaveLength(1);
+  expect(fake.calls.filter((c) => c.path.endsWith('/open_cash_session'))).toHaveLength(1);
+  await opening.getByRole('button', { name: /Annuler/ }).click();
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+  await expectMetric(page, 'Fond de caisse', '10 000 FCFA');
+  expect(fake.blocked).toEqual([]);
+  expect(fake.unexpected).toEqual([]);
+});
+
+test('création incertaine puis expiration : reprise suspendue et clé conservée jusqu’à réactivation', async ({ page }) => {
+  test.setTimeout(90_000);
+  const backend = operationsBackend();
+  backend.loseNextResponse();
+  let expired = false;
+  const mock = await installFakeSupabase(page, (call) => {
+    if (expired && call.path.endsWith('/my_subscription_access')) return { data: fakeExpiredTrialAccess() };
+    return backend.handle(call);
+  });
+  await signInFake(page);
+  const dialog = await prepareCreate(page, '8888 KL 01');
+  await dialog.getByRole('button', { name: 'Enregistrer la fiche' }).click();
+  await expect(dialog.getByText(/Résultat incertain/)).toBeVisible();
+  const key = `washguard.pending-wash.v1:${OWNER}:${STATION}`;
+  const raw = await page.evaluate((k) => sessionStorage.getItem(k), key);
+  expect(raw).toBeTruthy();
+  const creates = () => mock.calls.filter((call) => call.path.endsWith('/create_wash_atomic'));
+  expect(creates()).toHaveLength(1);
+
+  expired = true;
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(page.getByText('Abonnement en lecture seule.')).toBeVisible();
+  await expect(dialog.getByText(/reprise est suspendue en lecture seule/)).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Vérifier / réessayer la même opération' })).toBeDisabled();
+  await dialog.getByRole('button', { name: 'Fermer', exact: true }).last().click();
+  await page.reload();
+  await expect(page.getByRole('row').filter({ hasText: '8888 KL 01' })).toBeVisible();
+  await page.getByRole('button', { name: 'Vérifier la création' }).click();
+  await expect(dialog.getByRole('button', { name: 'Vérifier / réessayer la même opération' })).toBeDisabled();
+  expect(await page.evaluate((k) => sessionStorage.getItem(k), key)).toBe(raw);
+  expect(creates()).toHaveLength(1);
+
+  expired = false;
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  const retry = dialog.getByRole('button', { name: 'Vérifier / réessayer la même opération' });
+  await expect(retry).toBeEnabled();
+  await retry.click();
+  await expect(dialog).toHaveCount(0);
+  expect(creates()).toHaveLength(2);
+  expect(creates()[1].body).toEqual(creates()[0].body);
+  expect(backend.washes).toHaveLength(1);
+  expect(await page.evaluate((k) => sessionStorage.getItem(k), key)).toBeNull();
   expect(mock.unexpected).toEqual([]);
   expect(mock.blocked).toEqual([]);
 });

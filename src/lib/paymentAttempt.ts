@@ -35,7 +35,7 @@ export function readPendingPayment(user: string, station: string, wash: string):
   let raw: string | null;
   try { raw = sessionStorage.getItem(storageKey(user, station, wash)); }
   catch { throw new Error('Stockage de session indisponible : vérifiez les encaissements avant toute nouvelle opération.'); }
-  if (!raw) return null;
+  if (raw === null) return null;
   try {
     const parsed: unknown = JSON.parse(raw);
     if (!valid(parsed, user, station, wash)) throw new Error('invalid');

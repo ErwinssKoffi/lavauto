@@ -3,9 +3,10 @@ import { FiCheckCircle, FiEdit3, FiPlus, FiTrash2, FiX } from 'react-icons/fi';
 import { useStore } from '../lib/store';
 import { formatFCFA } from '../lib/format';
 import { Alert, Badge, Card, Input, Modal, PageHeader, useSafeAction } from '../components/ui';
+import { PriceInput } from '../components/PriceInput';
 
 export default function Services() {
-  const { state, addService, updateService, setPrice, removeService, notify } = useStore();
+  const { state, canWriteSubscription, addService, updateService, removeService, notify } = useStore();
   const safe = useSafeAction();
   const [addOpen, setAddOpen] = useState(false);
   const [name, setName] = useState('');
@@ -19,9 +20,9 @@ export default function Services() {
   return (
     <div>
       <PageHeader title="Prestations" subtitle="Catalogue propre à la station. Modifier un tarif ne change jamais les lavages déjà enregistrés."
-        actions={<button className="wg-btn wg-btn-primary" onClick={() => setAddOpen(true)}><FiPlus /> Nouvelle prestation</button>} />
+        actions={<button className="wg-btn wg-btn-primary" disabled={!canWriteSubscription} onClick={() => setAddOpen(true)}><FiPlus /> Nouvelle prestation</button>} />
 
-      <div className="mb-5"><Alert kind="info">La grille tarifaire est enregistrée à chaque saisie. Les prix sont figés sur chaque fiche au moment de sa création : l’historique et les rapports restent justes.</Alert></div>
+      <div className="mb-5"><Alert kind="info">Le tarif est enregistré lorsque vous quittez la case ou appuyez sur Entrée. Les prix sont figés sur chaque fiche au moment de sa création : l’historique et les rapports restent justes.</Alert></div>
 
       <Card className="mb-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -40,8 +41,7 @@ export default function Services() {
                     <td className="wg-td"><p className="font-medium">{s.name}</p>{s.description && <p className="wg-muted text-xs">{s.description}</p>}</td>
                     {cats.map((c) => (
                       <td key={c.id} className="wg-td">
-                        <input type="number" min="0" step="500" placeholder="—" className="wg-input !w-32" value={s.prices[c.id] || ''}
-                          onChange={(e) => setPrice(s.id, c.id, Number(e.target.value))} />
+                        <PriceInput serviceId={s.id} categoryId={c.id} value={s.prices[c.id]} label={`Prix ${s.name} pour ${c.name}`} />
                       </td>
                     ))}
                     <td className="wg-td"><Badge tone={s.active ? 'success' : 'neutral'}>{s.active ? 'Active' : 'Désactivée'}</Badge></td>
@@ -68,30 +68,30 @@ export default function Services() {
               {cats.length === 0 && <span className="wg-muted text-xs">Aucune catégorie</span>}
             </div>
             <div className="mt-4 flex flex-wrap gap-2 border-t pt-3" style={{ borderColor: 'var(--wg-border)' }}>
-              <button className="wg-btn wg-btn-ghost !px-2.5 !py-1.5 text-xs" onClick={() => { setEditId(s.id); setEditName(s.name); setEditDesc(s.description); }}><FiEdit3 /> Modifier</button>
-              <button className="wg-btn wg-btn-ghost !px-2.5 !py-1.5 text-xs" onClick={() => updateService(s.id, { active: !s.active })}>{s.active ? 'Désactiver' : 'Activer'}</button>
-              <button className="wg-muted ml-auto hover:text-red-400" onClick={() => safe(() => { removeService(s.id); notify('info', 'Prestation retirée du catalogue.'); })} aria-label="Supprimer"><FiTrash2 size={15} /></button>
+              <button className="wg-btn wg-btn-ghost !px-2.5 !py-1.5 text-xs" disabled={!canWriteSubscription} onClick={() => { setEditId(s.id); setEditName(s.name); setEditDesc(s.description); }}><FiEdit3 /> Modifier</button>
+              <button className="wg-btn wg-btn-ghost !px-2.5 !py-1.5 text-xs" disabled={!canWriteSubscription} onClick={() => { void safe(() => updateService(s.id, { active: !s.active })); }}>{s.active ? 'Désactiver' : 'Activer'}</button>
+              <button className="wg-muted ml-auto hover:text-red-400" disabled={!canWriteSubscription} onClick={() => { void safe(async () => { await removeService(s.id); notify('info', 'Prestation retirée du catalogue.'); }); }} aria-label="Supprimer"><FiTrash2 size={15} /></button>
             </div>
           </Card>
         ))}
       </div>
 
       <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Nouvelle prestation">
-        <Input label="Nom de la prestation *" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex. Lavage complet" />
-        <Input label="Description (facultative)" className="mt-3" value={desc} onChange={(e) => setDesc(e.target.value)} />
+        <Input label="Nom de la prestation *" disabled={!canWriteSubscription} value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex. Lavage complet" />
+        <Input label="Description (facultative)" disabled={!canWriteSubscription} className="mt-3" value={desc} onChange={(e) => setDesc(e.target.value)} />
         <p className="wg-muted mt-3 text-xs">Le prix sera saisi dans la grille tarifaire ci-dessus, pour chaque catégorie de véhicules. Aucun montant n’est suggéré.</p>
         <div className="mt-5 flex justify-end gap-2">
           <button className="wg-btn wg-btn-ghost" onClick={() => setAddOpen(false)}><FiX /> Annuler</button>
-          <button className="wg-btn wg-btn-primary" onClick={() => { if (!name.trim()) return; addService(name, desc); setName(''); setDesc(''); setAddOpen(false); notify('success', 'Prestation ajoutée.'); }}><FiPlus /> Ajouter</button>
+          <button className="wg-btn wg-btn-primary" disabled={!canWriteSubscription} onClick={() => { if (!name.trim()) return; void safe(async () => { await addService(name, desc); setName(''); setDesc(''); setAddOpen(false); notify('success', 'Prestation ajoutée.'); }); }}><FiPlus /> Ajouter</button>
         </div>
       </Modal>
 
       <Modal open={Boolean(edit)} onClose={() => setEditId(null)} title="Modifier la prestation">
-        <Input label="Nom" value={editName} onChange={(e) => setEditName(e.target.value)} />
-        <Input label="Description" className="mt-3" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} />
+        <Input label="Nom" disabled={!canWriteSubscription} value={editName} onChange={(e) => setEditName(e.target.value)} />
+        <Input label="Description" disabled={!canWriteSubscription} className="mt-3" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} />
         <div className="mt-5 flex justify-end gap-2">
           <button className="wg-btn wg-btn-ghost" onClick={() => setEditId(null)}>Annuler</button>
-          <button className="wg-btn wg-btn-primary" onClick={() => { if (edit) updateService(edit.id, { name: editName, description: editDesc }); setEditId(null); notify('success', 'Prestation modifiée.'); }}><FiCheckCircle /> Enregistrer</button>
+          <button className="wg-btn wg-btn-primary" disabled={!canWriteSubscription} onClick={() => { if (!edit) return; void safe(async () => { await updateService(edit.id, { name: editName, description: editDesc }); setEditId(null); notify('success', 'Prestation modifiée.'); }); }}><FiCheckCircle /> Enregistrer</button>
         </div>
       </Modal>
     </div>

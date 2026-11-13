@@ -10,6 +10,35 @@ export const CATEGORY = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 export const SERVICE = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 export const EMAIL = 'owner@test.invalid';
 
+export function fakePlanRows() {
+  const rights = (enabled: boolean) => ['stock', 'loyalty', 'fleets', 'consolidation', 'audit']
+    .map((feature_key) => ({ feature_key, enabled }));
+  return [
+    { id: 'essai', name: 'Essai', price_monthly_minor: 0, currency_code: 'XOF', trial_days: 14, sort_order: 1, features: [],
+      plan_limits: [{ key: 'stations', value_int: 1 }, { key: 'employees', value_int: 3 }, { key: 'washes_per_month', value_int: 100 }], plan_entitlements: rights(true) },
+    { id: 'standard', name: 'Standard', price_monthly_minor: 15000, currency_code: 'XOF', trial_days: 0, sort_order: 2, features: [],
+      plan_limits: [{ key: 'stations', value_int: 1 }, { key: 'employees', value_int: 10 }, { key: 'washes_per_month', value_int: 1000 }], plan_entitlements: rights(false) },
+    { id: 'premium', name: 'Premium', price_monthly_minor: 35000, currency_code: 'XOF', trial_days: 0, sort_order: 3, features: [],
+      plan_limits: [{ key: 'stations', value_int: 5 }, { key: 'employees', value_int: 50 }, { key: 'washes_per_month', value_int: 100000 }], plan_entitlements: rights(true) },
+  ];
+}
+
+export function fakeSubscriptionAccess(companyId = COMPANY) {
+  const now = Date.now();
+  return {
+    id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', companyId, planId: 'essai', planName: 'Essai', status: 'trial',
+    startedAt: new Date(now).toISOString(), trialEndsAt: new Date(now + 14 * 86400000).toISOString(),
+    currentPeriodEnd: new Date(now + 30 * 86400000).toISOString().slice(0, 10),
+    serverTime: new Date(now).toISOString(), pendingPlanId: null, canWrite: true, reason: null,
+    features: { stock: true, loyalty: true, fleets: true, consolidation: true, audit: true },
+  };
+}
+
+export function fakeExpiredTrialAccess(companyId = COMPANY) {
+  const access = fakeSubscriptionAccess(companyId);
+  return { ...access, trialEndsAt: new Date(Date.now() - 1000).toISOString(), canWrite: false, reason: 'trial_expired' };
+}
+
 export interface Call {
   path: string;
   method: string;
@@ -29,6 +58,18 @@ async function json(route: Route, data: unknown, status = 200, extraHeaders: Rec
   await route.fulfill({ status, headers: { ...headers, ...extraHeaders }, contentType: 'application/json', body: JSON.stringify(data) });
 }
 
+export function fakeStationSetup(logoPath: string | null = null) {
+  return {
+    company: { id: COMPANY, name: 'Entreprise test', city: 'Abidjan', phone: '', createdAt: '2026-11-12T00:00:00Z', suspended: false },
+    station: { id: STATION, companyId: COMPANY, name: 'Station A', address: '', city: 'Abidjan', phone: '',
+      hours: [], logoPath, paymentMethods: ['especes', 'mobile_money', 'wave', 'orange_money', 'mtn_momo', 'carte', 'virement'],
+      commissionRate: 0, monthlyTarget: 0, activated: true, activatedAt: null },
+    categories: [{ id: CATEGORY, station_id: STATION, name: 'Berline', active: true }],
+    services: [{ id: SERVICE, station_id: STATION, name: 'Lavage extérieur', description: '', active: true }],
+    prices: [{ station_id: STATION, service_id: SERVICE, vehicle_category_id: CATEGORY, price_minor: 3000, currency_code: 'XOF' }],
+  };
+}
+
 export function emptyFinanceBoard() {
   return {
     paymentMethods: [], cashSessions: [], cashMovements: [], cashClosures: [], expenses: [],
@@ -36,7 +77,7 @@ export function emptyFinanceBoard() {
   };
 }
 
-export async function installFakeSupabase(page: Page, custom: Handler) {
+export async function installFakeSupabase(page: Page, custom: Handler, options: { stationIds?: string[] } = {}) {
   const calls: Call[] = [];
   const blocked: string[] = [];
   const unexpected: Call[] = [];
@@ -65,7 +106,7 @@ export async function installFakeSupabase(page: Page, custom: Handler) {
     };
     calls.push(call);
     // Les lectures de la nouvelle API doivent toujours porter la station active.
-    if (call.path.startsWith('/rest/v1/rpc/my_station_') && call.body.p_station_id !== STATION) {
+    if (call.path.startsWith('/rest/v1/rpc/my_station_') && ![STATION, ...(options.stationIds ?? [])].includes(String(call.body.p_station_id))) {
       return json(route, { code: '42501', message: 'Station inaccessible en test' }, 403);
     }
     const result = await custom(call);
@@ -73,10 +114,8 @@ export async function installFakeSupabase(page: Page, custom: Handler) {
 
     if (call.path === '/auth/v1/token') return json(route, { access_token: jwt, token_type: 'bearer', expires_in: 3600, refresh_token: 'refresh-test', user });
     if (call.path === '/auth/v1/user') return json(route, user);
-    if (call.path === '/rest/v1/plans') return json(route, [{
-      id: 'essai', name: 'Essai', price_monthly_minor: 0, currency_code: 'XOF', trial_days: 14, sort_order: 1, features: [],
-      plan_limits: [{ key: 'stations', value_int: 1 }, { key: 'employees', value_int: 5 }, { key: 'washes_per_month', value_int: 100 }],
-    }]);
+    if (call.path === '/rest/v1/plans') return json(route, fakePlanRows());
+    if (call.path === '/rest/v1/rpc/my_subscription_access') return json(route, fakeSubscriptionAccess());
     if (call.path === '/rest/v1/vehicle_categories') return json(route, [{ id: CATEGORY, station_id: STATION, name: 'Berline', active: true, sort_order: 1 }]);
     if (call.path === '/rest/v1/services') return json(route, [{ id: SERVICE, station_id: STATION, name: 'Lavage extérieur', description: '', active: true, sort_order: 1 }]);
     if (call.path === '/rest/v1/service_prices') return json(route, [{ station_id: STATION, service_id: SERVICE, vehicle_category_id: CATEGORY, price_minor: 3000, currency_code: 'XOF' }]);
@@ -85,8 +124,9 @@ export async function installFakeSupabase(page: Page, custom: Handler) {
       fullName: 'Propriétaire', roleKey: 'owner', isPlatformAdmin: false, companyId: COMPANY,
       company: { id: COMPANY, name: 'Entreprise test', city: 'Abidjan', phone: '', currency_code: 'XOF', suspended: false, created_at: now },
       stations: [{ id: STATION, name: 'Station A', city: 'Abidjan', activated: true, logoPath: null }],
-      permissions: ['washes.view', 'washes.create', 'washes.assign', 'payments.create', 'cash.open', 'cash.close', 'employees.manage', 'employees.invite', 'employees.assign_stations'],
+      permissions: ['washes.view', 'washes.create', 'washes.assign', 'payments.create', 'cash.open', 'cash.close', 'employees.manage', 'employees.invite', 'employees.disable', 'employees.assign_stations'],
     });
+    if (call.path === '/rest/v1/rpc/my_station_setup') return json(route, fakeStationSetup());
     if (call.path === '/rest/v1/rpc/my_company_users') return json(route, [{ id: OWNER, fullName: 'Propriétaire', email: EMAIL, roleKey: 'owner', active: true, stationIds: [STATION] }]);
     if (call.path === '/rest/v1/rpc/my_company_invitations') return json(route, []);
     if (['/rest/v1/rpc/my_wash_board', '/rest/v1/rpc/my_wash_posts', '/rest/v1/rpc/my_company_clients',
@@ -123,7 +163,7 @@ export async function installFakeSupabase(page: Page, custom: Handler) {
     });
     if (call.path === '/rest/v1/rpc/my_subscription_usage') return json(route, {
       periodStart: call.body.p_period_start, usage: { stations: 1, employees: 1, washes: 0 },
-      limits: { stations: 1, employees: 5, washesPerMonth: 100 }, rows: [], rules: {},
+      limits: { stations: 1, employees: 3, washesPerMonth: 100 }, rows: [], rules: {},
     });
     unexpected.push(call);
     return json(route, { message: 'Route absente du serveur simulé' }, 404);

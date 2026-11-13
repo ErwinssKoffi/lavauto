@@ -13,11 +13,13 @@ import { findEntry, groupsForRole } from './navigation';
 import { ROLE_LABELS, type Role } from '../types';
 import { usePermissions } from '../lib/usePermissions';
 import StockAlertBanner from './StockAlertBanner';
+import { DemoNotice } from './DemoNotice';
 
 const SIDEBAR_KEY = 'washguard.sidebar.collapsed';
 
 export default function AppShell() {
-  const { state, identity, selectStation, theme, toggleTheme, signOut, missing } = useStore();
+  const { state, identity, selectStation, theme, toggleTheme, signOut, missing, dataSource, authKind,
+    subscriptionAccess, subscriptionStatus, subscriptionError, canWriteSubscription, refreshSubscriptionAccess } = useStore();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [alertsOpen, setAlertsOpen] = useState(false);
@@ -28,7 +30,7 @@ export default function AppShell() {
   });
   const location = useLocation();
   const navigate = useNavigate();
-  const { role: identityRole, permissions } = usePermissions();
+  const { role: identityRole, permissions, can } = usePermissions();
   const role: Role = identityRole ?? state.session?.role ?? 'caissier';
   const stationName = state.station?.name ?? 'Ma station';
   const groups = groupsForRole(role, permissions);
@@ -214,7 +216,7 @@ export default function AppShell() {
             <a href="/#faq" className="wg-btn wg-btn-ghost !px-2.5" title="Questions fréquentes" aria-label="Questions fréquentes"><FiHelpCircle size={16} /></a>
 
             {/* Cloche d'alertes stock en temps réel */}
-            <div className="relative">
+            {can('inventory.view') && <div className="relative">
               <button
                 type="button"
                 onClick={() => setAlertsOpen((v) => !v)}
@@ -275,7 +277,7 @@ export default function AppShell() {
                   </div>
                 </div>
               )}
-            </div>
+            </div>}
 
             <div className="relative">
               <button type="button" onClick={() => setMenuOpen((value) => !value)} className="flex items-center gap-2 rounded-xl px-2 py-1.5 hover:bg-sky-500/10" aria-expanded={menuOpen} aria-label="Menu du compte">
@@ -305,7 +307,15 @@ export default function AppShell() {
         </header>
 
         <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
-          <StockAlertBanner key={`${state.session?.userId}:${state.session?.stationId}`} />
+          {dataSource === 'local' && authKind === 'local' && <DemoNotice className="mb-5 rounded-xl" />}
+          {can('inventory.view') && <StockAlertBanner key={`${state.session?.userId}:${state.session?.stationId}`} />}
+          {role !== 'super_admin' && subscriptionStatus === 'loading' && <div role="status" className="wg-card mb-5 px-4 py-3 text-xs">Vérification de l’abonnement ; les écritures ordinaires sont momentanément bloquées.</div>}
+          {role !== 'super_admin' && subscriptionStatus !== 'loading' && !canWriteSubscription && <div role="status" className="wg-card mb-5 flex flex-wrap items-center justify-between gap-3 !border-amber-500/40 px-4 py-3 text-xs">
+            <span><strong>{subscriptionAccess ? 'Abonnement en lecture seule.' : 'Abonnement non confirmé.'}</strong>{' '}
+              {subscriptionAccess ? 'Les données restent consultables ; les écritures ordinaires sont bloquées jusqu’à validation. Après expiration, un retrait WhatsApp peut être demandé sous réserve des droits.' : `Les écritures ordinaires sont bloquées. ${subscriptionError ?? ''}`}</span>
+            <span className="flex gap-3">{can('subscription.manage') && <NavLink to="/app/abonnement" className="wg-link">Voir l’abonnement →</NavLink>}
+              {dataSource === 'supabase' && authKind === 'supabase' && <button className="wg-link" onClick={() => { void refreshSubscriptionAccess().catch(() => undefined); }}>Relire</button>}</span>
+          </div>}
           {!state.station?.activated && role !== 'super_admin' && location.pathname !== '/app/mise-en-route' && (
             <div className="wg-card mb-5 flex flex-wrap items-center justify-between gap-3 !border-amber-500/30 px-4 py-3">
               <div className="flex items-center gap-2 text-xs">

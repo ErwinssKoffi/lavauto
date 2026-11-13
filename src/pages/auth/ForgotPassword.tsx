@@ -7,7 +7,7 @@ import { useStore } from '../../lib/store';
 
 /** Demande RÉELLE de lien Supabase Auth ; aucun e-mail de test n'est envoyé. */
 export default function ForgotPassword() {
-  const { requestPasswordReset } = useStore();
+  const { requestPasswordReset, authKind } = useStore();
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [sent, setSent] = useState(false);
@@ -29,11 +29,13 @@ export default function ForgotPassword() {
 
   return (
     <AuthLayout>
-      <Badge tone="accent"><FiMail /> Réinitialisation sécurisée</Badge>
+      <Badge tone="accent"><FiMail /> {authKind === 'local' ? 'Démonstration locale' : 'Réinitialisation par e-mail'}</Badge>
       <h1 className="mt-4 text-3xl font-extrabold tracking-tight">Mot de passe oublié ?</h1>
-      <p className="mt-2 text-sm text-slate-500">Saisissez l’adresse e-mail de votre compte WashGuard.</p>
+      <p className="mt-2 text-sm text-slate-500">{authKind === 'local' ? 'La récupération par e-mail n’est pas disponible dans ce mode.' : 'Saisissez l’adresse e-mail de votre compte WashGuard.'}</p>
 
-      {sent ? (
+      {authKind === 'local' ? (
+        <div className="mt-7"><Alert kind="warn">Aucun e-mail n’est envoyé en démonstration. Conservez une copie des données locales avant toute tentative de récupération ; ne videz pas le navigateur.</Alert></div>
+      ) : sent ? (
         <div className="mt-7 space-y-4">
           <Alert kind="success">Si cette adresse correspond à un compte, un lien de réinitialisation vient d’être envoyé. Vérifiez aussi les courriers indésirables.</Alert>
           <Link to="/connexion" className="wg-btn wg-btn-primary w-full !py-3">Retour à la connexion <FiArrowRight /></Link>
@@ -56,7 +58,7 @@ export default function ForgotPassword() {
 
       <div className="mt-5 rounded-xl border border-sky-100 bg-sky-50 p-3.5 text-xs leading-relaxed text-slate-600">
         <div className="flex items-start gap-2"><FiInfo className="mt-0.5 shrink-0 text-sky-600" />
-          <p>Le lien est signé par Supabase Auth, expire rapidement et mène à la page de définition d’un nouveau mot de passe. L’entreprise ne voit jamais votre mot de passe.</p>
+          <p>{authKind === 'local' ? 'Utilisez le compte et le mot de passe de démonstration déjà créés dans ce navigateur.' : 'Si le service e-mail est configuré, Supabase Auth peut envoyer un lien de définition d’un nouveau mot de passe.'}</p>
         </div>
       </div>
       <p className="mt-6 text-center text-sm text-slate-500">

@@ -16,18 +16,22 @@ export default defineConfig({
     browserName: 'chromium',
     headless: true,
     screenshot: 'only-on-failure',
-    launchOptions: process.env.PLAYWRIGHT_CHROMIUM_PATH ? {
-      executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH,
+    // Ne pas dépendre du réseau Google Fonts dans les parcours fonctionnels.
+    launchOptions: {
+      executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined,
       args: [
-        '--no-sandbox', '--disable-dev-shm-usage', '--disable-setuid-sandbox',
-        '--disable-site-isolation-trials', '--disable-web-security',
-        '--allow-running-insecure-content',
-        '--disable-features=AudioServiceOutOfProcess,IsolateOrigins,site-per-process',
-        '--enable-features=SharedArrayBuffer', '--ignore-gpu-blocklist',
-        '--in-process-gpu', '--use-gl=angle', '--use-angle=swiftshader',
-        '--enable-unsafe-swiftshader',
+        '--host-resolver-rules=MAP fonts.googleapis.com ~NOTFOUND, MAP fonts.gstatic.com ~NOTFOUND',
+        ...(process.env.PLAYWRIGHT_CHROMIUM_PATH ? [
+          '--no-sandbox', '--disable-dev-shm-usage', '--disable-setuid-sandbox',
+          '--disable-site-isolation-trials', '--disable-web-security',
+          '--allow-running-insecure-content',
+          '--disable-features=AudioServiceOutOfProcess,IsolateOrigins,site-per-process',
+          // Le binaire de secours se fige parfois avec SwiftShader ; le rendu
+          // logiciel sans GPU conserve les captures et la séparation des tests.
+          '--enable-features=SharedArrayBuffer', '--disable-gpu',
+        ] : []),
       ],
-    } : undefined,
+    },
   },
   webServer: {
     command: 'VITE_DATA_SOURCE=supabase VITE_SUPABASE_URL=https://logo-test.supabase.invalid VITE_SUPABASE_ANON_KEY=public-test-key VITE_SUPABASE_STORAGE_BUCKET=station-assets VITE_WG_TEST_AUTH= npm run build && npx vite preview --host 127.0.0.1 --port 4174 --strictPort',

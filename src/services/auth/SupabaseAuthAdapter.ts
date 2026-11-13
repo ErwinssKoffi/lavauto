@@ -16,7 +16,35 @@ import { companyUsersToAppUsers } from './LocalAuthAdapter';
 // Aucun getSession(), aucun identifiant de tenant et aucun secret ne transitent
 // par ici. Un token forgé dans localStorage ne produit jamais de session UI.
 
-type SupaError = { message?: string; status?: number } | null | undefined;
+type SupaError = { message?: string; status?: number; code?: string; context?: unknown } | null | undefined;
+
+const invitationUnconfirmed = 'Invitation non confirmée : un compte ou un e-mail peut déjà exister. Ne renvoyez pas l’invitation avant vérification par le support.';
+const revocationUnconfirmed = 'Révocation non confirmée : elle a peut-être déjà été enregistrée. Vérifiez l’invitation et le compte avant de poursuivre.';
+const accountUpdateUnconfirmed = 'Modification de compte non confirmée : elle a peut-être déjà été enregistrée. Ne répétez pas l’action avant vérification avec le support.';
+
+/** Une erreur HTTP/transport ne prouve pas que l'appel Auth a été annulé. */
+async function toInvitationError(error: SupaError): Promise<ApiError> {
+  const response = error?.context;
+  if (response instanceof Response) {
+    try {
+      const body: unknown = await response.clone().json();
+      if (body && typeof body === 'object') {
+        const result = body as Record<string, unknown>;
+        const code = typeof result.code === 'string' ? result.code : '';
+        // Ces réponses de la fonction ne surviennent qu'avant l'appel externe.
+        const beforeAuth = ['invalid_payload', 'invalid_role', 'invalid_stations', 'unauthenticated',
+          'session_expired', 'forbidden', 'no_company', 'reservation_refused'];
+        if (beforeAuth.includes(code) && typeof result.error === 'string') {
+          return new ApiError(code, result.error);
+        }
+        if (code === 'reservation_unconfirmed') {
+          return new ApiError(code, 'Réservation non confirmée : aucun appel Auth n’a été effectué. Contactez le support avant de réessayer.');
+        }
+      }
+    } catch { /* Corps absent ou illisible : résultat potentiellement incertain. */ }
+  }
+  return new ApiError('invite_unconfirmed', invitationUnconfirmed);
+}
 
 function toApiError(error: SupaError, fallback = 'auth_failed'): ApiError {
   const message = error?.message ?? '';
@@ -39,9 +67,10 @@ function toApiError(error: SupaError, fallback = 'auth_failed'): ApiError {
 }
 
 function origin(): string {
-  return typeof window !== 'undefined' && window.location?.origin
-    ? window.location.origin
-    : 'https://5173-in4mdo7zgflqt72vpkywe.e2b.app';
+  if (typeof window === 'undefined' || !window.location?.origin || window.location.origin === 'null') {
+    throw new Error('Origine de l’application indisponible pour le lien d’authentification.');
+  }
+  return window.location.origin;
 }
 
 /** Client injecté : permet les tests sans réseau et garde un seul client Auth. */
@@ -228,6 +257,7 @@ export class SupabaseAuthAdapter implements AuthPort {
           owner_name: payload.ownerName.trim(),
           city: payload.city.trim(),
           phone: payload.phone.trim(),
+          requested_plan_id: payload.requestedPlanId ?? 'essai',
           invitation: false,
         },
       },
@@ -299,38 +329,80 @@ export class SupabaseAuthAdapter implements AuthPort {
 
   async invite(payload: InvitePayload) {
     const client = asClient(this.client);
-    const { data, error } = await client.functions.invoke('invite-user', {
-      body: {
-        fullName: payload.fullName.trim(),
-        email: payload.email.trim().toLowerCase(),
-        phone: payload.phone.trim(),
-        roleKey: uiRoleToDb(payload.role),
-        stationIds: payload.stationIds,
-      },
-    });
-    if (error) throw toApiError(error, 'invite_failed');
-    const result = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>;
+    let response: { data: unknown; error: SupaError };
+    try {
+      response = await client.functions.invoke('invite-user', {
+        body: {
+          fullName: payload.fullName.trim(),
+          email: payload.email.trim().toLowerCase(),
+          phone: payload.phone.trim(),
+          roleKey: uiRoleToDb(payload.role),
+          stationIds: payload.stationIds,
+        },
+      });
+    } catch {
+      throw new ApiError('invite_unconfirmed', invitationUnconfirmed);
+    }
+    if (!response || typeof response !== 'object' || !('error' in response) || !('data' in response)) {
+      throw new ApiError('invite_unconfirmed', invitationUnconfirmed);
+    }
+    if (response.error) throw await toInvitationError(response.error);
+    const result = (response.data && typeof response.data === 'object' ? response.data : {}) as Record<string, unknown>;
+    if (result.ok !== true || typeof result.invitationId !== 'string' || !result.invitationId.trim()
+      || typeof result.userId !== 'string' || !result.userId.trim()) {
+      throw new ApiError('invite_unconfirmed', invitationUnconfirmed);
+    }
     return {
-      id: typeof result.invitationId === 'string' ? result.invitationId : '',
+      id: result.invitationId,
       message: 'Invitation envoyée. Le collaborateur définira son mot de passe depuis le lien reçu.',
     };
   }
 
   async revokeInvitation(id: string): Promise<void> {
     const client = asClient(this.client);
-    const { error } = await client.rpc('revoke_invitation', { p_invitation_id: id });
-    if (error) throw toApiError(error, 'revoke_failed');
+    let response: { data: unknown; error: SupaError };
+    try {
+      response = await client.rpc('revoke_invitation', { p_invitation_id: id });
+    } catch {
+      throw new ApiError('revoke_unconfirmed', revocationUnconfirmed);
+    }
+    if (!response || typeof response !== 'object' || !('error' in response) || !('data' in response)) {
+      throw new ApiError('revoke_unconfirmed', revocationUnconfirmed);
+    }
+    if (response.error) {
+      // Ces codes proviennent d'un refus transactionnel connu de la RPC. Un
+      // transport, proxy ou corps invalide ne prouve pas l'absence de commit.
+      if (['42501', '23514', 'P0002', '55000'].includes(response.error.code ?? '')) {
+        throw toApiError(response.error, 'revoke_failed');
+      }
+      throw new ApiError('revoke_unconfirmed', revocationUnconfirmed);
+    }
   }
 
   async updateUser(payload: UpdateUserPayload): Promise<void> {
     const client = asClient(this.client);
-    const { error } = await client.rpc('admin_update_user', {
-      p_user_id: payload.userId,
-      p_role_key: payload.role ? uiRoleToDb(payload.role) : null,
-      p_active: payload.active ?? null,
-      p_station_ids: payload.stationIds ?? null,
-    });
-    if (error) throw toApiError(error, 'update_user_failed');
+    let response: { data: unknown; error: SupaError };
+    try {
+      response = await client.rpc('admin_update_user', {
+        p_user_id: payload.userId,
+        p_role_key: payload.role ? uiRoleToDb(payload.role) : null,
+        p_active: payload.active ?? null,
+        p_station_ids: payload.stationIds ?? null,
+      });
+    } catch {
+      throw new ApiError('update_unconfirmed', accountUpdateUnconfirmed);
+    }
+    if (!response || typeof response !== 'object' || !('error' in response) || !('data' in response)) {
+      throw new ApiError('update_unconfirmed', accountUpdateUnconfirmed);
+    }
+    if (response.error) {
+      // Un refus SQL connu annule la transaction. Une erreur réseau ou de
+      // proxy ne prouve pas qu'une modification déjà envoyée a échoué.
+      if (['42501', '23514', 'P0002', '55000'].includes(response.error.code ?? '')) {
+        throw toApiError(response.error, 'update_user_failed');
+      }
+      throw new ApiError('update_unconfirmed', accountUpdateUnconfirmed);
+    }
   }
 
   async refreshUsers(): Promise<AppUser[]> {

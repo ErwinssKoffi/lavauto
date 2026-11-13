@@ -100,10 +100,10 @@ describe('reprise locale d’une création incertaine', () => {
     clearPendingWash(pending);
     expect(readPendingWash('user-a', 'station')).toBeNull();
   });
-  it('bloque une tentative illisible au lieu de l’effacer silencieusement', () => {
-    sessionStorage.setItem('washguard.pending-wash.v1:user-a:station', '{');
+  it.each(['{', ''])('bloque une tentative illisible (%j) au lieu de l’effacer silencieusement', (raw) => {
+    sessionStorage.setItem('washguard.pending-wash.v1:user-a:station', raw);
     expect(() => readPendingWash('user-a', 'station')).toThrow('Tentative de création illisible');
-    expect(sessionStorage.getItem('washguard.pending-wash.v1:user-a:station')).toBe('{');
+    expect(sessionStorage.getItem('washguard.pending-wash.v1:user-a:station')).toBe(raw);
   });
   it.each([
     { ...payload, plate: null },

@@ -1,8 +1,20 @@
 # LAVAUTO — Auth, multi-tenancy et RBAC (Prompt 04)
 
-**Date :** 11/11/2026 · **Projet Supabase :** `lavauto` (`cgxrqorwmmcyqescatzs`, `eu-central-1`) · **Branche :** `arena/868cde36-lavauto` · **Statut :** livré (P04) ; P05 et P06 sont livrés, arrêt avant le Prompt 07.
+**Mise à jour locale :** 12/11/2026 · **Branche courante :** `arena/d6d6d8bb-lavauto` · **Projet historique :** `lavauto` (`cgxrqorwmmcyqescatzs`, `eu-central-1`).
 
-> Ce document décrit le branchement réel de Supabase Auth, l'isolation multi-entreprises et les permissions serveur. Le projet `BarberShop` (`fpapxbfsiiwgpvsefsec`) reste intact. Aucun compte Auth de test, aucune invitation envoyée, aucun e-mail de test, aucun secret ni aucune clé `service_role` n'a été versionné.
+> Les sections P04 ci-dessous conservent des constats **historiques** (branche et comptages de l’époque). Les protections d’identité, d’abonnement et de révocation de `057` et la nouvelle Edge Function sont locales et **non déployées** ; le frontend n’est pas déployé en production. Un aperçu Vercel automatique de la PR ne constitue pas une recette. Aucun test Auth/e-mail réel n’a été effectué pour ces changements ; toute recette ou mise en service nécessite une autorisation distincte. Le projet `BarberShop` (`fpapxbfsiiwgpvsefsec`) reste intact. Aucun secret ni clé `service_role` n’a été versionné.
+
+## Mise à jour locale : identité et invitations (`057`)
+
+- Les mutations directes des profils, affectations et invitations par les rôles utilisateurs sont retirées ; des policies restrictives empêchent aussi leur réouverture accidentelle par une policy permissive. Les RPC d’administration restent soumises aux permissions et aux gardes d’abonnement. Un profil supprimé logiquement ne peut plus obtenir d’entreprise ou de permission même si `active=true`.
+- `can_access_station()` n’autorise propriétaire et gérant que sur les stations de leur entreprise ; les autres rôles doivent être affectés à une station de la même entreprise. Les administrateurs plateforme constituent une exception distincte. Les tests couvrent une affectation interentreprise corrompue, mais pas les grants ni données d’une cible réelle.
+- La nouvelle invitation réserve une place avant Auth et finalise profil, stations et invitation transactionnellement. Une réponse incertaine exige un rapprochement ; l’avertissement bloque les actions sur les comptes pendant la navigation mais disparaît au rechargement ou à la déconnexion. L’e-mail et Auth sont externes à SQL.
+- Une réponse perdue lors d’une modification de rôle, d’état ou de stations n’est pas traitée comme un refus certain : un avertissement en mémoire bloque les actions sur les comptes pendant la navigation, et demande un contrôle par le support. Il disparaît au rechargement ou à la déconnexion et ne protège pas une requête encore en vol, un autre onglet ou un autre appareil.
+- Le réglage individuel de commission de la liste des employés est réservé à la démonstration intégralement locale ; il ne modifie pas un contrat serveur. Les relevés connectés utilisent les contrats et le barème station côté serveur.
+- `revoke_invitation()` exige `employees.invite` et `employees.disable` et marque l’invitation en attente tout en désactivant le profil lié, dans une seule transaction. Elle est sérialisée avec l’acceptation et refuse les associations anciennes non vérifiables ou les comptes protégés. Elle ne supprime ni ne révoque explicitement le compte, le lien ou les sessions Auth ; une réactivation peut rendre l’accès. La lecture seule bloque une nouvelle révocation.
+- Le rappel d’une révocation dont la réponse est incertaine est conservé avant envoi dans `sessionStorage` pour le même compte et la même entreprise dans cet onglet, sans jeton. Un rechargement ou une reconnexion du même compte le retrouve ; la fermeture, l’effacement ou un autre appareil peuvent le faire disparaître. Rejouer seulement la même révocation ; après un refus ultérieur, un stockage illisible ou une association inconnue, vérifier avec le support. Un avertissement distinct bloque les actions si les données confirmées n’ont pas pu être relues. Les quotas ne sont relus que si le rôle et la formule l’autorisent. Cette actualisation ne revalide pas à elle seule les permissions RBAC : les RPC les vérifient côté serveur.
+
+Les recettes isolées et leurs limites sont détaillées dans [testing.md](testing.md) et [subscriptions.md](subscriptions.md). La suite du document décrit principalement le socle historique P04.
 
 ---
 
@@ -61,7 +73,7 @@ formulaires existants
 - `SignUp` : mêmes deux sections et mêmes validations ; `signUp()` envoie les métadonnées `company_name`, `station_name`, `owner_name`, `city`, `phone`, `invitation:false`. Aucun `company_id`.
 - `ForgotPassword` / `ResetPassword` : nouveaux écrans minimalistes, lien signé Supabase Auth, mot de passe jamais communiqué à l'entreprise.
 - `Employees` : même table et mêmes composants, mais invitation par e-mail, sélection **multi-stations**, rôles `gerant` / `caissier` / `laveur`, activation / désactivation, révocation et lien de réinitialisation. Aucun « mot de passe provisoire ».
-- `Settings.resetAll()` : efface l'état métier et les empreintes de démo, déconnecte en mode Supabase, puis navigue sans rechargement brutal.
+- `Settings.resetAll()` : dans la branche actuelle, la réinitialisation ne concerne que la démonstration entièrement locale et refuse le mode connecté. Elle efface l’état local et les empreintes de démo après confirmation.
 
 ### Mode local
 
@@ -84,9 +96,9 @@ formulaires existants
 
 ---
 
-## 5. Migrations appliquées
+## 5. Migrations appliquées à l’époque P04
 
-Les 10 migrations P03 restent en place. Le Prompt 04 ajoute **10 migrations** (20 au total) :
+Les 10 migrations P03 restaient en place. Le Prompt 04 ajoutait **10 migrations** (20 au total) ; `057` modifie localement plusieurs comportements décrits ici, sans être appliquée sur `lavauto` :
 
 | Migration | Contenu |
 | --- | --- |
@@ -105,7 +117,9 @@ Les 10 migrations P03 restent en place. Le Prompt 04 ajoute **10 migrations** (2
 
 ---
 
-## 6. Tests
+## 6. Tests historiques P04
+
+Pour les résultats récents de cette branche et les limites des simulations, voir [testing.md](testing.md).
 
 - `npm ci` → 185 paquets ; `npm run typecheck` → 0 erreur ; `npm run lint` → 11 règles OK ; `npm run build` → 110 modules, CSS 31,25 kB / gzip 7,40 kB, JS 663,46 kB / gzip 176,94 kB (avertissement de taille de chunk, non bloquant) ; `npm audit` → 5 modérées, 0 haute, 0 critique. Chiffres relancés après la refonte de `/`.
 - `npm run check` → **140 OK / 0 KO · local** ; `WG_DATA_SOURCE=supabase npm run check` → **141 OK / 0 KO · supabase** après les 4 contrôles de la nouvelle vitrine. Les assertions P01–P03 sont conservées ; les assertions obsolètes sur `fetchMeOnce` et l'ancien texte « aucun e-mail » sont remplacées.
@@ -118,9 +132,9 @@ Les 10 migrations P03 restent en place. Le Prompt 04 ajoute **10 migrations** (2
 
 ---
 
-## 7. Limites assumées
+## 7. Limites historiques P04
 
-- Aucun compte Auth, aucune invitation et aucun e-mail de test créés conformément à `no_accounts`. L'Edge Function est déployée mais **non invoquée**.
+- À cette étape, aucun compte Auth, aucune invitation et aucun e-mail de test n’avaient été créés conformément à `no_accounts`. La version historique de l'Edge Function était déployée mais **non invoquée** ; la nouvelle version de cette branche n’est pas déployée.
 - Aucun SMTP personnalisé ni hook mail configuré ; la délivrabilité réelle dépend du mailer Supabase du projet. Aucun envoi n'a été effectué.
 - Les écritures du **cycle lavages** passent par les RPC `021`/`022`/`023` et celles de la **finance** par `024`–`029` (voir [washes.md](washes.md) et [finance.md](finance.md)). `DataAdapter` expose aussi `listFinanceBoard()`, `listProfitability()` et `financeCommands`. Le catalogue et l'abonnement restent des écritures locales.
 - `npm run lint` est un lint statique ciblé, pas ESLint/Prettier ; CI GitHub Actions et 15 specs Playwright sont livrés au Prompt 10 (exécution Chromium en CI).

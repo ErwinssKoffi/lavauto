@@ -1,10 +1,10 @@
 # LAVAUTO — Déploiement
 
-**Date :** 12/11/2026 · **Statut :** PR #3 **fusionnée** (`f6f6301`) ; configuration de production préparée. Le workflow `deploy.yml` a été corrigé et validé, `site_url` et l'allow-list Auth Supabase pointent sur le domaine de production. Le déploiement effectif reste conditionné aux secrets GitHub/Vercel et au rafraîchissement des origines CORS dans le tableau de bord Supabase.
+**Date :** 12/11/2026 · La production Vercel observée est `READY` / `PROMOTED` sur `2d41cfd…` (PR #5 fusionnée). Le frontend de cette branche n’est pas déployé en production. L’ouverture de la PR a déclenché un aperçu Vercel automatique ; sa source de données et ses routes n’ont pas été vérifiées. Ne pas y saisir de données réelles ni le considérer comme une recette autorisée. Aucun déploiement en production, aucune activation Supabase ni migration supplémentaire ne doit être effectué sans autorisation distincte et recette préalable.
 
-> **Migrations sur `lavauto` :** après confirmation de la cible et de la sauvegarde par l’utilisateur, `051_station_logo.sql` puis `052_atomic_wash_creation.sql` ont été appliquées le 12/11/2026 via le connecteur, sous les versions `20261112130423_station_logo` et `20261112130520_atomic_wash_creation`. L’historique, le contenu et les principaux objets/permissions ont été vérifiés ; la sauvegarde n’a pas été contrôlée indépendamment. Aucun frontend de cette branche n’a été déployé en production ; l’aperçu Vercel automatique de la PR ne remplace pas une recette métier/Auth/Storage sur un environnement autorisé. Voir [testing.md](testing.md).
+> **Migrations sur `lavauto` :** après confirmation de la cible et de la sauvegarde par l’utilisateur, `051_station_logo.sql` puis `052_atomic_wash_creation.sql` ont été appliquées le 12/11/2026 via le connecteur, sous les versions `20261112130423_station_logo` et `20261112130520_atomic_wash_creation`. L’historique, le contenu et les principaux objets/permissions ont été vérifiés ; la sauvegarde n’a pas été contrôlée indépendamment. Le frontend actuel de cette branche n’a pas été déployé en production ; l’aperçu automatique ne remplace pas une recette métier/Auth/Storage sur un environnement autorisé. Voir [testing.md](testing.md).
 >
-> **CLI :** la version npm `3.1.0` est installée et initialisée localement (`supabase/config.toml`), mais elle n’est ni authentifiée ni liée au projet. Le sandbox n’a pas de sortie réseau directe vers Supabase ; le connecteur est une intégration distincte. Le journal distant comporte 51 migrations horodatées ; le dépôt contient maintenant 54 fichiers numérotés (`001`–`055` sans `048`) et trois fichiers datés historiques. `053`, `054` et `055` restent locales et n’ont pas été appliquées à distance. Les migrations et le seed sont désactivés dans la configuration locale par précaution. **Ne pas lancer `supabase db push`, `--include-all`, `migration repair`, `db reset` ou `config push` aveuglément**, même avec ce garde-fou : ils peuvent rejouer ou désynchroniser l’historique, écraser des données ou modifier la configuration distante. Une réconciliation exacte et un aperçu vérifié sont nécessaires.
+> **CLI :** la version npm `3.1.0` est installée et initialisée localement (`supabase/config.toml`), mais elle n’est ni authentifiée ni liée au projet. Le sandbox n’a pas de sortie réseau directe vers Supabase ; le connecteur est une intégration distincte. Le journal distant comporte 51 migrations horodatées ; le dépôt contient maintenant 56 fichiers numérotés (`001`–`057` sans `048`) et trois fichiers datés historiques. `053`–`057` restent locales et n’ont pas été appliquées à distance. Les migrations et le seed sont désactivés dans la configuration locale par précaution ; le seed historique est incompatible avec le schéma courant et ne doit pas être exécuté. **Ne pas lancer `supabase db push`, `--include-all`, `migration repair`, `db reset` ou `config push` aveuglément**, même avec ce garde-fou : ils peuvent rejouer ou désynchroniser l’historique, écraser des données ou modifier la configuration distante. Une réconciliation exacte et un aperçu vérifié sont nécessaires.
 >
 > **WhatsApp :** aucun déploiement de `053`, des fonctions, des secrets, du webhook ou de l’ordonnanceur n’a eu lieu. Une autorisation distincte et une recette isolée sont nécessaires. L’approbation du compte et de l’expéditeur, déclarée par l’utilisateur, ne suffit pas à établir celle du modèle. Procédure et risques de backlog : [whatsapp-receipts.md](whatsapp-receipts.md).
 
@@ -13,7 +13,7 @@
 | Variable | Développement | Production |
 | --- | --- | --- |
 | Domaine | `http://localhost:5173`, aperçu Arena `https://5173-….e2b.app` | **`https://lavauto-five.vercel.app`** |
-| `VITE_DATA_SOURCE` | `local` ou `supabase` | `supabase` |
+| `VITE_DATA_SOURCE` | `local` ou `supabase` | `supabase` uniquement après validation et autorisation |
 | `VITE_SUPABASE_URL` | URL du projet | `https://cgxrqorwmmcyqescatzs.supabase.co` |
 | `VITE_SUPABASE_ANON_KEY` | Clé **publishable** | Clé **publishable** du même projet |
 | `VITE_SUPABASE_STORAGE_BUCKET` | `station-assets` | `station-assets` |
@@ -55,17 +55,17 @@ https://lavauto-five.vercel.app
 https://lavauto-git-arena-868cde36-lavauto-durandobi634-8314s-projects.vercel.app
 ```
 
-Le frontend n'appelle jamais `localhost` depuis le navigateur en production. Les redirections `/auth/*`, `/mot-de-passe-oublie` et `/reinitialiser-mot-de-passe` restent couvertes par le rewrite SPA de `vercel.json`.
+Le frontend n'appelle jamais `localhost` depuis le navigateur en production. Sur le déploiement observé, `/` et `/index.html` répondaient, mais plusieurs routes profondes telles que `/connexion` répondaient **404**. Le dépôt règle localement `cleanUrls: false` avec un rewrite vers `/index.html` ; ce correctif n’a pas été déployé en production ni validé par une recette Vercel. Un test Vite local ou le statut prêt de l’aperçu automatique ne démontre pas le comportement des routes Vercel.
 
 ## 3. Vercel
 
 `vercel.json` fixe :
 
 - framework Vite, `npm run build`, sortie `dist`, région `cdg1` ;
-- rewrite `/(.*)` → `/index.html` pour React Router ;
+- `cleanUrls: false` et rewrite `/(.*)` → `/index.html` pour React Router, en attente de validation Vercel ;
 - en-têtes `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`.
 
-Le projet Vercel lié à GitHub est `lavauto` (scope `durandobi634-8314s-projects`) ; les previews de PR sont générées automatiquement par l'application Vercel. Le domaine public `https://lavauto-five.vercel.app` est celui déclaré dans la page d'accueil du dépôt GitHub ; il doit être rafraîchi par un déploiement de production après configuration des secrets.
+Le projet Vercel lié à `main` est `lavauto` (scope `durandobi634-8314s-projects`). La production observée est `https://lavauto-five.vercel.app`. Aucune variable de projet ou partagée n’était listée lors de la lecture ; le code sans configuration est en mode local, mais le bundle déployé n’a pas été inspecté, donc le mode public exact reste à confirmer. Préserver les données locales des navigateurs avant tout changement d’origine ou de mode.
 
 `.github/workflows/deploy.yml` s'exécute sur `workflow_dispatch`, `repository_dispatch` (`deploy_production`) ou `push` vers `main`. Il :
 
@@ -83,7 +83,7 @@ Le workflow initial contenait une erreur YAML (`run: echo "… : …"` avec `:` 
 ```text
 npm ci
 npm run typecheck
-npx --yes deno@2.9.6 check --no-config supabase/functions/whatsapp-dispatch/index.ts supabase/functions/whatsapp-webhook/index.ts
+npx --yes deno@2.9.6 check --no-config supabase/functions/invite-user/index.ts supabase/functions/whatsapp-dispatch/index.ts supabase/functions/whatsapp-webhook/index.ts
 npm run lint
 npm run test:unit
 # PostgreSQL 17 temporaire vierge : npm run test:postgres:concurrency
@@ -102,7 +102,8 @@ La **PR #3** (« P10 — QA, Storage privé, performance, CI/CD et déploiement 
 1. Confirmer la référence et l’environnement visés (recette ou production), inspecter leur historique **effectif** et vérifier une sauvegarde/restauration exploitable. Sur `lavauto`, `051` et `052` sont déjà enregistrées : **ne pas les réappliquer**. La présence de certaines tables sans données ne remplace pas la vérification de sauvegarde.
 2. Pour une autre cible autorisée où elles sont absentes, établir un plan compatible avec son historique, puis appliquer `051` et `052` dans cet ordre, une seule fois chacune. Ne pas utiliser `seed.sql` ni les trois migrations datées historiques de la branche parallèle ; ne pas modifier l’historique pour masquer un écart.
 3. Sur une recette autorisée et isolée, vérifier le schéma, les grants, les policies et l’ordre dans le journal ; exécuter les scripts SQL de rollback et les parcours avec des comptes de recette. Tester caisse fermée, refus, même clé/contenu, réponse perdue, concurrence, canaux distincts, dépenses et logo. PGlite et le faux serveur ne remplacent pas ces contrôles ; les e-mails et les fixtures de recette ne doivent pas viser la production.
-4. Après recette, vérification de sauvegarde et autorisation de déploiement, déployer le frontend. Sans `052`, la création est refusée explicitement ; avec les anciens frontends, création et paiement restent deux opérations distinctes. Sans `053`, les panneaux WhatsApp affichent une erreur et n’envoient rien. L’activation de Meta exige en outre les deux fonctions, les secrets, le modèle approuvé, le webhook et un ordonnanceur : voir [whatsapp-receipts.md](whatsapp-receipts.md). Vérifier les anciennes opérations avant de les rapprocher.
+4. Établir séparément un plan autorisé pour `053`–`057`, en respectant l’ordre et l’historique effectif. Le frontend connecté utilise déjà des lectures de `054` et `057` absentes sur `lavauto` ; ne pas l’activer sur une base partiellement migrée. `056` modifie les permissions et verrouillages de configuration/catalogue ; `057` ajoute des gardes, quotas, vues filtrées et retraits de grants pouvant casser les anciens `SELECT *`. Évaluer les données et clients historiques, tester leurs compatibilités ainsi que la nouvelle fonction `invite-user` et son rapprochement Auth sur une recette isolée. Voir [subscriptions.md](subscriptions.md).
+5. Après recette, vérification de sauvegarde/restauration et autorisation explicite, envisager le déploiement. Sans `052`, la création atomique est refusée ; avec les anciens frontends, création et paiement restent distincts. WhatsApp exige aussi les fonctions, les secrets, un modèle approuvé, le webhook et un ordonnanceur : voir [whatsapp-receipts.md](whatsapp-receipts.md). Vérifier les anciennes opérations avant de les rapprocher.
 
 ### Activer la CLI dans un environnement réseau autorisé
 
@@ -126,7 +127,9 @@ Le flux de connexion est interactif ; conserver tout identifiant dans l’enviro
 - Chaque phase dispose d'un test `BEGIN … ROLLBACK` : `p05` 17/17, `p06` 32/32, `p07` 22/22, `p08` 35/35, `p09` 30/30, `p10` 30/30. Le test P10 couvre en plus la RLS restrictive Storage avec un objet réel et 0 ligne visible par `anon`. Aucun test ne laisse de fixture.
 - `docs/database.md` et `CHANGELOG.md` conservent les compteurs attendus après chaque phase.
 
-## 6. Mise en production minimale
+## 6. Mise en production minimale — uniquement après autorisation distincte
+
+Les commandes suivantes sont documentaires : ne pas les exécuter durant la présente tâche. Une promotion Vercel ou un `push` sur la branche de production peut publier le site.
 
 ```bash
 npm ci
@@ -142,6 +145,6 @@ Ou, depuis GitHub, déclencher `Deploy Vercel` (`workflow_dispatch`) ou envoyer 
 gh api -X POST repos/ErwinssKoffi/lavauto/dispatches -f event_type=deploy_production
 ```
 
-Après déploiement : vérifier `/`, `/connexion`, `/app/tableau-de-bord`, `/app/qualite`, l'Auth, `my_context()` et `my_qa_board()`. Tester le logo sur un environnement de recette autorisé. Retirer le logo ne supprime pas l'objet Storage : un éventuel nettoyage des fichiers de test doit être effectué séparément après vérification qu'ils ne sont plus référencés. Aucun compte de démonstration ne doit rester.
+Après un éventuel déploiement autorisé : vérifier les URL directes et rechargements de `/`, `/connexion`, `/inscription`, `/auth/callback`, `/app/tableau-de-bord` et `/app/qualite`, puis l'Auth, `my_context()` et `my_qa_board()`. Tester le logo sur un environnement de recette autorisé. Retirer le logo ne supprime pas l'objet Storage : un éventuel nettoyage des fichiers de test doit être effectué séparément après vérification qu'ils ne sont plus référencés. Aucun compte de démonstration ne doit rester.
 
 Voir [installation.md](installation.md), [security.md](security.md) et [testing.md](testing.md).

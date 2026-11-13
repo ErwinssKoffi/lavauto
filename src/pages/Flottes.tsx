@@ -13,13 +13,14 @@ const key = (prefix: string): string =>
 
 export default function Flottes() {
   const {
-    state, dataSource, notify, refreshCrm,
+    state, dataSource, canWriteSubscription, notify, refreshCrm,
     saveFleet, saveFleetContract, attachFleetVehicle,
     recordFleetReceivable, enqueueNotification,
   } = useStore();
   const safe = useSafeAction();
   const stationId = state.station?.id ?? '';
   const activated = Boolean(state.station?.activated);
+  const canOperate = activated && canWriteSubscription;
   const stats = state.crmStats;
 
   const [fleet, setFleet] = useState({
@@ -77,7 +78,7 @@ export default function Flottes() {
               <option value="none">Aucun</option><option value="sms">SMS</option><option value="email">E-mail</option><option value="whatsapp">WhatsApp</option>
             </Select>
           </div>
-          <button className="wg-btn wg-btn-primary mt-4" disabled={!activated} onClick={() => safe(async () => {
+          <button className="wg-btn wg-btn-primary mt-4" disabled={!canOperate} onClick={() => safe(async () => {
             await saveFleet({ stationId, ...fleet, channel: fleet.channel as 'none' | 'sms' | 'email' | 'whatsapp' });
             setFleet({ name: '', contactName: '', phone: '', email: '', creditLimit: 0, channel: 'sms' });
             notify('success', 'Flotte enregistrée.');
@@ -96,7 +97,7 @@ export default function Flottes() {
             <Input label="Remise (%)" type="number" min={0} max={100} value={contract.discountPercent} onChange={(e) => setContract({ ...contract, discountPercent: readNumber(e.target.value) })} />
             <Input label="Limite de crédit" type="number" min={0} value={contract.creditLimit} onChange={(e) => setContract({ ...contract, creditLimit: readNumber(e.target.value) })} />
           </div>
-          <button className="wg-btn wg-btn-primary mt-4" disabled={!activated} onClick={() => safe(async () => {
+          <button className="wg-btn wg-btn-primary mt-4" disabled={!canOperate} onClick={() => safe(async () => {
             await saveFleetContract({ stationId, ...contract, endDate: contract.endDate || undefined });
             setContract({ fleetId: '', number: '', startDate: todayISO(), endDate: '', discountPercent: 0, creditLimit: 0 });
             notify('success', 'Contrat enregistré.');
@@ -116,7 +117,7 @@ export default function Flottes() {
               <option value="">Aucun</option>{openContracts.map((c) => <option key={c.id} value={c.id}>{c.number}</option>)}
             </Select>
           </div>
-          <button className="wg-btn wg-btn-primary mt-4" disabled={!activated} onClick={() => safe(async () => {
+          <button className="wg-btn wg-btn-primary mt-4" disabled={!canOperate} onClick={() => safe(async () => {
             await attachFleetVehicle({ stationId, fleetId: attach.fleetId, vehicleId: attach.vehicleId, contractId: attach.contractId || null });
             setAttach({ fleetId: '', vehicleId: '', contractId: '' }); notify('success', 'Véhicule rattaché.');
           })}>Rattacher</button>
@@ -137,7 +138,7 @@ export default function Flottes() {
               <option value="">Aucune</option>{state.washes.map((w) => <option key={w.id} value={w.id}>{w.number}</option>)}
             </Select>
           </div>
-          <button className="wg-btn wg-btn-primary mt-4" disabled={!activated} onClick={() => safe(async () => {
+          <button className="wg-btn wg-btn-primary mt-4" disabled={!canOperate} onClick={() => safe(async () => {
             await recordFleetReceivable({ stationId, fleetId: receivable.fleetId, contractId: receivable.contractId, amountMinor: receivable.amount, washId: receivable.washId || null, dueDate: receivable.dueDate, idempotencyKey: receivable.idempotencyKey });
             setReceivable({ fleetId: '', contractId: '', amount: 0, washId: '', dueDate: todayISO(), idempotencyKey: key('recv') });
             notify('success', 'Créance enregistrée.');
@@ -153,7 +154,7 @@ export default function Flottes() {
             </Select>
             <Input label="Modèle" value={notification.templateKey} onChange={(e) => setNotification({ ...notification, templateKey: e.target.value })} />
           </div>
-          <button className="wg-btn wg-btn-primary mt-4" disabled={!activated} onClick={() => safe(async () => {
+          <button className="wg-btn wg-btn-primary mt-4" disabled={!canOperate} onClick={() => safe(async () => {
             await enqueueNotification({ stationId, templateKey: notification.templateKey, fleetId: notification.fleetId, payload: {}, idempotencyKey: notification.idempotencyKey });
             setNotification({ fleetId: '', templateKey: 'contract_renewal', idempotencyKey: key('fnotif') });
             notify('success', 'Notification en attente, aucun envoi.');

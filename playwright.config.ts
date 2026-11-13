@@ -21,20 +21,24 @@ export default defineConfig({
     headless: true,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
-    // Secours local : permet d'utiliser un binaire Chromium fourni par
-    // l'environnement quand le telechargement Playwright est bloque.
-    launchOptions: process.env.PLAYWRIGHT_CHROMIUM_PATH ? {
-      executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH,
+    // Les tests fonctionnels ne doivent pas attendre Google Fonts : ce service
+    // tiers peut être inaccessible. Le navigateur utilise la police de repli.
+    // Secours local : un binaire Chromium peut être fourni par l'environnement.
+    launchOptions: {
+      executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined,
       args: [
-        '--no-sandbox', '--disable-dev-shm-usage', '--disable-setuid-sandbox',
-        '--disable-site-isolation-trials', '--disable-web-security',
-        '--allow-running-insecure-content',
-        '--disable-features=AudioServiceOutOfProcess,IsolateOrigins,site-per-process',
-        '--enable-features=SharedArrayBuffer', '--ignore-gpu-blocklist',
-        '--in-process-gpu', '--use-gl=angle', '--use-angle=swiftshader',
-        '--enable-unsafe-swiftshader',
+        '--host-resolver-rules=MAP fonts.googleapis.com ~NOTFOUND, MAP fonts.gstatic.com ~NOTFOUND',
+        ...(process.env.PLAYWRIGHT_CHROMIUM_PATH ? [
+          '--no-sandbox', '--disable-dev-shm-usage', '--disable-setuid-sandbox',
+          '--disable-site-isolation-trials', '--disable-web-security',
+          '--allow-running-insecure-content',
+          '--disable-features=AudioServiceOutOfProcess,IsolateOrigins,site-per-process',
+          // Ce Chromium de secours se fige à la fermeture de certains contextes
+          // avec SwiftShader ; le rendu logiciel sans GPU conserve les captures.
+          '--enable-features=SharedArrayBuffer', '--disable-gpu',
+        ] : []),
       ],
-    } : undefined,
+    },
   },
   projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
   webServer: {

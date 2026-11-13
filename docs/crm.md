@@ -1,6 +1,6 @@
 # P08 — CRM, fidélité, forfaits, promotions, flottes et file de notifications
 
-> **Mise à jour non déployée :** les avis WhatsApp « lavage prêt » disposent désormais d’une file, d’un consentement et de fonctions Meta **séparés** de `notification_outbox`. La migration `053`, les fonctions et l’ordonnanceur restent locaux/non configurés ; aucun envoi réel n’a eu lieu. L’ancienne file CRM décrite ci-dessous reste inerte. Voir [whatsapp-receipts.md](whatsapp-receipts.md). Les autres sections de ce document décrivent la livraison historique P08.
+> **Mise à jour non déployée :** les avis WhatsApp « lavage prêt » disposent désormais d’une file, d’un consentement et de fonctions Meta **séparés** de `notification_outbox`. Les migrations `053`–`057`, les fonctions et l’ordonnanceur restent locaux/non configurés ; aucun envoi réel n’a eu lieu. L’ancienne file CRM décrite ci-dessous reste inerte. Avec `057`, fidélité et flottes nécessitent les droits avancés, tandis que les avis transactionnels restent distincts. Après expiration, le retrait avec preuve peut être enregistré sous réserve des droits et de l’accès à la station ; les envois déjà réclamés ne sont pas rappelables. Voir [subscriptions.md](subscriptions.md) et [whatsapp-receipts.md](whatsapp-receipts.md). Les autres sections décrivent la livraison historique P08.
 
 **Date :** 11/11/2026 · **Projet Supabase :** `lavauto` (`cgxrqorwmmcyqescatzs`) · **Branche :** `arena/868cde36-lavauto` · **Validation :** `p08_complet` reçue avant exécution.
 

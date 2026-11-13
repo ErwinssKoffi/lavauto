@@ -1,6 +1,6 @@
 # LAVAUTO — Architecture
 
-**Date :** 12/11/2026 · P10 historique : **49 migrations / 70 tables / 2 vues / 19 URL `/app`**. Depuis, `051` (logo) et `052` (création atomique) ont été appliquées sur `lavauto` via le connecteur : 51 migrations enregistrées et 71 tables sous RLS vérifiées à distance. Le reçu, `053`–`055` et les fonctions Meta ne sont pas déployés en production ; un aperçu Vercel est créé automatiquement pour la PR, sans envoi réel. La recette Auth/Storage et métier réelle reste à faire.
+**Date :** 12/11/2026 · P10 historique : **49 migrations / 70 tables / 2 vues / 19 URL `/app`**. Depuis, `051` (logo) et `052` (création atomique) ont été appliquées sur `lavauto` via le connecteur : 51 migrations enregistrées et 71 tables sous RLS vérifiées à distance. Le reçu, `053`–`057`, la nouvelle invitation et les fonctions Meta ne sont pas déployés en production. La recette Auth/Storage et métier réelle reste à faire.
 
 ## 1. Vue d’ensemble
 
@@ -25,7 +25,8 @@ Supabase
   ├── Storage : bucket privé station-assets + policies RLS
   ├── 053 locale : consentement, file et journal WhatsApp séparés de la file CRM
   ├── 054/055 locales : périmètre station, agrégats, validation et finance
-  ├── Edge non déployées : dispatch authentifié + webhook Meta HMAC
+  ├── 056/057 locales : configuration, catalogue, abonnements et quotas
+  ├── Edge non déployées : invitation avec réservation, dispatch + webhook Meta HMAC
   └── platform_audit_logs / rpc_idempotency_keys
 
 CI/CD
@@ -74,7 +75,7 @@ La migration `052` conserve aussi Wave, Orange Money et MTN comme canaux distinc
 
 ## 7. Limites conservées
 
-La remise maximale du caissier et les règles/modifications de barèmes dans Paramètres restent locales ; la base connectée ne contrôle pas ce plafond et ne reçoit pas ces réglages. Les notes de changement d’abonnement ne sont pas transmises au serveur. La gestion des paiements ultérieurs après réponse perdue demeure distincte et non sécurisée par la reprise de création.
+La remise maximale du caissier et certaines règles de caisse restent verrouillées en mode connecté, car la base ne garantit pas ces réglages ; `056` prépare les autres paramètres et le barème côté serveur. La migration locale `057` prépare les demandes d’abonnement serveur et leur validation manuelle, sans paiement automatique. Créations, paiements ultérieurs et dépenses disposent d’une reprise limitée au même onglet ; d’autres opérations financières nécessitent toujours une vérification avant répétition après réponse incertaine. Voir [subscriptions.md](subscriptions.md) et [testing.md](testing.md).
 
 Aucun compte Auth persistant, e-mail, secret, clé API, bucket public, fournisseur d’envoi ni secret versionné. Les 15 specs Playwright ont été exécutées dans un Chromium headless empaqueté récupéré depuis npm, sans versionner le binaire ; la PR #3 a été fusionnée dans `main` (`f6f6301`) avec `quality`, `Vercel` et `Vercel Preview Comments` **pass**, et `site_url` / allow-list Auth pointent désormais sur `https://lavauto-five.vercel.app`. Le déploiement de production effectif reste conditionné aux secrets GitHub/Vercel et aux origines CORS Supabase ; `deploy.yml` a été corrigé et validé. `npm audit fix --force` reste reporté. Les grants Storage historiques de `supabase_storage_admin` ne sont pas révoquables depuis le rôle de migration : la garde `050` est donc une RLS restrictive qui filtre 100 % des lignes pour `anon`. Le module « Prévisions & alertes » n’est pas livré : le libellé historique a été remplacé par l’écran réel « Qualité & déploiement ».
 

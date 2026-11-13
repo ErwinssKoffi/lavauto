@@ -25,7 +25,7 @@ const key = (prefix: string): string =>
 
 export default function Fidelisation() {
   const {
-    state, dataSource, notify, refreshCrm,
+    state, dataSource, canWriteSubscription, notify, refreshCrm,
     createLoyaltyProgram, enrollLoyaltyCustomer, recordLoyaltyTransaction,
     accrueLoyaltyForWash, savePackagePlan, sellPackageToCustomer,
     consumePackageForWash, savePromotion, applyPromotionToWash,
@@ -35,6 +35,7 @@ export default function Fidelisation() {
   const [tab, setTab] = useState<Tab>('fidelite');
   const stationId = state.station?.id ?? '';
   const activated = Boolean(state.station?.activated);
+  const canOperate = activated && canWriteSubscription;
   const stats = state.crmStats;
 
   const [program, setProgram] = useState({ name: '', rate: 1, threshold: 100 });
@@ -88,7 +89,7 @@ export default function Fidelisation() {
             <Input label="Points / 1 000 FCFA" type="number" min={1} value={program.rate} onChange={(e) => setProgram({ ...program, rate: readNumber(e.target.value) })} />
             <Input label="Seuil de rachat" type="number" min={1} value={program.threshold} onChange={(e) => setProgram({ ...program, threshold: readNumber(e.target.value) })} />
           </div>
-          <button className="wg-btn wg-btn-primary mt-4" disabled={!activated} onClick={() => safe(async () => {
+          <button className="wg-btn wg-btn-primary mt-4" disabled={!canOperate} onClick={() => safe(async () => {
             await createLoyaltyProgram({ stationId, name: program.name, pointsPer1000Minor: program.rate, redemptionThreshold: program.threshold });
             setProgram({ name: '', rate: 1, threshold: 100 }); notify('success', 'Programme enregistré.');
           })}>Créer le programme</button>
@@ -104,7 +105,7 @@ export default function Fidelisation() {
             </Select>
             <Input label="Numéro de carte" value={enroll.cardNumber} onChange={(e) => setEnroll({ ...enroll, cardNumber: e.target.value })} />
           </div>
-          <button className="wg-btn wg-btn-primary mt-4" disabled={!activated} onClick={() => safe(async () => {
+          <button className="wg-btn wg-btn-primary mt-4" disabled={!canOperate} onClick={() => safe(async () => {
             await enrollLoyaltyCustomer({ stationId, ...enroll });
             setEnroll({ customerId: '', programId: '', cardNumber: '' }); notify('success', 'Carte créée.');
           })}>Créer la carte</button>
@@ -121,7 +122,7 @@ export default function Fidelisation() {
             <Input label="Points" type="number" min={1} value={tx.points} onChange={(e) => setTx({ ...tx, points: readNumber(e.target.value) })} />
             <Input label="Motif" value={tx.reason} onChange={(e) => setTx({ ...tx, reason: e.target.value })} />
           </div>
-          <button className="wg-btn wg-btn-primary mt-4" disabled={!activated} onClick={() => safe(async () => {
+          <button className="wg-btn wg-btn-primary mt-4" disabled={!canOperate} onClick={() => safe(async () => {
             await recordLoyaltyTransaction({ cardId: tx.cardId, kind: tx.kind as 'earn' | 'redeem', pointsDelta: tx.kind === 'redeem' ? -tx.points : tx.points, reason: tx.reason, idempotencyKey: tx.idempotencyKey });
             setTx({ cardId: '', kind: 'earn', points: 1, reason: '', idempotencyKey: key('ltx') }); notify('success', 'Points enregistrés.');
           })}>Enregistrer</button>
@@ -132,7 +133,7 @@ export default function Fidelisation() {
           <Select label="Fiche de lavage" value={accrueWashId} onChange={(e) => setAccrueWashId(e.target.value)}>
             <option value="">Choisir…</option>{state.washes.filter((w) => w.status !== 'cancelled').map((w) => <option key={w.id} value={w.id}>{w.number}</option>)}
           </Select>
-          <button className="wg-btn wg-btn-primary mt-4" disabled={!activated || !accrueWashId} onClick={() => safe(async () => {
+          <button className="wg-btn wg-btn-primary mt-4" disabled={!canOperate || !accrueWashId} onClick={() => safe(async () => {
             const result = await accrueLoyaltyForWash(accrueWashId);
             notify(result.duplicate ? 'info' : 'success', result.duplicate ? 'Déjà comptabilisé : aucun double.' : `${result.points} point(s) ajouté(s).`);
           })}>Attribuer les points</button>
@@ -167,7 +168,7 @@ export default function Fidelisation() {
             <Input label="Début" type="date" value={plan.startsAt} onChange={(e) => setPlan({ ...plan, startsAt: e.target.value })} />
             <Input label="Fin (facultative)" type="date" value={plan.endsAt} onChange={(e) => setPlan({ ...plan, endsAt: e.target.value })} />
           </div>
-          <button className="wg-btn wg-btn-primary mt-4" disabled={!activated} onClick={() => safe(async () => {
+          <button className="wg-btn wg-btn-primary mt-4" disabled={!canOperate} onClick={() => safe(async () => {
             await savePackagePlan({ stationId, name: plan.name, priceMinor: plan.price, washCount: plan.washCount, validityDays: plan.validityDays, startsAt: plan.startsAt, endsAt: plan.endsAt || null });
             setPlan({ name: '', price: 0, washCount: 1, validityDays: 30, startsAt: todayISO(), endsAt: '' }); notify('success', 'Forfait enregistré.');
           })}>Créer le forfait</button>
@@ -183,7 +184,7 @@ export default function Fidelisation() {
             </Select>
             <Input label="Acheté le" type="date" value={sale.purchasedAt} onChange={(e) => setSale({ ...sale, purchasedAt: e.target.value })} />
           </div>
-          <button className="wg-btn wg-btn-primary mt-4" disabled={!activated} onClick={() => safe(async () => {
+          <button className="wg-btn wg-btn-primary mt-4" disabled={!canOperate} onClick={() => safe(async () => {
             await sellPackageToCustomer({ stationId, ...sale, idempotencyKey: sale.idempotencyKey });
             setSale({ customerId: '', packageId: '', purchasedAt: todayISO(), idempotencyKey: key('sale') }); notify('success', 'Forfait vendu.');
           })}>Vendre le forfait</button>
@@ -194,7 +195,7 @@ export default function Fidelisation() {
           <Select label="Fiche de lavage" value={consumeWashId} onChange={(e) => setConsumeWashId(e.target.value)}>
             <option value="">Choisir…</option>{state.washes.filter((w) => w.status !== 'cancelled').map((w) => <option key={w.id} value={w.id}>{w.number}</option>)}
           </Select>
-          <button className="wg-btn wg-btn-primary mt-4" disabled={!activated || !consumeWashId} onClick={() => safe(async () => {
+          <button className="wg-btn wg-btn-primary mt-4" disabled={!canOperate || !consumeWashId} onClick={() => safe(async () => {
             const result = await consumePackageForWash(consumeWashId);
             notify(result.duplicate ? 'info' : result.consumed ? 'success' : 'info',
               result.duplicate ? 'Déjà consommé : aucun double.' : result.consumed ? `Il reste ${result.remaining} lavage(s).` : (result.reason ?? 'Aucun forfait actif.'));
@@ -228,7 +229,7 @@ export default function Fidelisation() {
             <Input label="Quota (facultatif)" type="number" min={1} value={promo.maxUsages} onChange={(e) => setPromo({ ...promo, maxUsages: e.target.value })} />
             <Input label="Montant minimum" type="number" min={0} value={promo.minAmount} onChange={(e) => setPromo({ ...promo, minAmount: readNumber(e.target.value) })} />
           </div>
-          <button className="wg-btn wg-btn-primary mt-4" disabled={!activated} onClick={() => safe(async () => {
+          <button className="wg-btn wg-btn-primary mt-4" disabled={!canOperate} onClick={() => safe(async () => {
             await savePromotion({ stationId, name: promo.name, code: promo.code, kind: promo.kind as 'percent' | 'amount', value: promo.value, startsAt: promo.startsAt, endsAt: promo.endsAt || undefined, maxUsages: promo.maxUsages ? Number(promo.maxUsages) : null, minAmountMinor: promo.minAmount });
             setPromo({ name: '', code: '', kind: 'percent', value: 10, startsAt: todayISO(), endsAt: '', maxUsages: '', minAmount: 0 }); notify('success', 'Promotion enregistrée.');
           })}>Créer la promotion</button>
@@ -242,7 +243,7 @@ export default function Fidelisation() {
             </Select>
             <Input label="Code *" value={apply.code} onChange={(e) => setApply({ ...apply, code: e.target.value.toUpperCase() })} />
           </div>
-          <button className="wg-btn wg-btn-primary mt-4" disabled={!activated} onClick={() => safe(async () => {
+          <button className="wg-btn wg-btn-primary mt-4" disabled={!canOperate} onClick={() => safe(async () => {
             const result = await applyPromotionToWash(apply);
             notify(result.duplicate ? 'info' : result.applied ? 'success' : 'info',
               result.duplicate ? 'Promotion déjà appliquée : aucun double.' : `Remise ${formatFCFA(result.discountMinor)}.`);
@@ -278,7 +279,7 @@ export default function Fidelisation() {
             </Select>
             <Input label="Modèle" value={notif.templateKey} onChange={(e) => setNotif({ ...notif, templateKey: e.target.value })} />
           </div>
-          <button className="wg-btn wg-btn-primary mt-4" disabled={!activated} onClick={() => safe(async () => {
+          <button className="wg-btn wg-btn-primary mt-4" disabled={!canOperate} onClick={() => safe(async () => {
             await enqueueNotification({ stationId, templateKey: notif.templateKey, customerId: notif.targetId, payload: {}, idempotencyKey: notif.idempotencyKey });
             setNotif({ targetId: '', templateKey: 'package_expiry', idempotencyKey: key('notif') }); notify('success', 'Notification en attente, aucun envoi.');
           })}><FiSend /> Mettre en attente</button>
@@ -293,7 +294,7 @@ export default function Fidelisation() {
                   <td className="wg-td font-bold">{n.templateKey}</td>
                   <td className="wg-td">{n.channel}</td>
                   <td className="wg-td"><Badge tone={n.status === 'pending' ? 'warn' : 'neutral'}>{n.status}</Badge></td>
-                  <td className="wg-td">{n.status === 'pending' && <button className="wg-btn wg-btn-ghost !py-1 !px-2 text-xs" onClick={() => safe(async () => {
+                  <td className="wg-td">{n.status === 'pending' && <button className="wg-btn wg-btn-ghost !py-1 !px-2 text-xs" disabled={!canOperate} onClick={() => safe(async () => {
                     await cancelPendingNotification(n.id); notify('info', 'Notification annulée.');
                   })}>Annuler</button>}</td>
                 </tr>

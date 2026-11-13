@@ -19,6 +19,7 @@ test('18 — caisse, lavage, paiements mixtes et clôture persistent après rech
   await expect(opening).toHaveCount(0);
   await expectMetric(page, 'Fond de caisse', '10 000 FCFA');
   await expectMetric(page, 'Théorique en caisse', '10 000 FCFA');
+  await expect.poll(async () => (await savedState(page)).cashSessions[0]?.status).toBe('ouverte');
 
   // page.goto et reload provoquent de vrais changements de document : la
   // fixture initiale ne doit pas écraser la caisse qui vient d'être créée.
@@ -75,11 +76,16 @@ test('18 — caisse, lavage, paiements mixtes et clôture persistent après rech
   await expect(detail.getByText(/^Livré le/)).toHaveCount(0);
   await detail.getByRole('button', { name: 'Livrer au client' }).click();
   await expect(detail.getByText(/^Livré le/)).toBeVisible();
+  // L'état React est rendu avant la sauvegarde locale asynchrone sous Web Lock.
+  // Attendre cette sauvegarde avant une navigation qui recharge le document.
+  await expect.poll(async () => (await savedState(page)).washes[0]?.status).toBe('delivered');
 
   // Modifier la grille après coup ne doit pas recalculer la fiche vendue.
   await page.goto('/app/prestations');
   const service = page.getByRole('row').filter({ hasText: 'Lavage complet' });
-  await service.locator('input[type="number"]').first().fill('7000');
+  const tariff = service.locator('input[type="number"]').first();
+  await tariff.fill('7000');
+  await tariff.press('Enter'); // Le brouillon est validé à la sortie du champ.
   await expect.poll(async () => (await savedState(page)).services.find((s) => s.id === 's2')?.prices.c1).toBe(7000);
   await page.goto('/app/lavages');
   await expect(page.getByRole('row').filter({ hasText: '4567 CD 01' })).toContainText('5 500 FCFA');
@@ -102,6 +108,7 @@ test('18 — caisse, lavage, paiements mixtes et clôture persistent après rech
   await expect(closures.getByRole('row').nth(1)).toContainText('13 000 FCFA');
   await expect(closures.getByRole('row').nth(1)).toContainText('12 750 FCFA');
   await expect(closures.getByRole('row').nth(1)).toContainText('-250 FCFA');
+  await expect.poll(async () => (await savedState(page)).cashSessions[0]?.status).toBe('cloturee');
 
   await page.reload();
   await expect(page.getByText('Aucune caisse ouverte')).toBeVisible();
@@ -180,6 +187,9 @@ test('19 — validations lavage et caisse fermée : aucune écriture erronée', 
   await detail.getByLabel('Moyen de paiement').selectOption('mobile_money');
   await detail.getByRole('button', { name: 'Encaisser', exact: true }).click();
   await expectMetric(detail, 'Reste à payer', '0 FCFA');
+  // Le rendu précède l'écriture locale ; le paiement doit être conservé avant
+  // de provoquer un rechargement complet du document.
+  await expect.poll(async () => (await savedState(page)).washes[0]?.paid).toBe(3000);
   await page.reload();
   await expect(page.getByRole('row').filter({ hasText: '8888 ZZ 01' })).toContainText('En cours');
   await expect.poll(async () => {
@@ -194,7 +204,10 @@ test('19 — validations lavage et caisse fermée : aucune écriture erronée', 
 
 test('20 — invitation locale : validations, rôle, station, doublon et révocation', async ({ page }) => {
   test.setTimeout(60_000);
-  await seedJourney(page);
+  // L'essai à trois comptes serait plein après cette invitation ; Standard
+  // laisse de la place pour vérifier indépendamment la détection du doublon.
+  const state = journeyState();
+  await seedJourney(page, { ...state, subscription: { ...(state.subscription as Record<string, unknown>), planId: 'standard', status: 'active' } });
   await page.goto('/app/employes');
   await expect(page.getByText(/Mode démonstration locale : aucun e-mail n’est envoyé/)).toBeVisible();
   await page.getByRole('button', { name: 'Inviter un employé' }).click();
@@ -236,8 +249,13 @@ test('20 — invitation locale : validations, rôle, station, doublon et révoca
   await expect.poll(async () => (await savedState(page)).users.filter((u) => u.email === 'aminata@example.invalid').length).toBe(1);
   await invite.getByRole('button', { name: 'Annuler' }).click();
   await invitation.getByTitle('Révoquer').click();
+  const confirm = page.getByRole('dialog', { name: 'Révoquer l’invitation' });
+  await confirm.getByRole('button', { name: 'Révoquer et désactiver' }).click();
+  await expect(confirm).toHaveCount(0);
   await expect(invitation).toContainText('Révoquée');
   await expect(invitation.getByTitle('Révoquer')).toHaveCount(0);
+  await expect(employee).toContainText('Désactivé');
+  await expect.poll(async () => (await savedState(page)).users.find((u) => u.email === 'aminata@example.invalid')?.active).toBe(false);
 });
 
 test('21 — un caissier ne voit pas le formulaire d’invitation', async ({ page }) => {

@@ -1,6 +1,6 @@
 # LAVAUTO — Installation
 
-**Date :** 12/11/2026 · Les migrations `051` (logo) et `052` (création atomique) ont été appliquées sur `lavauto` via le connecteur Supabase ; la recette métier réelle et le déploiement du frontend de cette branche restent à effectuer.
+**Date :** 12/11/2026 · Les migrations `051` (logo) et `052` (création atomique) ont été appliquées sur `lavauto` via le connecteur Supabase ; `053`–`057` et les nouvelles fonctions de cette branche restent locales, et le frontend n’est pas déployé en production. Un aperçu Vercel automatique de la PR ne constitue pas une recette. La recette réelle et toute mise en production nécessitent une autorisation distincte.
 
 ## 1. Prérequis
 

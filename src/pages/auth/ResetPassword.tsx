@@ -7,7 +7,7 @@ import { useStore } from '../../lib/store';
 
 /** Arrivée depuis le lien Supabase Auth (événement PASSWORD_RECOVERY). */
 export default function ResetPassword() {
-  const { authRecovery, updatePassword } = useStore();
+  const { authRecovery, updatePassword, authKind } = useStore();
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -34,7 +34,12 @@ export default function ResetPassword() {
     <AuthLayout>
       <Badge tone="accent"><FiLock /> Nouveau mot de passe</Badge>
       <h1 className="mt-4 text-3xl font-extrabold tracking-tight">Définir un mot de passe</h1>
-      {!authRecovery ? (
+      {authKind === 'local' ? (
+        <div className="mt-7 space-y-4">
+          <Alert kind="warn">La démonstration locale ne dispose pas de lien de réinitialisation et n’envoie aucun e-mail. Sauvegardez les données avant toute récupération.</Alert>
+          <Link to="/connexion" className="wg-btn wg-btn-primary w-full !py-3">Retour à la connexion <FiArrowRight /></Link>
+        </div>
+      ) : !authRecovery ? (
         <div className="mt-7 space-y-4">
           <Alert kind="warn">Ce lien de réinitialisation est absent, déjà utilisé ou expiré. Demandez-en un nouveau depuis la page « Mot de passe oublié ».</Alert>
           <Link to="/mot-de-passe-oublie" className="wg-btn wg-btn-primary w-full !py-3">Demander un nouveau lien <FiArrowRight /></Link>

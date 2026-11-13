@@ -107,9 +107,14 @@ CREATE OR REPLACE FUNCTION public.whatsapp_cancel_pending_for_customer(p_custome
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE v_id uuid;
 BEGIN
-  FOR v_id IN UPDATE public.wash_whatsapp_notifications
+  -- Même si une notification historique a été corrompue par un rôle
+  -- privilégié, ne jamais modifier une autre entreprise ou station à partir
+  -- du seul identifiant client. Le claim recontrôle lui aussi cette portée.
+  FOR v_id IN UPDATE public.wash_whatsapp_notifications n
     SET status='cancelled', reason_code=p_reason, updated_at=clock_timestamp()
-    WHERE customer_id=p_customer_id AND status='pending' RETURNING id
+    FROM public.customers c
+    WHERE c.id=p_customer_id AND n.customer_id=c.id AND n.company_id=c.company_id
+      AND n.station_id=c.station_id AND n.status='pending' RETURNING n.id
   LOOP
     PERFORM public.whatsapp_log_event(v_id, 'cancelled', p_reason);
   END LOOP;
@@ -349,9 +354,11 @@ BEGIN
       WHERE id=v_candidate.id AND company_id=p_company AND status='pending' FOR UPDATE SKIP LOCKED;
     IF NOT FOUND THEN CONTINUE; END IF;
     v_reason := NULL;
-    IF v_wash.id IS NULL OR v_wash.deleted_at IS NOT NULL OR v_wash.status <> 'ready' OR v_wash.station_id <> v_n.station_id THEN
+    IF v_wash.id IS NULL OR v_wash.deleted_at IS NOT NULL OR v_wash.status <> 'ready'
+      OR v_wash.station_id <> v_n.station_id OR v_wash.customer_id IS DISTINCT FROM v_n.customer_id THEN
       v_reason := 'wash_no_longer_ready';
-    ELSIF v_customer.deleted_at IS NOT NULL OR NOT v_customer.whatsapp_consent_granted
+    ELSIF v_customer.deleted_at IS NOT NULL OR v_customer.station_id IS DISTINCT FROM v_n.station_id
+      OR NOT v_customer.whatsapp_consent_granted
       OR v_customer.whatsapp_consent_event_id IS DISTINCT FROM v_n.consent_event_id
       OR v_customer.whatsapp_consent_phone IS DISTINCT FROM v_n.recipient_e164
       OR public.whatsapp_normalize_phone(v_customer.phone) IS DISTINCT FROM v_n.recipient_e164 THEN

@@ -8,6 +8,8 @@ import {
 } from 'react-icons/fi';
 import { useStore } from '../lib/store';
 import { formatFCFA } from '../lib/format';
+import { DemoNotice } from '../components/DemoNotice';
+import { PlanDetails } from '../components/PlanDetails';
 
 interface FaqItem {
   q: string;
@@ -42,11 +44,12 @@ const FAQS: FaqItem[] = [
 ];
 
 export default function Landing() {
-  const { plans, plansError } = useStore();
+  const { plans, plansError, dataSource, authKind } = useStore();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'lavages' | 'caisse' | 'stock' | 'commissions'>('caisse');
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 antialiased selection:bg-sky-500 selection:text-white">
+      {dataSource === 'local' && authKind === 'local' && <DemoNotice />}
       {/* ── Top Announcement Banner ────────────────────────────────────────── */}
       <div className="border-b border-sky-500/20 bg-gradient-to-r from-sky-950 via-slate-900 to-indigo-950 px-4 py-2 text-center text-xs font-medium text-sky-200">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-500/20 px-2.5 py-0.5 font-bold text-sky-300">
@@ -719,7 +722,7 @@ export default function Landing() {
               Des formules adaptées à chaque taille de station
             </p>
             <p className="mx-auto mt-4 max-w-2xl text-slate-400">
-              Les formules disponibles et leurs limites sont affichées en Francs CFA (XOF).
+Essai de 14 jours avec tous les modules. Standard et Premium nécessitent une demande puis une validation administrateur : une validation anticipée met fin à l’essai immédiatement. Aucun paiement automatique. Montants indicatifs en FCFA, à valider commercialement.
             </p>
           </div>
 
@@ -732,7 +735,7 @@ export default function Landing() {
             <p role="status" className="mt-14 text-center text-sm text-slate-400">Chargement des formules…</p>
           ) : (
           <div className="mt-14 grid gap-8 lg:grid-cols-3">
-            {plans.map((plan) => {
+            {plans.filter((plan) => ['essai', 'standard', 'premium'].includes(plan.id)).map((plan) => {
               const isPopular = plan.id === 'standard';
               return (
                 <div
@@ -760,37 +763,31 @@ export default function Landing() {
                       )}
                     </div>
                     <p className="mt-2 text-xs text-slate-400">
-                      {plan.trial ? 'Formule d’essai' : 'Facturation mensuelle'}
+                      {plan.id === 'essai' ? '14 jours · tous les modules' : 'Tarif mensuel indicatif · activation sur validation'}
                     </p>
 
                     <div className="my-6 border-t border-slate-800" />
 
                     <div className="text-xs font-semibold text-slate-300">
                       <p className="font-bold text-sky-400">
-                        {plan.limits.stations} station(s) · {plan.limits.employees} collaborateur(s) · {plan.limits.washesPerMonth.toLocaleString('fr-FR')} lavages/mois
+                        {plan.limits.stations} station(s) · {plan.limits.employees} comptes actifs · {plan.limits.washesPerMonth.toLocaleString('fr-FR')} lavages/mois
                       </p>
+                      <p className="mt-1 text-slate-400">Le propriétaire compte dans les comptes actifs.</p>
                     </div>
 
-                    <ul className="mt-6 space-y-3 text-xs text-slate-300">
-                      {plan.features.map((feature, idx) => (
-                        <li key={idx} className="flex items-start gap-2.5">
-                          <FiCheck className="mt-0.5 shrink-0 text-sky-400" />
-                          <span>{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
+                    <div className="mt-6 text-slate-300"><PlanDetails plan={plan} /></div>
                   </div>
 
                   <div className="mt-8">
                     <Link
-                      to="/inscription"
+                      to={`/inscription?plan=${encodeURIComponent(plan.id)}`}
                       className={`block w-full rounded-xl py-3 text-center text-sm font-bold transition ${
                         isPopular
                           ? 'bg-sky-500 text-white shadow-lg shadow-sky-500/25 hover:bg-sky-400'
                           : 'border border-slate-700 bg-slate-800 text-white hover:bg-slate-700'
                       }`}
                     >
-                      Créer un compte
+                      {plan.id === 'essai' ? 'Commencer l’essai' : `Choisir ${plan.name}`}
                     </Link>
                   </div>
                 </div>

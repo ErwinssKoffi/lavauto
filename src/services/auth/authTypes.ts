@@ -89,6 +89,8 @@ export interface SignUpPayload {
   ownerName: string;
   email: string;
   password: string;
+  /** Choix à l’inscription : les formules payantes ne sont que demandées. */
+  requestedPlanId?: 'essai' | 'standard' | 'premium';
 }
 
 export const DB_ROLE_TO_UI: Record<string, Role> = {

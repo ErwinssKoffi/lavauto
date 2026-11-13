@@ -44,7 +44,7 @@ const rules = [
   ['plus de session forgeable ni de support démo', () =>
     !src.includes('signInSupportDemo') && !/export function fetchMeOnce/.test(store) &&
     !/\.getSession\(\)/.test(authAdapter) &&
-    /persist\(state\)/.test(store) && /onAuthStateChange/.test(store)],
+    /serializeDemoState\(state\)/.test(store) && /withDemoStorageLock/.test(store) && /onAuthStateChange/.test(store)],
   ['Auth vérifiée côté serveur', () => authAdapter.includes('auth.getUser()') &&
     authAdapter.includes("rpc('my_context')") && authAdapter.includes("rpc('my_company_users')")],
   ['mot de passe oublié réel, anciens textes retirés', () =>
@@ -52,17 +52,18 @@ const rules = [
     employees.includes('requestPasswordReset') && !employees.includes('Mot de passe provisoire') &&
     !signIn.includes('n’envoie aucun e-mail') && !signIn.includes('module Employés') &&
     !landing.includes('n’envoie aucun e-mail') && !signUp.includes('Session de 30 jours')],
-  ['confirmation e-mail requise conservée', () =>
-    signUp.includes('confirmationRequired') && signUp.includes('Un e-mail de confirmation') &&
+  ['confirmation e-mail connectée et limites de la démo explicites', () =>
+    signUp.includes('confirmationRequired') && signUp.includes('confirmation par e-mail') &&
+    signUp.includes('Aucun e-mail n’est envoyé') && signUp.includes("authKind === 'local'") &&
     authAdapter.includes('emailRedirectTo') && !authAdapter.includes('mailer_autoconfirm=true')],
   ['UI pilotée par les permissions serveur', () =>
     exists('src/lib/usePermissions.ts') && read('src/lib/usePermissions.ts').includes('my_context()') &&
     read('src/components/navigation.tsx').includes('granted.includes(entry.permission)') &&
     read('src/App.tsx').includes('usePermissions') && read('src/App.tsx').includes('RoleRoute')],
-  ['54 migrations locales numérotées, documentation et tests SQL en ROLLBACK', () => {
+  ['56 migrations locales numérotées, documentation et tests SQL en ROLLBACK', () => {
     const migrations = fs.readdirSync(path.join(ROOT, 'supabase/migrations'))
       .filter((f) => /^\d{3}_.*\.sql$/.test(f));
-    return migrations.length === 54 && migrations.includes('052_atomic_wash_creation.sql') &&
+    return migrations.length === 56 && migrations.includes('057_subscription_entitlements.sql') && migrations.includes('056_station_setup_catalog.sql') && migrations.includes('052_atomic_wash_creation.sql') &&
       migrations.includes('053_whatsapp_wash_notifications.sql') &&
       migrations.includes('054_station_scope_and_metrics.sql') && migrations.includes('055_shared_form_validation.sql') &&
       exists('docs/auth-rbac.md') &&
@@ -76,7 +77,9 @@ const rules = [
       exists('supabase/tests/p10_rollback.sql') && exists('supabase/tests/station_logo_rollback.sql') &&
       exists('supabase/tests/atomic_wash_rollback.sql') && exists('supabase/tests/whatsapp_wash_rollback.sql') &&
       /^BEGIN;/m.test(read('supabase/tests/station_scope_rollback.sql')) &&
-      read('supabase/tests/station_scope_rollback.sql').trim().endsWith('ROLLBACK;');
+      read('supabase/tests/station_scope_rollback.sql').trim().endsWith('ROLLBACK;') &&
+      /^BEGIN;/m.test(read('supabase/tests/subscription_entitlements_rollback.sql')) &&
+      read('supabase/tests/subscription_entitlements_rollback.sql').trim().endsWith('ROLLBACK;');
   }],
   ['P06 : aucun « Résultat simplifié » ni faux bénéfice net dans l’UI', () =>
     !uiPages.includes('Résultat simplifié') && !metrics.includes('result: collected - expenses') &&

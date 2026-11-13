@@ -19,7 +19,7 @@ const dateISO = (d: Date): string =>
 
 export default function Commissions() {
   const {
-    state, dataSource, authReady, identity, createCommissionPeriod,
+    state, dataSource, authReady, identity, canWriteSubscription, createCommissionPeriod,
     validateCommissionPeriod, recordCommissionPayout, refreshFinance,
   } = useStore();
   const { can } = usePermissions();
@@ -76,7 +76,8 @@ export default function Commissions() {
       const paid = payouts.some((p) => p.periodId === l.periodId && p.userId === l.userId);
       const periodRow = periods.find((p) => p.id === l.periodId);
       if (paid) return <Badge tone="success">Payée</Badge>;
-      if (!canValidate || (periodRow && periodRow.status === 'draft')) return <Badge>Brouillon</Badge>;
+      if (periodRow && periodRow.status === 'draft') return <Badge>Brouillon</Badge>;
+      if (!canValidate || !canWriteSubscription) return <Badge>À payer · lecture seule</Badge>;
       return (
         <button className="wg-link text-xs" onClick={() => safe(async () => {
           await recordCommissionPayout(l.periodId, l.userId, l.amount,
@@ -135,7 +136,7 @@ export default function Commissions() {
           <div className="flex flex-wrap items-center gap-2">
             <Input type="date" value={pStart} onChange={(e) => setPStart(e.target.value)} />
             <Input type="date" value={pEnd} onChange={(e) => setPEnd(e.target.value)} />
-            <button className="wg-btn wg-btn-primary" disabled={!canValidate || !state.station?.activated}
+            <button className="wg-btn wg-btn-primary" disabled={!canWriteSubscription || !canValidate || !state.station?.activated}
               onClick={() => safe(async () => {
                 await createCommissionPeriod(state.station!.id, pStart, pEnd);
               })}>Créer un brouillon</button>
@@ -150,7 +151,7 @@ export default function Commissions() {
                   <td className="wg-td"><Badge tone={p.status === 'draft' ? 'warn' : p.status === 'paid' ? 'success' : 'accent'}>{p.status === 'draft' ? 'Brouillon' : p.status === 'paid' ? 'Payée' : 'Validée · figée'}</Badge></td>
                   <td className="wg-td">{periodLines.filter((l) => l.periodId === p.id).length}</td>
                   <td className="wg-td">{p.status === 'draft' && canValidate &&
-                    <button className="wg-link text-xs" onClick={() => safe(async () => {
+                    <button className="wg-link text-xs" disabled={!canWriteSubscription} onClick={() => safe(async () => {
                       await validateCommissionPeriod(p.id);
                     })}><FiLock className="inline" /> Valider et figer</button>}
                   </td>

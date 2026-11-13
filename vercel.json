@@ -4,7 +4,7 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "regions": ["cdg1"],
-  "cleanUrls": true,
+  "cleanUrls": false,
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ],

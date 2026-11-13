@@ -1,5 +1,7 @@
 # Prompt 07 — Stock, fournisseurs, achats, consommations et coûts certifiés
 
+> **Préparation locale ultérieure :** la migration `057`, non déployée, réserve le stock, les achats, les consommations et leurs coûts aux modules avancés de l’essai et de Premium. Les données restent conservées mais masquées en Standard ; les coûts non disponibles ne sont pas des zéros. Voir [subscriptions.md](subscriptions.md). Les sections suivantes décrivent la livraison historique P07.
+
 **Statut : livré sur la branche de travail.** Le projet Supabase `cgxrqorwmmcyqescatzs` porte **33 migrations** (`001` → `033`). Les migrations `030`–`033` sont additives : elles n'ont pas réécrit `021`–`029`, n'ont créé aucun compte Auth, e-mail, secret, clé API, commit ni PR. Aucune donnée de démonstration n'est insérée.
 
 ## 1. Ce que la base garantit
@@ -67,5 +69,5 @@ Résultat : **22 lignes, 22 `ok=true`, 0 `ok=false`**. Invariants vérifiés : c
 
 ## 7. Limite volontaire
 
-Le **Prompt 08 est livré** : CRM, fidélité, forfaits, promotions, flottes et file de notifications sans fournisseur ; voir [`docs/crm.md`](crm.md). À la livraison P08 : aucun navigateur réel / Playwright, aucun bucket Storage, aucun envoi et aucune donnée client persistante. P10 a ensuite livré Storage privé, 15 specs Playwright et la CI ; les 2 vulnérabilités modérées de production restent ouvertes et `npm audit fix --force` n'est pas appliqué car il imposerait React Router v7.
+Le **Prompt 08 est livré** : CRM, fidélité, forfaits, promotions, flottes et file de notifications sans fournisseur ; voir [`docs/crm.md`](crm.md). À la livraison P08 : aucun navigateur réel / Playwright, aucun bucket Storage, aucun envoi et aucune donnée client persistante. P10 a ensuite livré Storage privé, 15 specs Playwright et la CI. À cette époque, 2 vulnérabilités modérées de production restaient ouvertes ; cette branche utilise depuis React Router 7 et les audits actuels ne signalent aucune vulnérabilité.
 

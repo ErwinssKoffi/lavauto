@@ -61,7 +61,7 @@ function Stat({ label, value, ok }: { label: string; value: string | number; ok?
 }
 
 export default function Quality() {
-  const { state, dataSource, authKind } = useStore();
+  const { state, dataSource, authKind, canWriteSubscription } = useStore();
   const serverReady = dataSource === 'supabase' && authKind === 'supabase' && Boolean(supabase && state.session?.userId);
   const [board, setBoard] = useState<QaBoard | null>(null);
   const [page, setPage] = useState<WashPage | null>(null);
@@ -98,7 +98,7 @@ export default function Quality() {
   }, [serverReady, pageIndex]);
 
   async function handleUpload() {
-    if (!file || !serverReady) return;
+    if (!file || !serverReady || !canWriteSubscription) return;
     setUploading(true);
     setUploadError(null);
     setUpload(null);
@@ -215,7 +215,7 @@ export default function Quality() {
             className="mb-3 block w-full text-xs text-slate-300"
             onChange={(event) => setFile(event.target.files?.[0] ?? null)}
           />
-          <button className="wg-btn wg-btn-primary" disabled={!serverReady || !file || uploading} onClick={handleUpload}>
+          <button className="wg-btn wg-btn-primary" disabled={!serverReady || !canWriteSubscription || !file || uploading} onClick={handleUpload}>
             <FiUpload /> {uploading ? 'Envoi…' : 'Envoyer le logo'}
           </button>
           {uploadError && <div className="mt-3"><Alert kind="warn">{uploadError}</Alert></div>}

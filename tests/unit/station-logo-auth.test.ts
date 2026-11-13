@@ -77,7 +77,8 @@ describe('logo et rafraîchissement Auth', () => {
     await act(async () => { send({ type: 'SIGNED_IN', identity }); });
     expect(store.authReady).toBe(true);
     expect(store.state.station?.logoPath).toBeNull();
-    await act(async () => { store.updateStation({ address: 'Adresse locale', cashRequiresOpen: false }); });
+    // Sans port de configuration serveur, aucune écriture de repli local.
+    expect(() => store.updateStation({ address: 'Adresse locale', cashRequiresOpen: false })).toThrow(/Abonnement non confirmé|indisponible/);
     await act(async () => { store.setStationLogoPath(stationId, userId, pathA); });
 
     // Supabase peut réémettre SIGNED_IN avec le contexte initial en cache.
@@ -94,8 +95,8 @@ describe('logo et rafraîchissement Auth', () => {
     await act(async () => { store.setStationLogoPath(stationId, userId, pathB); });
     await act(async () => { finish({ identity: refreshed, users: [] }); });
     expect(store.state.station?.logoPath).toBe(pathB);
-    expect(store.state.station?.address).toBe('Adresse locale');
-    expect(store.state.station?.cashRequiresOpen).toBe(false);
+    expect(store.state.station?.address).toBe('');
+    expect(store.state.station?.cashRequiresOpen).toBe(true);
     await act(async () => { store.setStationLogoPath(stationId, 'autre-utilisateur', pathA); });
     await act(async () => { store.setStationLogoPath(stationId, userId, 'https://example.invalid/logo.png'); });
     await act(async () => { store.setStationLogoPath(stationId, userId, '22222222-2222-4222-8222-222222222222/logo.webp'); });
