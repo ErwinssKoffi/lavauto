@@ -485,6 +485,32 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     Boolean(pkg.dependencies.jspdf) && Boolean(pkg.dependencies.zod) && Boolean(pkg.devDependencies['pdfjs-dist']) &&
     String(pkg.dependencies.recharts).startsWith('^2.') &&
     String(pkg.dependencies['react-router-dom']).startsWith('^7.'));
+  check('aucune trace de shadcn/ui (ou de sa pile) : DaisyUI est la seule couche UI', (() => {
+    const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+    const forbiddenDeps = [
+      'shadcn', 'shadcn-ui', 'class-variance-authority', 'clsx', 'tailwind-merge',
+      'tailwindcss-animate', 'tw-animate-css', 'lucide-react', 'sonner', 'cmdk',
+    ];
+    const hasForbiddenDep = forbiddenDeps.some((name) => Boolean(deps[name])) ||
+      Object.keys(deps).some((name) => name.startsWith('@radix-ui/'));
+    const hasConfigFile = ['components.json', '.components.json', 'src/components.json']
+      .some((file) => fs.existsSync(path.join(ROOT, file)));
+    const hasUiFolder = fs.existsSync(path.join(ROOT, 'src/components/ui'));
+    const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) return walk(full);
+      return /\.(tsx?|css)$/.test(entry.name) ? [full] : [];
+    });
+    const sources = walk(path.join(ROOT, 'src'));
+    const forbiddenImport = /from\s+['"](@radix-ui\/[^'"]+|class-variance-authority|tailwind-merge|clsx|lucide-react|@\/components\/ui|@\/lib\/utils)['"]/;
+    const hasForbiddenImport = sources.some((file) => forbiddenImport.test(fs.readFileSync(file, 'utf8')));
+    const hasCnHelper = sources.some((file) => /export\s+(function|const)\s+cn\b/.test(fs.readFileSync(file, 'utf8')));
+    const shadcnTokens = sources
+      .filter((file) => file.endsWith('.css'))
+      .some((file) => /--(primary|secondary|muted|accent|destructive|popover|card)-foreground\s*:/.test(fs.readFileSync(file, 'utf8')));
+    return !hasForbiddenDep && !hasConfigFile && !hasUiFolder && !hasForbiddenImport && !hasCnHelper && !shadcnTokens &&
+      Boolean(deps.daisyui) && uiSrc.includes('card bg-base-100');
+  })());
   check('sélecteur de thème : catalogue complet, persisté et branché dans le shell', (() => {
     const themesSrc = read('src/lib/themes.ts');
     const names = [...themesSrc.matchAll(/name: '([a-z0-9-]+)'/g)].map((m) => m[1]);

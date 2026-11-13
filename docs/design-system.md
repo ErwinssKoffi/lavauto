@@ -58,6 +58,23 @@ Réglages complémentaires :
 
 Seules règles globales restantes dans `src/index.css` : fond de page, `::selection`, anneau `:focus-visible`, barres de défilement, `prefers-reduced-motion` et les styles du **reçu imprimable**, volontairement isolés du thème.
 
+### Audit : aucune trace de shadcn/ui
+
+Vérifié sur tout le dépôt (code, configuration, `package.json`, CSS) :
+
+| Marqueur shadcn/ui | Résultat |
+| --- | --- |
+| `shadcn`, `@radix-ui/*`, `class-variance-authority`, `tailwind-merge`, `lucide-react`, `sonner`, `cmdk`, `tailwindcss-animate` | **absents** de `dependencies` et `devDependencies` |
+| `components.json` / `.components.json` | **absents** |
+| Dossier `src/components/ui/` | **absent** — une seule primitive maison, `src/components/ui.tsx`, réécrite sur DaisyUI |
+| Helper `cn()` / `@/lib/utils` / alias `@/` | **absents** |
+| Tokens `--primary-foreground`, `--muted-foreground`, `--ring`, `--popover`… | **absents** (`--border: 1px` est un token de largeur DaisyUI 5, pas le `--border` couleur de shadcn) |
+| `data-slot`, `data-orientation`, `data-state` (Radix) | **absents** |
+
+`clsx@2.1.1` apparaît dans `node_modules` uniquement comme dépendance transitive de **recharts** (`npm ls clsx` → `recharts`), jamais importée par le code de l'application : la retirer casserait les graphiques.
+
+Rien n'a donc été supprimé : il n'y avait aucun shadcn à retirer. DaisyUI est la seule couche UI, et le contrôle `npm run check` « aucune trace de shadcn/ui (ou de sa pile) » échoue désormais si l'une de ces dépendances, de ces imports, de ce helper ou de ces tokens réapparaît.
+
 ## 3. Composants réels
 
 | Fichier | Composant | Comportement réel | Branché sur |
@@ -136,7 +153,7 @@ Responsive : sidebar desktop / drawer mobile, topbar qui tronque, tableaux `tabl
 | --- | --- |
 | `npm run typecheck` | ✅ 0 erreur (TS strict) |
 | `npm run lint` | ✅ 26 règles statiques |
-| `npm run check` | ✅ **248 contrôles OK / 0 KO** (dont le rendu des 15 écrans en JSDOM) |
+| `npm run check` | ✅ **249 contrôles OK / 0 KO** (dont le rendu des 15 écrans en JSDOM) |
 | `npm run test:unit` | ✅ 288 tests / 34 fichiers |
 | `npm run build` | ✅ build Vite + PWA (39 entrées pré-cachées) · CSS 192,3 kB / gzip 30,2 kB |
 

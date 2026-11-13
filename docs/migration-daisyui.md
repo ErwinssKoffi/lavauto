@@ -90,7 +90,7 @@
 | --- | --- |
 | `npm run typecheck` | ✅ 0 erreur |
 | `npm run lint` | ✅ 26 règles |
-| `npm run check` | ✅ 248 OK / 0 KO |
+| `npm run check` | ✅ 249 OK / 0 KO |
 | `npm run test:unit` | ✅ 288 tests / 34 fichiers |
 | `npm run build` | ✅ build Vite + PWA |
 
@@ -155,7 +155,7 @@ Trois ajustements restent **hors couche** (donc prioritaires sur la couche `util
 | --- | --- |
 | `npm run typecheck` | ✅ 0 erreur |
 | `npm run lint` | ✅ 26 règles |
-| `npm run check` | ✅ 248 OK / 0 KO |
+| `npm run check` | ✅ 249 OK / 0 KO |
 | `npm run test:unit` | ✅ 288 tests / 34 fichiers |
 | `npm run build` | ✅ Vite + PWA · CSS 192,3 kB / gzip 30,2 kB |
 
@@ -177,3 +177,12 @@ Trois ajustements restent **hors couche** (donc prioritaires sur la couche `util
 | Garde-fous | `npm run check` compare `themes.ts` aux fichiers `node_modules/daisyui/theme/*.css` et rejoue l'ouverture du menu, ses 37 entrées, l'application d'un thème, sa persistance et le retour au WashGuard clair ; `tests/unit/themes.test.ts` vérifie l'unicité, l'ordre et les libellés |
 
 La bascule rapide soleil/lune reste volontairement limitée aux deux thèmes WashGuard : un thème exotique sélectionné n'empêche pas de revenir en un clic au thème de la marque.
+
+
+---
+
+## 11. Audit shadcn/ui
+
+Le dépôt n'a jamais contenu de shadcn/ui, et n'en contient toujours pas : aucun `components.json`, aucun dossier `src/components/ui/`, aucune dépendance `shadcn`, `@radix-ui/*`, `class-variance-authority`, `tailwind-merge`, `lucide-react`, `tailwindcss-animate`, aucun helper `cn()`, aucun token `--*-foreground` ni attribut `data-slot`. Le seul paquet proche présent dans `node_modules` est `clsx`, dépendance transitive de `recharts` (`npm ls clsx`), jamais importée par l'application.
+
+`npm run check` porte un contrôle dédié, validé en réintroduisant volontairement `clsx` dans `package.json` (KO attendu, puis restauration).
