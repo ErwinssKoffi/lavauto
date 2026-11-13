@@ -1138,6 +1138,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('washguard.theme.name', themeName);
       localStorage.setItem('washguard.theme', scheme);
     } catch { /* préférence facultative */ }
+    // La barre du navigateur mobile (et l'écran de démarrage PWA) suivent le
+    // thème actif : on recopie `base-100` dans la balise `theme-color`.
+    try {
+      const meta = document.querySelector('meta[name="theme-color"]');
+      const base = getComputedStyle(root).getPropertyValue('--color-base-100').trim();
+      if (meta && base) meta.setAttribute('content', base);
+    } catch { /* balise absente ou CSS non calculable */ }
   }, [themeName]);
 
   const onboarding = useMemo(() => computeOnboarding(state), [state]);

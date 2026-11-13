@@ -53,9 +53,10 @@ Pourquoi pas `all` : dans `daisyui/functions/pluginOptionsHandler.js`, la branch
 Réglages complémentaires :
 
 - **Bordure par défaut** : Tailwind 4 utilise `currentColor` ; une règle `@layer base { *, ::before, ::after, ::backdrop { border-color: var(--color-base-300); } }` rétablit une bordure thématique pour les simples `border`.
-- **`--page-bg`** : fond applicatif volontairement distinct de `base-100` pour conserver la profondeur visuelle d'origine.
+- **Fond applicatif** : `body { background: color-mix(in oklab, var(--color-base-100) 94%, #000) }` — légèrement plus profond que la surface des cartes, et **dérivé du thème actif** : les 37 thèmes sont donc respectés sans aucune couleur codée en dur (l'ancienne variable `--page-bg` figée sur deux valeurs a été supprimée).
 - **Ajustements hors couche** : DaisyUI 5 émet ses composants dans la couche `utilities`, donc une règle `@layer components` serait perdante. Trois règles volontairement **non calquées** (donc prioritaires) ajustent le texte des `btn-sm` (`--fontsize: .875rem`), le rayon des badges (pastille `999px`) et la capitalisation des en-têtes de tableaux.
-- **Sélecteur de thème** (`src/components/ThemeSwitcher.tsx`) : menu de la topbar listant les deux thèmes WashGuard puis les 35 thèmes DaisyUI. Chaque ligne porte son propre `data-theme`, donc les pastilles montrent les couleurs réelles du thème proposé. Persistance `localStorage` : `washguard.theme.name` (thème exact) et `washguard.theme` (`dark`/`light`, conservé pour la compatibilité et le script inline de `index.html`). La bascule rapide soleil/lune ne revient qu'aux thèmes WashGuard.
+- **Sélecteur de thème** (`src/components/ThemeSwitcher.tsx`) : menu de la topbar listant les deux thèmes WashGuard puis les 35 thèmes DaisyUI. Chaque ligne porte son propre `data-theme`, donc les pastilles montrent les couleurs réelles du thème proposé. Champ de **recherche** (insensible aux accents : « lofi » trouve `Lo-Fi`), navigation par **flèches haut/bas**, `Échap` referme et rend le focus au bouton, thème actif amené à l'écran à l'ouverture. Persistance `localStorage` : `washguard.theme.name` (thème exact) et `washguard.theme` (`dark`/`light`, conservé pour la compatibilité et le script inline de `index.html`). La bascule rapide soleil/lune ne revient qu'aux thèmes WashGuard.
+- **Barre du navigateur mobile** : à chaque changement de thème, le store recopie `--color-base-100` du thème actif dans `<meta name="theme-color">`.
 - **`@theme`** : police `Inter` (`--font-sans`) et animation `--animate-fade-in` (keyframes `fadeIn`).
 - **`@import "tailwindcss" source(none)` + `@source`** : seuls `index.html` et `src/**/*.{ts,tsx}` produisent des classes (ni la documentation ni les tests ne gonflent le CSS).
 - `darkMode: 'class'` n'existe plus : la classe `dark` reste posée pour compatibilité, mais la source de vérité est `data-theme`, synchronisée dans `store.tsx` et appliquée avant le premier rendu par `index.html`.
@@ -185,7 +186,7 @@ Responsive : sidebar desktop / drawer mobile, topbar qui tronque, tableaux `tabl
 | --- | --- |
 | `npm run typecheck` | ✅ 0 erreur (TS strict) |
 | `npm run lint` | ✅ 26 règles statiques |
-| `npm run check` | ✅ **251 contrôles OK / 0 KO** (dont le rendu des 15 écrans en JSDOM) |
+| `npm run check` | ✅ **253 contrôles OK / 0 KO** (dont le rendu des 15 écrans en JSDOM) |
 | `npm run test:unit` | ✅ 288 tests / 34 fichiers |
 | `npm run build` | ✅ build Vite + PWA (39 entrées pré-cachées) · CSS 192,3 kB / gzip 30,2 kB |
 

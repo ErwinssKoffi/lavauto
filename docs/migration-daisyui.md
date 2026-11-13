@@ -90,7 +90,7 @@
 | --- | --- |
 | `npm run typecheck` | ✅ 0 erreur |
 | `npm run lint` | ✅ 26 règles |
-| `npm run check` | ✅ 251 OK / 0 KO |
+| `npm run check` | ✅ 253 OK / 0 KO |
 | `npm run test:unit` | ✅ 288 tests / 34 fichiers |
 | `npm run build` | ✅ build Vite + PWA |
 
@@ -162,7 +162,7 @@ Trois ajustements restent **hors couche** (donc prioritaires sur la couche `util
 | --- | --- |
 | `npm run typecheck` | ✅ 0 erreur |
 | `npm run lint` | ✅ 26 règles |
-| `npm run check` | ✅ 251 OK / 0 KO |
+| `npm run check` | ✅ 253 OK / 0 KO |
 | `npm run test:unit` | ✅ 288 tests / 34 fichiers |
 | `npm run build` | ✅ Vite + PWA · CSS 192,3 kB / gzip 30,2 kB |
 
@@ -180,6 +180,8 @@ Les 35 thèmes intégrés sont déclarés explicitement dans `@plugin "daisyui" 
 | Persistance | `washguard.theme.name` (nom exact du thème) + `washguard.theme` (`dark`/`light`) ; l'ancienne clé seule reste lue si la nouvelle est absente |
 | Premier rendu | `index.html` applique `washguard.theme.name` avant tout script (aucun flash), avec repli sur `washguard-dark` |
 | Aperçu | chaque ligne du menu porte `data-theme="<thème>"` : les pastilles affichent la vraie palette, sans image |
+| Recherche | champ filtrant les 37 thèmes (nom ou libellé, accents ignorés), réinitialisé à l'ouverture |
+| Clavier | flèches haut/bas dans la liste, `Échap` referme et rend le focus au déclencheur |
 | Accessibilité | bouton `aria-expanded`, lignes `aria-pressed`, fermeture au clic extérieur et sur Échap |
 | Garde-fous | `npm run check` compare `themes.ts` aux fichiers `node_modules/daisyui/theme/*.css` et rejoue l'ouverture du menu, ses 37 entrées, l'application d'un thème, sa persistance et le retour au WashGuard clair ; `tests/unit/themes.test.ts` vérifie l'unicité, l'ordre et les libellés |
 
@@ -212,3 +214,14 @@ Conversion appliquée à **31 fichiers** (≈ 310 occurrences) : `slate` → `ba
 | Graphiques (recharts) | chrome (axes, grille, infobulles) en `var(--color-base-*)` ; couleurs de série conservées en hexadécimal |
 
 Garde-fou : le contrôle « palette DaisyUI partout » refuse toute classe de palette Tailwind hors des deux zones épinglées (testé en injectant `bg-slate-900 text-amber-400` → KO, puis restauration).
+
+
+---
+
+## 13. Chrome du navigateur et fond applicatif
+
+- `--page-bg` (deux valeurs figées `#f4f7fb` / `#080f1d`) a été supprimé : `body` utilise
+  `color-mix(in oklab, var(--color-base-100) 94%, #000)`, donc le fond suit les 37 thèmes.
+- `<meta name="theme-color">` est recopié depuis `--color-base-100` à chaque changement de thème
+  (barre du navigateur mobile / écran de démarrage PWA), avec repli silencieux si la valeur n'est
+  pas calculable (JSDOM, navigateur ancien).

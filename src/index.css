@@ -106,17 +106,6 @@
   }
 }
 
-/* Fond applicatif : volontairement distinct de `base-100` (surface des cartes)
-   pour conserver la profondeur visuelle d'origine. */
-:root,
-[data-theme='washguard'] {
-  --page-bg: #f4f7fb;
-}
-
-[data-theme='washguard-dark'] {
-  --page-bg: #080f1d;
-}
-
 /* Bordure par défaut alignée sur `base-300` du thème actif : un simple
    `border` reste donc sensible au thème clair/sombre (Tailwind 4 utilise
    `currentColor` par défaut). */
@@ -148,9 +137,12 @@
 
 html, body, #root { min-height: 100%; }
 
+/* Fond applicatif légèrement plus profond que `base-100` (surface des cartes).
+   Il est dérivé du thème actif : les 37 thèmes DaisyUI sont donc tous
+   respectés, sans couleur codée en dur. */
 body {
   margin: 0;
-  background: var(--page-bg);
+  background: color-mix(in oklab, var(--color-base-100) 94%, #000);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   font-feature-settings: 'kern', 'tnum';

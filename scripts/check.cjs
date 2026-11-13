@@ -653,6 +653,16 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
       click(pickerButton());
       await wait(120);
       check('sélecteur de thème : les 37 thèmes sont proposés', rows().length === 37, String(rows().length));
+      const search = w.document.querySelector('input[aria-label="Rechercher un thème"]');
+      if (search) {
+        const setter = Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, 'value').set;
+        setter.call(search, 'drac');
+        search.dispatchEvent(new w.Event('input', { bubbles: true }));
+        await wait(120);
+        const filtered = rows();
+        check('sélecteur de thème : la recherche filtre la liste',
+          filtered.length === 1 && /dracula/i.test(filtered[0].textContent || ''), String(filtered.length));
+      }
       const target = rows().find((row) => row.getAttribute('data-theme') === 'dracula');
       if (target) click(target);
       await wait(140);
@@ -663,6 +673,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
         w.document.documentElement.classList.contains('dark'));
       click(pickerButton());
       await wait(100);
+      check('sélecteur de thème : la recherche est réinitialisée à l’ouverture', rows().length === 37, String(rows().length));
       const light = rows().find((row) => row.getAttribute('data-theme') === 'washguard');
       if (light) click(light);
       await wait(140);
