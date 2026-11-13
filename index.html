@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fr" class="dark">
+<html lang="fr" class="dark" data-theme="washguard-dark">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" href="/favicon.ico" sizes="any" />
@@ -20,7 +20,9 @@
       (function () {
         try {
           var saved = localStorage.getItem('washguard.theme');
-          document.documentElement.classList.toggle('dark', saved !== 'light');
+          var light = saved === 'light';
+          document.documentElement.classList.toggle('dark', !light);
+          document.documentElement.setAttribute('data-theme', light ? 'washguard' : 'washguard-dark');
         } catch (e) { /* stockage indisponible : thème sombre par défaut */ }
       })();
     </script>

@@ -48,9 +48,9 @@ export default function Commissions() {
     return (
       <div>
         <PageHeader title="Commissions" subtitle="Réservé au propriétaire et au gérant." />
-        <Card className="flex items-start gap-3 border-red-500/30">
+        <Card className="flex flex-row items-start gap-3 border-red-500/30">
           <FiLock className="mt-0.5 text-xl text-red-400" />
-          <div><h2 className="text-sm font-bold">Accès refusé</h2><p className="wg-muted mt-1 text-xs">Ce module affiche ce que la station doit à chaque laveur. Il est réservé au propriétaire et au gérant.</p></div>
+          <div><h2 className="text-sm font-bold">Accès refusé</h2><p className="text-base-content/60 mt-1 text-xs">Ce module affiche ce que la station doit à chaque laveur. Il est réservé au propriétaire et au gérant.</p></div>
         </Card>
       </div>
     );
@@ -79,7 +79,7 @@ export default function Commissions() {
       if (periodRow && periodRow.status === 'draft') return <Badge>Brouillon</Badge>;
       if (!canValidate || !canWriteSubscription) return <Badge>À payer · lecture seule</Badge>;
       return (
-        <button className="wg-link text-xs" onClick={() => safe(async () => {
+        <button className="link link-primary text-xs" onClick={() => safe(async () => {
           await recordCommissionPayout(l.periodId, l.userId, l.amount,
             `PAIE-${l.periodId.slice(0, 8)}-${l.userId.slice(0, 4)}`);
         })}>Enregistrer la paie</button>
@@ -117,8 +117,8 @@ export default function Commissions() {
       <PageHeader title="Commissions" subtitle={`Aperçu brouillon, relevés validés figés et paie tracée (${label}).`}
         actions={<div className="flex gap-2">
           {dataSource !== 'local' && authReady && identity &&
-            <button className="wg-btn wg-btn-ghost" onClick={() => safe(() => refreshFinance())}><FiRefreshCw /> Actualiser</button>}
-          <button className="wg-btn wg-btn-primary" onClick={exportCSV}><FiDownload /> Export CSV pour la paie</button>
+            <button className="btn btn-sm" onClick={() => safe(() => refreshFinance())}><FiRefreshCw /> Actualiser</button>}
+          <button className="btn btn-sm btn-primary" onClick={exportCSV}><FiDownload /> Export CSV pour la paie</button>
         </div>} />
       <div className="mb-5"><Tabs value={period} onChange={setPeriod} options={PERIODS} /></div>
 
@@ -136,22 +136,22 @@ export default function Commissions() {
           <div className="flex flex-wrap items-center gap-2">
             <Input type="date" value={pStart} onChange={(e) => setPStart(e.target.value)} />
             <Input type="date" value={pEnd} onChange={(e) => setPEnd(e.target.value)} />
-            <button className="wg-btn wg-btn-primary" disabled={!canWriteSubscription || !canValidate || !state.station?.activated}
+            <button className="btn btn-sm btn-primary" disabled={!canWriteSubscription || !canValidate || !state.station?.activated}
               onClick={() => safe(async () => {
                 await createCommissionPeriod(state.station!.id, pStart, pEnd);
               })}>Créer un brouillon</button>
           </div>
         </div>
-        {periods.length === 0 ? <p className="wg-muted text-xs">Aucune période. Créez un brouillon, puis validez-le pour figer les lignes.</p> : (
-          <div className="wg-scroll-x rounded-xl border" style={{ borderColor: 'var(--wg-border)' }}>
-            <table><thead><tr><th className="wg-th">Période</th><th className="wg-th">Statut</th><th className="wg-th">Lignes</th><th className="wg-th" /></tr></thead>
+        {periods.length === 0 ? <p className="text-base-content/60 text-xs">Aucune période. Créez un brouillon, puis validez-le pour figer les lignes.</p> : (
+          <div className="overflow-x-auto rounded-xl border">
+            <table className="table min-w-[620px]"><thead><tr><th>Période</th><th>Statut</th><th>Lignes</th><th /></tr></thead>
               <tbody>{periods.map((p) => (
                 <tr key={p.id}>
-                  <td className="wg-td">{formatDate(p.start)} – {formatDate(p.end)}</td>
-                  <td className="wg-td"><Badge tone={p.status === 'draft' ? 'warn' : p.status === 'paid' ? 'success' : 'accent'}>{p.status === 'draft' ? 'Brouillon' : p.status === 'paid' ? 'Payée' : 'Validée · figée'}</Badge></td>
-                  <td className="wg-td">{periodLines.filter((l) => l.periodId === p.id).length}</td>
-                  <td className="wg-td">{p.status === 'draft' && canValidate &&
-                    <button className="wg-link text-xs" disabled={!canWriteSubscription} onClick={() => safe(async () => {
+                  <td>{formatDate(p.start)} – {formatDate(p.end)}</td>
+                  <td><Badge tone={p.status === 'draft' ? 'warn' : p.status === 'paid' ? 'success' : 'accent'}>{p.status === 'draft' ? 'Brouillon' : p.status === 'paid' ? 'Payée' : 'Validée · figée'}</Badge></td>
+                  <td>{periodLines.filter((l) => l.periodId === p.id).length}</td>
+                  <td>{p.status === 'draft' && canValidate &&
+                    <button className="link link-primary text-xs" disabled={!canWriteSubscription} onClick={() => safe(async () => {
                       await validateCommissionPeriod(p.id);
                     })}><FiLock className="inline" /> Valider et figer</button>}
                   </td>
@@ -173,7 +173,7 @@ export default function Commissions() {
           emptyTitle="Aucun relevé validé"
           emptyDescription="Créez une période puis validez-la : les montants seront figés et ne pourront plus être recalculés."
           footer={periodLines.length > 0 ? (
-            <tr><td className="wg-td font-bold" colSpan={5}>Total figé de tous les relevés</td><td className="wg-td font-bold text-emerald-400">{formatFCFA(frozenTotal)}</td><td /></tr>
+            <tr><td className="font-bold" colSpan={5}>Total figé de tous les relevés</td><td className="font-bold text-emerald-400">{formatFCFA(frozenTotal)}</td><td /></tr>
           ) : undefined}
         />
       </Card>
@@ -189,11 +189,11 @@ export default function Commissions() {
           emptyTitle="Aucune commission sur la période"
           emptyDescription="Marquez des fiches comme « terminé » et fixez un barème pour voir apparaître les montants dus."
           footer={lines.length > 0 ? (
-            <tr><td className="wg-td font-bold" colSpan={5}>Total indicatif (tous laveurs)</td><td className="wg-td font-bold">{formatFCFA(totalDue)}</td></tr>
+            <tr><td className="font-bold" colSpan={5}>Total indicatif (tous laveurs)</td><td className="font-bold">{formatFCFA(totalDue)}</td></tr>
           ) : undefined}
         />
       </Card>
-      <p className="wg-muted mt-4 text-xs">L’export CSV privilégie les relevés figés ; sans relevé, il est nommé BROUILLON. Le total porte sur tous les laveurs de la période, même lorsqu’un filtre de recherche est appliqué.</p>
+      <p className="text-base-content/60 mt-4 text-xs">L’export CSV privilégie les relevés figés ; sans relevé, il est nommé BROUILLON. Le total porte sur tous les laveurs de la période, même lorsqu’un filtre de recherche est appliqué.</p>
     </div>
   );
 }

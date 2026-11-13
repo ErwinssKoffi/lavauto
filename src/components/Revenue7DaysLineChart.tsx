@@ -24,7 +24,6 @@ export default function Revenue7DaysLineChart({ data }: { data: DayChartPoint[] 
           className="rounded-xl border p-3 shadow-xl backdrop-blur-md"
           style={{
             background: 'rgba(15, 23, 42, 0.95)',
-            borderColor: 'var(--wg-border)',
             color: '#e2e8f0',
           }}
         >
@@ -59,7 +58,7 @@ export default function Revenue7DaysLineChart({ data }: { data: DayChartPoint[] 
   return (
     <Card className="overflow-hidden">
       {/* Header and stats */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4 mb-4" style={{ borderColor: 'var(--wg-border)' }}>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-base-300 pb-4">
         <div>
           <div className="flex items-center gap-2">
             <span className="grid h-7 w-7 place-items-center rounded-lg bg-sky-500/15 text-sky-400">
@@ -69,7 +68,7 @@ export default function Revenue7DaysLineChart({ data }: { data: DayChartPoint[] 
               Évolution du chiffre d’affaires (7 derniers jours)
             </h2>
           </div>
-          <p className="wg-muted mt-0.5 text-xs">
+          <p className="mt-0.5 text-xs text-base-content/60">
             Visualisation en courbe du CA journalier et des encaissements effectifs.
           </p>
         </div>
@@ -77,18 +76,16 @@ export default function Revenue7DaysLineChart({ data }: { data: DayChartPoint[] 
         {/* Quick summary badges */}
         <div className="flex flex-wrap items-center gap-2">
           <div
-            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs border"
-            style={{ background: 'var(--wg-surface-2)', borderColor: 'var(--wg-border)' }}
+            className="flex items-center gap-1.5 rounded-lg border border-base-300 bg-base-200 px-2.5 py-1 text-xs"
           >
-            <span className="wg-muted text-[11px]">Total 7j :</span>
+            <span className="text-[11px] text-base-content/60">Total 7j :</span>
             <span className="font-bold text-sky-400">{formatFCFA(totalRevenue)}</span>
           </div>
 
           <div
-            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs border"
-            style={{ background: 'var(--wg-surface-2)', borderColor: 'var(--wg-border)' }}
+            className="flex items-center gap-1.5 rounded-lg border border-base-300 bg-base-200 px-2.5 py-1 text-xs"
           >
-            <span className="wg-muted text-[11px]">Moyenne/j :</span>
+            <span className="text-[11px] text-base-content/60">Moyenne/j :</span>
             <span className="font-bold text-slate-200">{formatFCFA(dailyAverage)}</span>
           </div>
 
@@ -151,7 +148,7 @@ export default function Revenue7DaysLineChart({ data }: { data: DayChartPoint[] 
         </ResponsiveContainer>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t pt-2.5 text-[11px] wg-muted" style={{ borderColor: 'var(--wg-border)' }}>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-base-300 pt-2.5 text-[11px] text-base-content/60">
         <span>Volume cumulé : <strong>{totalWashes} lavage(s)</strong> sur la période de 7 jours.</span>
         <span>Paiements et annulations comptabilisés à leur date respective.</span>
       </div>

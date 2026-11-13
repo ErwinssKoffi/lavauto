@@ -458,6 +458,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
   const uiSrc = read('src/components/ui.tsx');
   const navSrc = read('src/components/navigation.tsx');
   const shellSrc = read('src/components/AppShell.tsx');
+  const tailwindSrc = read('tailwind.config.js');
   const cssSrc = read('src/index.css');
   const pkg = JSON.parse(read('package.json'));
 
@@ -485,8 +486,12 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     Boolean(pkg.dependencies.jspdf) && Boolean(pkg.dependencies.zod) && Boolean(pkg.devDependencies['pdfjs-dist']) &&
     String(pkg.dependencies.recharts).startsWith('^2.') &&
     String(pkg.dependencies['react-router-dom']).startsWith('^7.'));
-  check('tokens : focus clavier, mouvement réduit, élévation, squelette',
-    [':focus-visible','prefers-reduced-motion','--wg-elev-2','wg-nav-item-active','wg-skeleton'].every((token) => cssSrc.includes(token)));
+  check('thème : DaisyUI configuré, thèmes clair/sombre, focus clavier et mouvement réduit',
+    [':focus-visible','prefers-reduced-motion'].every((token) => cssSrc.includes(token)) &&
+    ['washguard-dark', 'primary', 'base-100'].every((token) => tailwindSrc.includes(token)) &&
+    /plugins:\s*\[\s*daisyui\s*\]/.test(tailwindSrc) &&
+    tailwindSrc.includes("darkTheme: 'washguard-dark'") &&
+    !cssSrc.includes('.wg-'));
   check('états réels branchés : chargement, erreur, confirmation, tableau',
     read('src/App.tsx').includes('LoadingState') &&
     read('src/main.tsx').includes('ErrorBoundary') &&

@@ -49,7 +49,7 @@ export default function Flottes() {
     <div>
       <PageHeader title="Flottes & contrats" subtitle="Contrats, véhicules rattachés, créances ouvertes et préférence de canal."
         actions={dataSource !== 'local' ? (
-          <button className="wg-btn wg-btn-ghost" onClick={() => { void refreshCrm().catch(() => {}); }}><FiRefreshCw /> Actualiser</button>
+          <button className="btn btn-sm" onClick={() => { void refreshCrm().catch(() => {}); }}><FiRefreshCw /> Actualiser</button>
         ) : undefined} />
 
       {!activated && <div className="mb-5"><LockedPanel /></div>}
@@ -78,7 +78,7 @@ export default function Flottes() {
               <option value="none">Aucun</option><option value="sms">SMS</option><option value="email">E-mail</option><option value="whatsapp">WhatsApp</option>
             </Select>
           </div>
-          <button className="wg-btn wg-btn-primary mt-4" disabled={!canOperate} onClick={() => safe(async () => {
+          <button className="btn btn-sm btn-primary mt-4" disabled={!canOperate} onClick={() => safe(async () => {
             await saveFleet({ stationId, ...fleet, channel: fleet.channel as 'none' | 'sms' | 'email' | 'whatsapp' });
             setFleet({ name: '', contactName: '', phone: '', email: '', creditLimit: 0, channel: 'sms' });
             notify('success', 'Flotte enregistrée.');
@@ -97,7 +97,7 @@ export default function Flottes() {
             <Input label="Remise (%)" type="number" min={0} max={100} value={contract.discountPercent} onChange={(e) => setContract({ ...contract, discountPercent: readNumber(e.target.value) })} />
             <Input label="Limite de crédit" type="number" min={0} value={contract.creditLimit} onChange={(e) => setContract({ ...contract, creditLimit: readNumber(e.target.value) })} />
           </div>
-          <button className="wg-btn wg-btn-primary mt-4" disabled={!canOperate} onClick={() => safe(async () => {
+          <button className="btn btn-sm btn-primary mt-4" disabled={!canOperate} onClick={() => safe(async () => {
             await saveFleetContract({ stationId, ...contract, endDate: contract.endDate || undefined });
             setContract({ fleetId: '', number: '', startDate: todayISO(), endDate: '', discountPercent: 0, creditLimit: 0 });
             notify('success', 'Contrat enregistré.');
@@ -117,7 +117,7 @@ export default function Flottes() {
               <option value="">Aucun</option>{openContracts.map((c) => <option key={c.id} value={c.id}>{c.number}</option>)}
             </Select>
           </div>
-          <button className="wg-btn wg-btn-primary mt-4" disabled={!canOperate} onClick={() => safe(async () => {
+          <button className="btn btn-sm btn-primary mt-4" disabled={!canOperate} onClick={() => safe(async () => {
             await attachFleetVehicle({ stationId, fleetId: attach.fleetId, vehicleId: attach.vehicleId, contractId: attach.contractId || null });
             setAttach({ fleetId: '', vehicleId: '', contractId: '' }); notify('success', 'Véhicule rattaché.');
           })}>Rattacher</button>
@@ -138,7 +138,7 @@ export default function Flottes() {
               <option value="">Aucune</option>{state.washes.map((w) => <option key={w.id} value={w.id}>{w.number}</option>)}
             </Select>
           </div>
-          <button className="wg-btn wg-btn-primary mt-4" disabled={!canOperate} onClick={() => safe(async () => {
+          <button className="btn btn-sm btn-primary mt-4" disabled={!canOperate} onClick={() => safe(async () => {
             await recordFleetReceivable({ stationId, fleetId: receivable.fleetId, contractId: receivable.contractId, amountMinor: receivable.amount, washId: receivable.washId || null, dueDate: receivable.dueDate, idempotencyKey: receivable.idempotencyKey });
             setReceivable({ fleetId: '', contractId: '', amount: 0, washId: '', dueDate: todayISO(), idempotencyKey: key('recv') });
             notify('success', 'Créance enregistrée.');
@@ -147,14 +147,14 @@ export default function Flottes() {
 
         <Card>
           <h2 className="mb-3 text-sm font-bold">Notification en attente</h2>
-          <p className="wg-muted mb-3 text-xs">File CRM historique distincte des avis WhatsApp de lavage prêt. Le canal choisi sur la flotte est obligatoire ; cette ligne reste en attente et n’est pas envoyée.</p>
+          <p className="text-base-content/60 mb-3 text-xs">File CRM historique distincte des avis WhatsApp de lavage prêt. Le canal choisi sur la flotte est obligatoire ; cette ligne reste en attente et n’est pas envoyée.</p>
           <div className="grid gap-3">
             <Select label="Flotte *" value={notification.fleetId} onChange={(e) => setNotification({ ...notification, fleetId: e.target.value })}>
               <option value="">Choisir…</option>{state.fleets.map((f) => <option key={f.id} value={f.id}>{f.name} ({f.preferredChannel})</option>)}
             </Select>
             <Input label="Modèle" value={notification.templateKey} onChange={(e) => setNotification({ ...notification, templateKey: e.target.value })} />
           </div>
-          <button className="wg-btn wg-btn-primary mt-4" disabled={!canOperate} onClick={() => safe(async () => {
+          <button className="btn btn-sm btn-primary mt-4" disabled={!canOperate} onClick={() => safe(async () => {
             await enqueueNotification({ stationId, templateKey: notification.templateKey, fleetId: notification.fleetId, payload: {}, idempotencyKey: notification.idempotencyKey });
             setNotification({ fleetId: '', templateKey: 'contract_renewal', idempotencyKey: key('fnotif') });
             notify('success', 'Notification en attente, aucun envoi.');
@@ -164,17 +164,17 @@ export default function Flottes() {
         <Card className="!p-0 overflow-hidden">
           <div className="p-4 text-sm font-bold">Contrats & créances</div>
           {state.fleetContracts.length === 0 ? <EmptyState icon={<FiBriefcase />} title="Aucun contrat" description="Créez une flotte puis son contrat." /> : (
-            <div className="wg-scroll-x"><table>
-              <thead><tr><th className="wg-th">Numéro</th><th className="wg-th">Flotte</th><th className="wg-th">Crédit</th><th className="wg-th">Statut</th></tr></thead>
+            <div className="overflow-x-auto"><table className="table min-w-[620px]">
+              <thead><tr><th>Numéro</th><th>Flotte</th><th>Crédit</th><th>Statut</th></tr></thead>
               <tbody>{state.fleetContracts.map((c) => (
-                <tr key={c.id}><td className="wg-td font-bold">{c.number}</td><td className="wg-td">{fleetById.get(c.fleetId) ?? '—'}</td><td className="wg-td">{formatFCFA(c.creditLimitMinor)}</td><td className="wg-td"><Badge tone={c.status === 'active' ? 'success' : 'neutral'}>{c.status}</Badge></td></tr>
+                <tr key={c.id}><td className="font-bold">{c.number}</td><td>{fleetById.get(c.fleetId) ?? '—'}</td><td>{formatFCFA(c.creditLimitMinor)}</td><td><Badge tone={c.status === 'active' ? 'success' : 'neutral'}>{c.status}</Badge></td></tr>
               ))}</tbody>
             </table></div>
           )}
-          {state.fleetReceivables.length > 0 && <div className="wg-scroll-x border-t" style={{ borderColor: 'var(--wg-border)' }}><table>
-            <thead><tr><th className="wg-th">Échéance</th><th className="wg-th">Contrat</th><th className="wg-th">Montant</th><th className="wg-th">Statut</th></tr></thead>
+          {state.fleetReceivables.length > 0 && <div className="overflow-x-auto border-t"><table className="table min-w-[620px]">
+            <thead><tr><th>Échéance</th><th>Contrat</th><th>Montant</th><th>Statut</th></tr></thead>
             <tbody>{state.fleetReceivables.map((r) => (
-              <tr key={r.id}><td className="wg-td">{r.dueDate}</td><td className="wg-td">{contractById.get(r.contractId) ?? '—'}</td><td className="wg-td font-bold">{formatFCFA(r.amountMinor)}</td><td className="wg-td"><Badge tone={r.status === 'open' ? 'warn' : 'success'}>{r.status}</Badge></td></tr>
+              <tr key={r.id}><td>{r.dueDate}</td><td>{contractById.get(r.contractId) ?? '—'}</td><td className="font-bold">{formatFCFA(r.amountMinor)}</td><td><Badge tone={r.status === 'open' ? 'warn' : 'success'}>{r.status}</Badge></td></tr>
             ))}</tbody>
           </table></div>}
         </Card>
@@ -183,14 +183,14 @@ export default function Flottes() {
           <div className="p-4 text-sm font-bold">Véhicules & file</div>
           {state.fleetVehicles.length === 0 && state.notificationOutbox.filter((n) => n.fleetId).length === 0
             ? <EmptyState icon={<FiTruck />} title="Aucun rattachement" description="Rattachez un véhicule à une flotte pour le suivre ici." />
-            : <div className="wg-scroll-x"><table>
-              <thead><tr><th className="wg-th">Type</th><th className="wg-th">Référence</th><th className="wg-th">Flotte</th><th className="wg-th">Date</th></tr></thead>
+            : <div className="overflow-x-auto"><table className="table min-w-[620px]">
+              <thead><tr><th>Type</th><th>Référence</th><th>Flotte</th><th>Date</th></tr></thead>
               <tbody>
                 {state.fleetVehicles.map((v) => (
-                  <tr key={v.id}><td className="wg-td">Véhicule</td><td className="wg-td font-bold">{vehicleById.get(v.vehicleId) ?? v.vehicleId}</td><td className="wg-td">{fleetById.get(v.fleetId) ?? '—'}</td><td className="wg-td">{formatDate(v.createdAt)}</td></tr>
+                  <tr key={v.id}><td>Véhicule</td><td className="font-bold">{vehicleById.get(v.vehicleId) ?? v.vehicleId}</td><td>{fleetById.get(v.fleetId) ?? '—'}</td><td>{formatDate(v.createdAt)}</td></tr>
                 ))}
                 {state.notificationOutbox.filter((n) => n.fleetId).map((n) => (
-                  <tr key={n.id}><td className="wg-td">Notification</td><td className="wg-td font-bold">{n.templateKey} ({n.channel})</td><td className="wg-td">{fleetById.get(n.fleetId ?? '') ?? '—'}</td><td className="wg-td"><Badge tone={n.status === 'pending' ? 'warn' : 'neutral'}>{n.status}</Badge></td></tr>
+                  <tr key={n.id}><td>Notification</td><td className="font-bold">{n.templateKey} ({n.channel})</td><td>{fleetById.get(n.fleetId ?? '') ?? '—'}</td><td><Badge tone={n.status === 'pending' ? 'warn' : 'neutral'}>{n.status}</Badge></td></tr>
                 ))}
               </tbody>
             </table></div>}

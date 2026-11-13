@@ -82,19 +82,19 @@ export default function ResetPassword() {
       {authKind === 'local' ? (
         <div className="mt-7 space-y-4">
           <Alert kind="warn">Le mode stockage local ne dispose pas de lien de réinitialisation.</Alert>
-          <Link to="/connexion" className="wg-btn wg-btn-primary w-full !py-3">Retour à la connexion <FiArrowRight aria-hidden="true" /></Link>
+          <Link to="/connexion" className="btn btn-sm btn-primary w-full !py-3">Retour à la connexion <FiArrowRight aria-hidden="true" /></Link>
         </div>
       ) : !canReset ? (
         <div className="mt-7 space-y-4">
           <Alert kind="warn">Ce lien de réinitialisation est absent, déjà utilisé ou expiré. Demandez-en un nouveau depuis la page « Mot de passe oublié ».</Alert>
-          <Link to="/mot-de-passe-oublie" className="wg-btn wg-btn-primary w-full !py-3">Demander un nouveau lien <FiArrowRight aria-hidden="true" /></Link>
+          <Link to="/mot-de-passe-oublie" className="btn btn-sm btn-primary w-full !py-3">Demander un nouveau lien <FiArrowRight aria-hidden="true" /></Link>
         </div>
       ) : tokenState === 'checking' ? (
         <p className="mt-7 text-xs text-slate-500" role="status">Vérification du lien…</p>
       ) : tokenState === 'invalid' ? (
         <div className="mt-7 space-y-4">
           <Alert kind="warn">Ce lien de réinitialisation est invalide, déjà utilisé ou expiré. Aucun mot de passe n’a été modifié.</Alert>
-          <Link to="/mot-de-passe-oublie" className="wg-btn wg-btn-primary w-full !py-3">Demander un nouveau lien <FiArrowRight aria-hidden="true" /></Link>
+          <Link to="/mot-de-passe-oublie" className="btn btn-sm btn-primary w-full !py-3">Demander un nouveau lien <FiArrowRight aria-hidden="true" /></Link>
         </div>
       ) : (
         <form onSubmit={(e) => { void submit(e); }} className="mt-7 space-y-4" noValidate>
@@ -121,7 +121,7 @@ export default function ResetPassword() {
             error={confirmError}
           />
           {error && <div className="text-xs"><Alert kind="danger">{error}</Alert></div>}
-          <button type="submit" disabled={busy} className="wg-btn wg-btn-primary w-full !py-3 disabled:opacity-60">
+          <button type="submit" disabled={busy} className="btn btn-sm btn-primary w-full !py-3 disabled:opacity-60">
             {busy ? 'Enregistrement…' : 'Enregistrer le mot de passe'} <FiArrowRight aria-hidden="true" />
           </button>
           <div className="flex items-start gap-2 rounded-xl bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-500">

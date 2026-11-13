@@ -126,7 +126,7 @@ export default function SignIn() {
 
         {error && <div className="text-xs"><Alert kind="danger">{error}</Alert></div>}
 
-        <button type="submit" disabled={!canSubmit} className="wg-btn wg-btn-primary w-full !py-3 disabled:opacity-60">
+        <button type="submit" disabled={!canSubmit} className="btn btn-sm btn-primary w-full !py-3 disabled:opacity-60">
           {busy ? 'Connexion…' : 'Se connecter'} <FiArrowRight aria-hidden="true" />
         </button>
       </form>

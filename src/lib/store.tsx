@@ -1106,10 +1106,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setTheme((t) => {
       const next = t === 'dark' ? 'light' : 'dark';
       try { localStorage.setItem('washguard.theme', next); } catch { /* préférence facultative */ }
-      document.documentElement.classList.toggle('dark', next === 'dark');
       return next;
     });
   }, []);
+
+  // Le thème pilote deux attributs du document : la classe `dark` (utilisée par
+  // quelques surcharges Tailwind) et `data-theme`, seule source de vérité des
+  // thèmes DaisyUI `washguard` / `washguard-dark`.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle('dark', theme === 'dark');
+    root.setAttribute('data-theme', theme === 'dark' ? 'washguard-dark' : 'washguard');
+  }, [theme]);
 
   const onboarding = useMemo(() => computeOnboarding(state), [state]);
   const missing = useMemo(() => missingRequired(state), [state]);

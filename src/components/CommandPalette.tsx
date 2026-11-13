@@ -77,33 +77,31 @@ export function CommandPalette({
 
   return (
     <div
-      className="wg-overlay fixed inset-0 z-[95] flex items-start justify-center px-4 pt-[12vh]"
+      className="fixed inset-0 z-[95] flex items-start justify-center bg-black/60 px-4 pt-[12vh] backdrop-blur-sm"
       onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Recherche rapide"
-        className="wg-card wg-elev-2 wg-fade-in w-full max-w-xl overflow-hidden"
-        style={{ background: 'var(--wg-surface)' }}
+        className="card w-full max-w-xl animate-fade-in overflow-hidden bg-base-100 shadow-xl"
       >
-        <div className="flex items-center gap-3 border-b px-4 py-3" style={{ borderColor: 'var(--wg-border)' }}>
-          <FiSearch className="wg-muted shrink-0" aria-hidden="true" />
+        <div className="flex items-center gap-3 border-b border-base-300 px-4 py-3">
+          <FiSearch className="shrink-0 text-base-content/60" aria-hidden="true" />
           <input
             ref={inputRef}
             type="search"
-            className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-            style={{ color: 'var(--wg-text)' }}
+            className="min-w-0 flex-1 bg-transparent text-sm text-base-content outline-none"
             aria-label="Rechercher un écran"
             placeholder="Rechercher un écran, un module…"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
-          <button type="button" className="wg-muted" onClick={onClose} aria-label="Fermer la recherche"><FiX size={18} /></button>
+          <button type="button" className="text-base-content/60" onClick={onClose} aria-label="Fermer la recherche"><FiX size={18} /></button>
         </div>
-        <div role="listbox" aria-label="Écrans disponibles" className="wg-scroll-thin max-h-[52vh] overflow-y-auto p-2">
+        <div role="listbox" aria-label="Écrans disponibles" className="max-h-[52vh] overflow-y-auto p-2 [scrollbar-width:thin]">
           {results.length === 0 ? (
-            <p className="wg-muted px-3 py-6 text-center text-xs">Aucun écran autorisé ne correspond à « {query} ».</p>
+            <p className="px-3 py-6 text-center text-xs text-base-content/60">Aucun écran autorisé ne correspond à « {query} ».</p>
           ) : results.map(({ entry, group }, index) => (
             <button
               key={entry.to}
@@ -112,20 +110,20 @@ export function CommandPalette({
               aria-selected={index === active}
               onMouseEnter={() => setActive(index)}
               onClick={() => { if (entry.to) { navigate(entry.to); onClose(); } }}
-              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition ${index === active ? 'wg-nav-item-active' : 'wg-nav-item'}`}
+              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition ${index === active ? 'bg-primary font-semibold text-primary-content shadow-lg shadow-sky-500/20' : 'text-base-content/60 hover:bg-primary/10 hover:text-base-content'}`}
             >
               <span className="text-base">{entry.icon}</span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-semibold">{entry.label}</span>
-                <span className="wg-muted block truncate text-[11px]">{group}</span>
+                <span className="block truncate text-[11px] text-base-content/60">{group}</span>
               </span>
-              {index === active && <FiCornerDownLeft className="wg-muted shrink-0" size={14} aria-hidden="true" />}
+              {index === active && <FiCornerDownLeft className="shrink-0 text-base-content/60" size={14} aria-hidden="true" />}
             </button>
           ))}
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-2.5 text-[11px]" style={{ borderColor: 'var(--wg-border)' }}>
-          <span className="wg-muted">{results.length} écran(s) · ↑ ↓ pour parcourir · Entrée pour ouvrir</span>
-          <span className="wg-kbd">Échap</span>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-base-300 px-4 py-2.5 text-[11px]">
+          <span className="text-base-content/60">{results.length} écran(s) · ↑ ↓ pour parcourir · Entrée pour ouvrir</span>
+          <kbd>Échap</kbd>
         </div>
       </div>
     </div>

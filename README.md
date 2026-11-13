@@ -101,7 +101,7 @@ src/
   main.tsx              thème initial + providers
   App.tsx               routes, garde de session et gardes de rôle
   types.ts              types métier (reflet des tables Supabase)
-  index.css             thème sombre / clair (variables CSS) + composants Tailwind
+  index.css             règles globales (fond, focus, reçu) ; thèmes DaisyUI dans tailwind.config.js
   lib/
     format.ts           FCFA, jj/mm/aaaa, export CSV
     metrics.ts          rapports, commissions, théorique de caisse
@@ -143,7 +143,7 @@ Le projet évolue progressivement vers un ERP SaaS multi-entreprises. Le diagnos
 - [docs/architecture-target.md](docs/architecture-target.md) — organisation cible, contrat `DataAdapter`, multi-tenancy, RLS, RBAC, cycles de vie.
 - [docs/technical-debt.md](docs/technical-debt.md) — 38 dettes priorisées et 14 risques.
 - [docs/migration-roadmap.md](docs/migration-roadmap.md) — phases 02 → 10, mapping des données, cutover et rollback.
-- [docs/design-system.md](docs/design-system.md) — **Prompt 02** : tokens clair/sombre, 8 sections de navigation, composants réels (palette `Ctrl/Cmd + K`, fil d'Ariane, confirmation accessible, `DataTable`, états de chargement/erreur), accessibilité et dette restante.
+- [docs/design-system.md](docs/design-system.md) — **DaisyUI** : thèmes `washguard` / `washguard-dark`, 8 sections de navigation, composants réels (palette `Ctrl/Cmd + K`, fil d'Ariane, confirmation accessible, `DataTable`, états de chargement/erreur), accessibilité et dette restante.
 - [docs/database.md](docs/database.md) — **Prompt 03** : 10 migrations initiales, 51 tables, RLS sur 100 % des tables, 8 fonctions transactionnelles, isolation A/B vérifiée, `DataAdapter` en lecture seule derrière `VITE_DATA_SOURCE`, aucune donnée de démonstration. État historique après P10 : 49 migrations, 70 tables, 2 vues analytics, 48 permissions, 112 liaisons RBAC, 5 index P10 et Storage privé.
 - [docs/auth-rbac.md](docs/auth-rbac.md) — **Prompt 04** : 10 migrations supplémentaires (20 au total), Supabase Auth, confirmation e-mail, reset réel, invitations, affectations multi-stations, 31 permissions, `usePermissions`, audit append-only, aucune session forgeable depuis `localStorage`, aucun compte ni e-mail de test.
 - [docs/landing.md](docs/landing.md) — Vitrine WashGuard actuelle, navigation, exemples fictifs, prix et attribution historique.

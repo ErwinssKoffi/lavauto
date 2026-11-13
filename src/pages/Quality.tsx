@@ -158,7 +158,7 @@ export default function Quality() {
           <div className="mb-4 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-sm font-bold"><FiDatabase /> Pagination serveur</div>
             <button
-              className="wg-btn wg-btn-ghost !py-2"
+              className="btn btn-sm !py-2"
               disabled={!serverReady}
               onClick={() => { setPageError(null); fetchWashesPage(limit, pageIndex * limit).then(setPage).catch((e: unknown) => setPageError(e instanceof Error ? e.message : 'Erreur')); }}
             >
@@ -197,8 +197,8 @@ export default function Quality() {
                 </table>
               </div>
               <div className="mt-4 flex gap-2">
-                <button className="wg-btn wg-btn-ghost !py-2" disabled={pageIndex === 0} onClick={() => setPageIndex((n) => Math.max(0, n - 1))}>Précédent</button>
-                <button className="wg-btn wg-btn-ghost !py-2" disabled={!page.hasMore} onClick={() => setPageIndex((n) => n + 1)}>Suivant</button>
+                <button className="btn btn-sm !py-2" disabled={pageIndex === 0} onClick={() => setPageIndex((n) => Math.max(0, n - 1))}>Précédent</button>
+                <button className="btn btn-sm !py-2" disabled={!page.hasMore} onClick={() => setPageIndex((n) => n + 1)}>Suivant</button>
               </div>
             </>
           )}
@@ -206,7 +206,7 @@ export default function Quality() {
 
         <Card>
           <div className="mb-4 flex items-center gap-2 text-sm font-bold"><FiHardDrive /> Stockage du logo</div>
-          <p className="wg-muted mb-4 text-xs leading-relaxed">
+          <p className="text-base-content/60 mb-4 text-xs leading-relaxed">
             Bucket privé <code>station-assets</code>, 5 Mo maximum, PNG / JPEG / WebP. Le logo est optimisé en WebP jusqu’à 512 px lorsque possible ; sinon le fichier d’origine est conservé. Le chemin est construit par le serveur et l’URL est signée une heure. Cet envoi de diagnostic ne modifie pas le logo de la station : utilisez Paramètres pour l’associer.
           </p>
           <input
@@ -216,7 +216,7 @@ export default function Quality() {
             className="mb-3 block w-full text-xs text-slate-300"
             onChange={(event) => setFile(event.target.files?.[0] ?? null)}
           />
-          <button className="wg-btn wg-btn-primary" disabled={!serverReady || !canWriteSubscription || !file || uploading} onClick={handleUpload}>
+          <button className="btn btn-sm btn-primary" disabled={!serverReady || !canWriteSubscription || !file || uploading} onClick={handleUpload}>
             <FiUpload /> {uploading ? 'Envoi…' : 'Envoyer le logo'}
           </button>
           {uploadError && <div className="mt-3"><Alert kind="warn">{uploadError}</Alert></div>}
@@ -226,7 +226,7 @@ export default function Quality() {
               <div><span className="text-slate-400">Clé d’idempotence :</span> <code>{upload.idempotencyKey}</code></div>
               <div><span className="text-slate-400">Optimisation :</span> {upload.optimized ? 'WebP 512 px' : 'fichier d’origine conservé'} · {upload.bytes} octets</div>
               {logoPreview.loading && <p>Préparation de l’URL signée…</p>}
-              {logoPreview.error && <button type="button" className="wg-link" onClick={logoPreview.retry}>Réessayer l’URL signée</button>}
+              {logoPreview.error && <button type="button" className="link link-primary" onClick={logoPreview.retry}>Réessayer l’URL signée</button>}
               {logoPreview.url && <a className="inline-flex items-center gap-1 text-sky-300 hover:underline" href={logoPreview.url} target="_blank" rel="noreferrer">
                 Ouvrir l’URL signée <FiExternalLink />
               </a>}
@@ -267,7 +267,7 @@ export default function Quality() {
           <ul className="grid grid-cols-1 gap-1 text-xs text-sky-300 sm:grid-cols-2">
             {DOCS.map((doc) => <li key={doc}><code>{doc}</code></li>)}
           </ul>
-          <p className="wg-muted mt-3 text-xs">
+          <p className="text-base-content/60 mt-3 text-xs">
             Les parcours locaux et les scénarios Supabase simulés sont exécutés en CI avec Chromium. Les 15 vérifications de routes JSDOM de <code>npm run check</code> ne remplacent pas ces interactions ni une recette sur service réel.
           </p>
         </Card>

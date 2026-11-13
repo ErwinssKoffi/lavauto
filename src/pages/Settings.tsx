@@ -46,7 +46,7 @@ export default function Settings() {
             <Input label="Téléphone" value={stationDraft.phone} onChange={(e) => setStationDraft({ ...stationDraft, phone: e.target.value })} />
             <Input label="Devise" value="FCFA" disabled hint="La devise est fixée en FCFA pour toutes les stations." />
           </div>
-          <button className="wg-btn wg-btn-primary mt-4" onClick={() => { void safe(async () => { await updateStation(stationDraft); notify('success', 'Identité de la station enregistrée.'); }); }}><FiSave /> Enregistrer</button>
+          <button className="btn btn-sm btn-primary mt-4" onClick={() => { void safe(async () => { await updateStation(stationDraft); notify('success', 'Identité de la station enregistrée.'); }); }}><FiSave /> Enregistrer</button>
           </fieldset>
           <StationLogoEditor />
         </Card>
@@ -57,8 +57,8 @@ export default function Settings() {
             <div className="mb-4"><Alert kind="warn">En mode Supabase, la caisse ouverte est obligatoire pour les espèces et le plafond de remise du caissier n’est pas configurable ici. Le barème et l’objectif sont enregistrés pour la station.</Alert></div>
           )}
           <fieldset disabled={!canWriteSubscription} className="min-w-0">
-          <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border p-4" style={{ borderColor: 'var(--wg-border)' }}>
-            <div><p className="text-sm font-bold">Espèces : caisse ouverte obligatoire</p><p className="wg-muted text-xs">Désactivable station par station. Mobile Money enregistrable à tout moment.</p></div>
+          <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border p-4">
+            <div><p className="text-sm font-bold">Espèces : caisse ouverte obligatoire</p><p className="text-base-content/60 text-xs">Désactivable station par station. Mobile Money enregistrable à tout moment.</p></div>
             <input type="checkbox" className="h-5 w-5 accent-sky-500" disabled={!canEditCashRules} checked={rules.cashRequiresOpen} onChange={(e) => setRules({ ...rules, cashRequiresOpen: e.target.checked })} />
           </label>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -66,7 +66,7 @@ export default function Settings() {
             <Input label="Barème des commissions (%)" type="number" min="0" max="100" value={rules.commissionRate} onChange={(e) => setRules({ ...rules, commissionRate: readNumber(e.target.value) })} />
             <Input label="Objectif de CA du mois (FCFA)" type="number" min="0" value={rules.monthlyTarget} onChange={(e) => setRules({ ...rules, monthlyTarget: readNumber(e.target.value) })} />
           </div>
-          <button className="wg-btn wg-btn-primary mt-4" onClick={() => { void safe(async () => {
+          <button className="btn btn-sm btn-primary mt-4" onClick={() => { void safe(async () => {
             await updateStation(canEditCashRules ? rules : { commissionRate: rules.commissionRate, monthlyTarget: rules.monthlyTarget });
             notify('success', 'Règles de la station enregistrées.');
           }); }}><FiSave /> Enregistrer</button>
@@ -78,16 +78,16 @@ export default function Settings() {
           <fieldset disabled={!canWriteSubscription} className="min-w-0">
           <div className="space-y-2">
             {hours.map((h, i) => (
-              <div key={h.day} className="flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: 'var(--wg-border)' }}>
+              <div key={h.day} className="flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-xs">
                 <span className="w-20 font-bold">{h.day}</span>
-                <input type="time" className="wg-input !w-28 !py-1" disabled={h.closed} value={h.open} onChange={(e) => setLocalHours((hs) => hs.map((x, idx) => idx === i ? { ...x, open: e.target.value } : x))} />
-                <span className="wg-muted">→</span>
-                <input type="time" className="wg-input !w-28 !py-1" disabled={h.closed} value={h.close} onChange={(e) => setLocalHours((hs) => hs.map((x, idx) => idx === i ? { ...x, close: e.target.value } : x))} />
-                <label className="wg-muted ml-auto flex items-center gap-1.5"><input type="checkbox" className="accent-sky-500" checked={h.closed} onChange={(e) => setLocalHours((hs) => hs.map((x, idx) => idx === i ? { ...x, closed: e.target.checked } : x))} /> Fermé</label>
+                <input type="time" className="input input-bordered input-sm !w-28 !py-1" disabled={h.closed} value={h.open} onChange={(e) => setLocalHours((hs) => hs.map((x, idx) => idx === i ? { ...x, open: e.target.value } : x))} />
+                <span className="text-base-content/60">→</span>
+                <input type="time" className="input input-bordered input-sm !w-28 !py-1" disabled={h.closed} value={h.close} onChange={(e) => setLocalHours((hs) => hs.map((x, idx) => idx === i ? { ...x, close: e.target.value } : x))} />
+                <label className="text-base-content/60 ml-auto flex items-center gap-1.5"><input type="checkbox" className="accent-sky-500" checked={h.closed} onChange={(e) => setLocalHours((hs) => hs.map((x, idx) => idx === i ? { ...x, closed: e.target.checked } : x))} /> Fermé</label>
               </div>
             ))}
           </div>
-          <button className="wg-btn wg-btn-primary mt-4" onClick={() => { void safe(async () => { await setHours(hours); notify('success', 'Horaires enregistrés.'); }); }}><FiSave /> Enregistrer les horaires</button>
+          <button className="btn btn-sm btn-primary mt-4" onClick={() => { void safe(async () => { await setHours(hours); notify('success', 'Horaires enregistrés.'); }); }}><FiSave /> Enregistrer les horaires</button>
           </fieldset>
         </Card>
 
@@ -99,16 +99,16 @@ export default function Settings() {
             <Input label="Ville" value={companyDraft.city} onChange={(e) => setCompanyDraft({ ...companyDraft, city: e.target.value })} />
             <Input label="Téléphone" value={companyDraft.phone} onChange={(e) => setCompanyDraft({ ...companyDraft, phone: e.target.value })} />
           </div>
-          <button className="wg-btn wg-btn-primary mt-4" onClick={() => { void safe(async () => { await updateCompany(companyDraft); notify('success', 'Entreprise enregistrée.'); }); }}><FiSave /> Enregistrer</button>
+          <button className="btn btn-sm btn-primary mt-4" onClick={() => { void safe(async () => { await updateCompany(companyDraft); notify('success', 'Entreprise enregistrée.'); }); }}><FiSave /> Enregistrer</button>
           </fieldset>
 
-          {can('audit.view') && <div className="mt-6 border-t pt-5" style={{ borderColor: 'var(--wg-border)' }}>
+          {can('audit.view') && <div className="mt-6 border-t pt-5">
             <SectionTitle hint="Traçabilité des actions sensibles de la station.">Journal des opérations sensibles</SectionTitle>
             <div className="max-h-56 space-y-1.5 overflow-y-auto">
-              {state.auditLogs.length === 0 ? <p className="wg-muted text-xs">Aucune opération sensible enregistrée.</p> : state.auditLogs.map((l) => (
-                <div key={l.id} className="rounded-lg px-3 py-2 text-xs" style={{ background: 'var(--wg-surface-2)' }}>
-                  <div className="flex flex-wrap justify-between gap-2"><span className="font-bold">{l.action}</span><span className="wg-muted">{formatDateTime(l.at)}</span></div>
-                  <p className="wg-muted mt-0.5">{l.actor} · {l.detail}</p>
+              {state.auditLogs.length === 0 ? <p className="text-base-content/60 text-xs">Aucune opération sensible enregistrée.</p> : state.auditLogs.map((l) => (
+                <div key={l.id} className="rounded-lg px-3 py-2 text-xs bg-base-200">
+                  <div className="flex flex-wrap justify-between gap-2"><span className="font-bold">{l.action}</span><span className="text-base-content/60">{formatDateTime(l.at)}</span></div>
+                  <p className="text-base-content/60 mt-0.5">{l.actor} · {l.detail}</p>
                 </div>
               ))}
             </div>
@@ -128,21 +128,21 @@ export default function Settings() {
                   <Badge tone="success">Tous les stocks sont au-dessus des seuils</Badge>
                 )}
               </div>
-              <p className="wg-muted mt-1 text-xs">
+              <p className="text-base-content/60 mt-1 text-xs">
                 Une alerte est déclenchée dès que le stock descend à ou sous le seuil critique.
               </p>
-              <p className="wg-muted mt-1 text-xs">
+              <p className="text-base-content/60 mt-1 text-xs">
                 {canEditThreshold
                   ? 'Modifiez le seuil critique de chaque produit puis quittez le champ (ou appuyez sur Entrée) pour l’enregistrer.'
                   : 'Pour les opérations de stock et réceptions, utilisez le module Stocks & achats.'}
               </p>
             </div>
-            <Link to="/app/stock" className="wg-link text-xs">Ouvrir le module Stocks complet →</Link>
+            <Link to="/app/stock" className="link link-primary text-xs">Ouvrir le module Stocks complet →</Link>
           </div>
 
-          <div className="mt-4 divide-y" style={{ borderColor: 'var(--wg-border)' }}>
+          <div className="mt-4 divide-y">
             {state.products.length === 0 ? (
-              <p className="wg-muted py-4 text-xs">Aucun produit configuré.</p>
+              <p className="text-base-content/60 py-4 text-xs">Aucun produit configuré.</p>
             ) : (
               state.products.map((p) => {
                 const level = state.stockLevels.find((l) => l.productId === p.id);
@@ -157,7 +157,7 @@ export default function Settings() {
                         <p className="font-bold text-white">{p.name}</p>
                         <span className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">{p.sku}</span>
                       </div>
-                      <p className="wg-muted text-[11px]">{p.category || 'Consommable'} · Unité : {p.unit}</p>
+                      <p className="text-base-content/60 text-[11px]">{p.category || 'Consommable'} · Unité : {p.unit}</p>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-4">
@@ -178,7 +178,7 @@ export default function Settings() {
                               type="number"
                               min="0"
                               disabled={!canWriteSubscription}
-                              className="wg-input !py-1 !text-xs font-bold"
+                              className="input input-bordered input-sm !py-1 !text-xs font-bold"
                               defaultValue={p.reorderLevel}
                               onBlur={(e) => { const value = readNumber(e.target.value); if (value !== p.reorderLevel) void safe(() => updateStockThreshold(p.id, value)); }}
                               onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
@@ -209,14 +209,14 @@ export default function Settings() {
           <Badge><FiShield /> Thème sombre par défaut, clair disponible</Badge>
           <Badge><FiLock /> Montants FCFA · dates jj/mm/aaaa</Badge>
         </div>
-        <p className="wg-muted mt-3 text-xs leading-relaxed">
+        <p className="text-base-content/60 mt-3 text-xs leading-relaxed">
           {authKind === 'api'
             ? 'Les comptes, permissions, écritures financières, stocks et audits sont persistés en base PostgreSQL via le serveur WashGuard.'
             : authKind === 'supabase'
               ? 'L’authentification et les permissions sont servies par Supabase Auth et les RPC RBAC.'
               : 'Mode stockage navigateur actif.'}
         </p>
-        {isLocalStockDemo && <button className="wg-btn wg-btn-danger mt-4" onClick={() => setConfirmReset(true)}><FiTrash2 /> Réinitialiser les données locales</button>}
+        {isLocalStockDemo && <button className="btn btn-sm btn-error btn-outline mt-4" onClick={() => setConfirmReset(true)}><FiTrash2 /> Réinitialiser les données locales</button>}
       </Card>
 
       <ConfirmDialog

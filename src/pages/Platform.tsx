@@ -83,8 +83,8 @@ export default function Platform() {
     return (
       <div>
         <PageHeader title="Espace plateforme" subtitle="Réservé au support WashGuard." />
-        <Card className="flex items-start gap-3 border-red-500/30"><FiLock className="mt-0.5 text-xl text-red-400" />
-          <div><h2 className="text-sm font-bold">Accès refusé</h2><p className="wg-muted mt-1 text-xs">Cet espace est réservé au support WashGuard : entreprises clientes, formules, abonnements, suspension, quotas et journaux.</p></div>
+        <Card className="flex flex-row items-start gap-3 border-red-500/30"><FiLock className="mt-0.5 text-xl text-red-400" />
+          <div><h2 className="text-sm font-bold">Accès refusé</h2><p className="text-base-content/60 mt-1 text-xs">Cet espace est réservé au support WashGuard : entreprises clientes, formules, abonnements, suspension, quotas et journaux.</p></div>
         </Card>
       </div>
     );
@@ -116,36 +116,36 @@ export default function Platform() {
       <Card className="mt-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-bold">Demandes de formule en attente</h2>
-          {connected && <button className="wg-btn wg-btn-ghost !px-2 !py-1 text-xs" disabled={decisionBusy} onClick={() => { void safe(refreshSubscriptionRequests); }}><FiRefreshCw /> Relire les demandes</button>}
+          {connected && <button className="btn btn-sm !px-2 !py-1 text-xs" disabled={decisionBusy} onClick={() => { void safe(refreshSubscriptionRequests); }}><FiRefreshCw /> Relire les demandes</button>}
         </div>
         {!connected ? <Alert kind="info">Démonstration locale : aucune demande réelle n’est transmise et aucune validation administrateur n’est simulée.</Alert>
           : subscriptionRequestsError ? <Alert kind="danger">Demandes indisponibles : {subscriptionRequestsError}</Alert>
-          : subscriptionRequests.length === 0 ? <p className="wg-muted text-xs">Aucune demande en attente.</p>
-          : <div className="space-y-3">{subscriptionRequests.map((request) => <div key={request.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3" style={{ borderColor: 'var(--wg-border)' }}>
+          : subscriptionRequests.length === 0 ? <p className="text-base-content/60 text-xs">Aucune demande en attente.</p>
+          : <div className="space-y-3">{subscriptionRequests.map((request) => <div key={request.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3">
             <div><p className="text-sm font-bold">{request.companyName} · {request.toPlanName}</p>
-              <p className="wg-muted mt-1 text-xs">Demandée le {formatDateTime(request.requestedAt)} · depuis {request.fromPlanId ?? '—'} · référence {request.id.slice(0, 8)}</p></div>
-            <div className="flex gap-2"><button className="wg-btn wg-btn-ghost" disabled={decisionBusy} onClick={() => setDecision({ request, approve: false })}>Refuser</button>
-              <button className="wg-btn wg-btn-primary" disabled={decisionBusy} onClick={() => setDecision({ request, approve: true })}>Valider la formule</button></div>
+              <p className="text-base-content/60 mt-1 text-xs">Demandée le {formatDateTime(request.requestedAt)} · depuis {request.fromPlanId ?? '—'} · référence {request.id.slice(0, 8)}</p></div>
+            <div className="flex gap-2"><button className="btn btn-sm" disabled={decisionBusy} onClick={() => setDecision({ request, approve: false })}>Refuser</button>
+              <button className="btn btn-sm btn-primary" disabled={decisionBusy} onClick={() => setDecision({ request, approve: true })}>Valider la formule</button></div>
           </div>)}</div>}
-        <p className="wg-muted mt-3 text-xs">La validation active la formule demandée ; elle n’enregistre ni paiement ni facture. Vérifiez les conditions commerciales séparément.</p>
+        <p className="text-base-content/60 mt-3 text-xs">La validation active la formule demandée ; elle n’enregistre ni paiement ni facture. Vérifiez les conditions commerciales séparément.</p>
       </Card>
 
       <Card className="mt-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-bold">Entreprises clientes</h2>
-          <button className="wg-btn wg-btn-ghost !px-2 !py-1 text-xs" onClick={() => void safe(async () => { await refreshPlatform(); })}>
+          <button className="btn btn-sm !px-2 !py-1 text-xs" onClick={() => void safe(async () => { await refreshPlatform(); })}>
             <FiRefreshCw /> Actualiser
           </button>
         </div>
         {companies.length === 0 ? (
           <EmptyState icon={<FiBriefcase />} title="Aucune entreprise enregistrée" description="Les entreprises apparaîtront après leur inscription. Aucune donnée d’exemple n’est ajoutée." />
         ) : (
-          <div className="wg-scroll-x rounded-xl border" style={{ borderColor: 'var(--wg-border)' }}>
-            <table>
+          <div className="overflow-x-auto rounded-xl border">
+            <table className="table min-w-[620px]">
               <thead><tr>
-                <th className="wg-th">Entreprise</th><th className="wg-th">Ville</th><th className="wg-th">Formule</th>
-                <th className="wg-th">Statut</th><th className="wg-th">Stations</th><th className="wg-th">Comptes utilisés</th>
-                <th className="wg-th">Lavages / mois UTC</th><th className="wg-th">CA du mois UTC</th><th className="wg-th">Quota</th><th className="wg-th">Action</th>
+                <th>Entreprise</th><th>Ville</th><th>Formule</th>
+                <th>Statut</th><th>Stations</th><th>Comptes utilisés</th>
+                <th>Lavages / mois UTC</th><th>CA du mois UTC</th><th>Quota</th><th>Action</th>
               </tr></thead>
               <tbody>
                 {companies.map((c) => {
@@ -154,18 +154,18 @@ export default function Platform() {
                   const statusTone = status === 'active' ? 'success' : status === 'trial' || status.endsWith('_expired') ? 'warn' : 'danger';
                   return (
                     <tr key={c.companyId}>
-                      <td className="wg-td font-bold">{c.name}<div className="wg-muted text-[11px]">{formatDate(c.companyCreatedAt)}</div></td>
-                      <td className="wg-td">{c.city || '—'}</td>
-                      <td className="wg-td">{c.planName ?? c.planId ?? '—'}</td>
-                      <td className="wg-td"><Badge tone={statusTone}>{STATUS_LABELS[status] ?? status}</Badge></td>
-                      <td className="wg-td">{c.stationCount} / {c.limits.stations ?? 'indisponible'}</td>
-                      <td className="wg-td">{c.employeeCount} / {c.limits.employees ?? 'indisponible'}</td>
-                      <td className="wg-td">{c.washesMonth} / {c.limits.washesPerMonth ?? 'indisponible'}</td>
-                      <td className="wg-td">{formatFCFA(c.monthlyRevenue)}</td>
-                      <td className="wg-td">{c.quota.quotaExceeded ? <Badge tone="danger">Dépassé</Badge>
+                      <td className="font-bold">{c.name}<div className="text-base-content/60 text-[11px]">{formatDate(c.companyCreatedAt)}</div></td>
+                      <td>{c.city || '—'}</td>
+                      <td>{c.planName ?? c.planId ?? '—'}</td>
+                      <td><Badge tone={statusTone}>{STATUS_LABELS[status] ?? status}</Badge></td>
+                      <td>{c.stationCount} / {c.limits.stations ?? 'indisponible'}</td>
+                      <td>{c.employeeCount} / {c.limits.employees ?? 'indisponible'}</td>
+                      <td>{c.washesMonth} / {c.limits.washesPerMonth ?? 'indisponible'}</td>
+                      <td>{formatFCFA(c.monthlyRevenue)}</td>
+                      <td>{c.quota.quotaExceeded ? <Badge tone="danger">Dépassé</Badge>
                         : quotaUnavailable ? <Badge tone="warn">Limite indisponible</Badge> : <Badge tone="success">OK</Badge>}</td>
-                      <td className="wg-td">
-                        <button className="wg-btn wg-btn-ghost !px-2 !py-1 text-xs"
+                      <td>
+                        <button className="btn btn-sm !px-2 !py-1 text-xs"
                           onClick={() => void safe(async () => {
                             await setCompanySuspended({ companyId: c.companyId, suspended: !c.suspended });
                           })}>
@@ -179,7 +179,7 @@ export default function Platform() {
             </table>
           </div>
         )}
-        <p className="wg-muted mt-3 text-xs">Les comptes utilisés comprennent le propriétaire, les profils actifs et les invitations réservées non résolues. Une limite indisponible ne signifie pas « illimité ».</p>
+        <p className="text-base-content/60 mt-3 text-xs">Les comptes utilisés comprennent le propriétaire, les profils actifs et les invitations réservées non résolues. Une limite indisponible ne signifie pas « illimité ».</p>
       </Card>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
@@ -196,7 +196,7 @@ export default function Platform() {
             <Input label="Ordre d’affichage" type="number" min={0} value={planDraft.sortOrder} onChange={(e) => setPlanDraft({ ...planDraft, sortOrder: Number(e.target.value) })} />
           </div>
           <label className="mt-3 flex items-center gap-2 text-xs"><input type="checkbox" checked={planDraft.active} onChange={(e) => setPlanDraft({ ...planDraft, active: e.target.checked })} /> Formule active</label>
-          <button className="wg-btn wg-btn-primary mt-4" onClick={() => void safe(async () => {
+          <button className="btn btn-sm btn-primary mt-4" onClick={() => void safe(async () => {
             const plan = platformBoard.plans.find((p) => p.id === planDraft.planId);
             await savePlan({
               planId: planDraft.planId, name: planDraft.name,
@@ -207,7 +207,7 @@ export default function Platform() {
             });
           })}>Enregistrer la formule</button>
 
-          <div className="mt-5 grid gap-3 border-t pt-4 sm:grid-cols-3" style={{ borderColor: 'var(--wg-border)' }}>
+          <div className="mt-5 grid gap-3 border-t pt-4 sm:grid-cols-3">
             <Select label="Formule du quota" value={limitDraft.planId} onChange={(e) => setLimitDraft({ ...limitDraft, planId: e.target.value })}>
               {platformBoard.plans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </Select>
@@ -216,16 +216,16 @@ export default function Platform() {
             </Select>
             <Input label="Limite" type="number" min={0} value={limitDraft.valueInt} onChange={(e) => setLimitDraft({ ...limitDraft, valueInt: Number(e.target.value) })} />
           </div>
-          <button className="wg-btn wg-btn-ghost mt-3" onClick={() => void safe(async () => {
+          <button className="btn btn-sm mt-3" onClick={() => void safe(async () => {
             await setPlanLimit({ ...limitDraft, valueInt: Math.max(0, Math.round(limitDraft.valueInt)) });
           })}>Enregistrer le quota</button>
-          <p className="wg-muted mt-3 text-xs">{platformBoard.rules.quotas}. {platformBoard.rules.suspension}. Les droits techniques des modules sont définis par la configuration serveur, distincte de ces libellés.</p>
+          <p className="text-base-content/60 mt-3 text-xs">{platformBoard.rules.quotas}. {platformBoard.rules.suspension}. Les droits techniques des modules sont définis par la configuration serveur, distincte de ces libellés.</p>
         </Card>
 
         <Card>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-bold">Usage et quotas du mois</h2>
-            <button className="wg-btn wg-btn-ghost !px-2 !py-1 text-xs" onClick={() => void safe(async () => {
+            <button className="btn btn-sm !px-2 !py-1 text-xs" onClick={() => void safe(async () => {
               await refreshUsageCounters(quotaMonthStartISO());
             })}><FiRefreshCw /> Recalculer les compteurs</button>
           </div>
@@ -234,12 +234,12 @@ export default function Platform() {
             <LimitRow label="Comptes et invitations réservées" value={subscriptionUsage.usage.employees} max={subscriptionUsage.limits.employees} />
             <LimitRow label="Lavages du mois UTC" value={subscriptionUsage.usage.washes} max={subscriptionUsage.limits.washesPerMonth} />
           </div>
-          <p className="wg-muted mt-3 text-xs">{subscriptionUsage.rules.quota}. {stats.usageRows} ligne(s) d’usage dérivées des données réelles. Stations et comptes reflètent le moment du recalcul, pas un historique.</p>
-          <div className="mt-4 max-h-44 overflow-y-auto rounded-xl border" style={{ borderColor: 'var(--wg-border)' }}>
-            {platformBoard.subscriptionUsage.length === 0 ? <p className="wg-muted p-3 text-xs">Aucun compteur enregistré.</p> : (
-              <table><thead><tr><th className="wg-th">Station</th><th className="wg-th">Clé</th><th className="wg-th">Valeur</th><th className="wg-th">Période</th></tr></thead>
+          <p className="text-base-content/60 mt-3 text-xs">{subscriptionUsage.rules.quota}. {stats.usageRows} ligne(s) d’usage dérivées des données réelles. Stations et comptes reflètent le moment du recalcul, pas un historique.</p>
+          <div className="mt-4 max-h-44 overflow-y-auto rounded-xl border">
+            {platformBoard.subscriptionUsage.length === 0 ? <p className="text-base-content/60 p-3 text-xs">Aucun compteur enregistré.</p> : (
+              <table className="table w-full"><thead><tr><th>Station</th><th>Clé</th><th>Valeur</th><th>Période</th></tr></thead>
                 <tbody>{platformBoard.subscriptionUsage.slice(0, 30).map((row, i) => (
-                  <tr key={`${row.stationId}-${row.metricKey}-${i}`}><td className="wg-td">{row.stationId.slice(0, 8)}</td><td className="wg-td">{row.metricKey}</td><td className="wg-td">{row.valueInt}</td><td className="wg-td">{formatDate(row.periodStart)}</td></tr>
+                  <tr key={`${row.stationId}-${row.metricKey}-${i}`}><td>{row.stationId.slice(0, 8)}</td><td>{row.metricKey}</td><td>{row.valueInt}</td><td>{formatDate(row.periodStart)}</td></tr>
                 ))}</tbody></table>
             )}
           </div>
@@ -256,17 +256,17 @@ export default function Platform() {
         }} />
       <Card className="mt-5">
         <h2 className="mb-3 text-sm font-bold">Journal de la plateforme</h2>
-        {platformBoard.auditLogs.length === 0 ? <p className="wg-muted text-xs">Aucune opération enregistrée.</p> : (
+        {platformBoard.auditLogs.length === 0 ? <p className="text-base-content/60 text-xs">Aucune opération enregistrée.</p> : (
           <div className="max-h-80 space-y-1.5 overflow-y-auto">
             {platformBoard.auditLogs.map((log) => (
-              <div key={log.id} className="rounded-lg px-3 py-2 text-xs" style={{ background: 'var(--wg-surface-2)' }}>
-                <div className="flex flex-wrap justify-between gap-2"><span className="font-bold">{log.action}</span><span className="wg-muted">{formatDateTime(log.createdAt)}</span></div>
-                <p className="wg-muted mt-0.5">{log.actorUserId ?? 'Système'} · {log.entityType} {log.entityId} · {JSON.stringify(log.detail)}</p>
+              <div key={log.id} className="rounded-lg px-3 py-2 text-xs bg-base-200">
+                <div className="flex flex-wrap justify-between gap-2"><span className="font-bold">{log.action}</span><span className="text-base-content/60">{formatDateTime(log.createdAt)}</span></div>
+                <p className="text-base-content/60 mt-0.5">{log.actorUserId ?? 'Système'} · {log.entityType} {log.entityId} · {JSON.stringify(log.detail)}</p>
               </div>
             ))}
           </div>
         )}
-        <p className="wg-muted mt-3 text-xs">{platformBoard.rules.audit}. Aucune opération n’est supprimée du journal.</p>
+        <p className="text-base-content/60 mt-3 text-xs">{platformBoard.rules.audit}. Aucune opération n’est supprimée du journal.</p>
       </Card>
     </div>
   );
@@ -275,7 +275,7 @@ export default function Platform() {
 function LimitRow({ label, value, max }: { label: string; value: number; max: number | null }) {
   return (
     <div>
-      <div className="mb-1 flex justify-between text-xs"><span className="font-medium">{label}</span><span className="wg-muted">{value.toLocaleString('fr-FR')} / {max === null ? 'limite indisponible' : max.toLocaleString('fr-FR')}</span></div>
+      <div className="mb-1 flex justify-between text-xs"><span className="font-medium">{label}</span><span className="text-base-content/60">{value.toLocaleString('fr-FR')} / {max === null ? 'limite indisponible' : max.toLocaleString('fr-FR')}</span></div>
       {max !== null && <Progress value={value} max={max} tone={value >= max ? 'warn' : 'accent'} />}
     </div>
   );

@@ -26,8 +26,8 @@ export default function Consumptions() {
     <div>
       <PageHeader title="Consommations" subtitle="Normes produit × prestation, consommation théorique valorisée une seule fois par lavage et coût de revient certifiable."
         actions={<div className="flex gap-2">
-          {dataSource !== 'local' && <button className="wg-btn wg-btn-ghost" onClick={() => { void refreshStock().catch(() => {}); }}><FiRefreshCw /> Actualiser</button>}
-          <button className="wg-btn wg-btn-primary" disabled={!canOperate || state.stockServices.length === 0 || state.products.length === 0} onClick={() => setOpen(true)}><FiPlus /> Nouvelle norme</button>
+          {dataSource !== 'local' && <button className="btn btn-sm" onClick={() => { void refreshStock().catch(() => {}); }}><FiRefreshCw /> Actualiser</button>}
+          <button className="btn btn-sm btn-primary" disabled={!canOperate || state.stockServices.length === 0 || state.products.length === 0} onClick={() => setOpen(true)}><FiPlus /> Nouvelle norme</button>
         </div>} />
 
       {!activated && <div className="mb-5"><LockedPanel /></div>}
@@ -51,13 +51,13 @@ export default function Consumptions() {
         <Card>
           <h2 className="mb-3 text-sm font-bold">Normes de consommation théorique</h2>
           {state.serviceConsumptions.length === 0 ? <EmptyState icon={<FiLayers />} title="Aucune norme" description="Associez un produit à une prestation pour valoriser les lavages terminés." /> : (
-            <div className="wg-scroll-x rounded-xl border" style={{ borderColor: 'var(--wg-border)' }}><table>
-              <thead><tr><th className="wg-th">Prestation</th><th className="wg-th">Produit</th><th className="wg-th">Qté / lavage</th><th className="wg-th">État</th></tr></thead>
+            <div className="overflow-x-auto rounded-xl border"><table className="table min-w-[620px]">
+              <thead><tr><th>Prestation</th><th>Produit</th><th>Qté / lavage</th><th>État</th></tr></thead>
               <tbody>{state.serviceConsumptions.map((r) => (
-                <tr key={r.id}><td className="wg-td font-semibold">{serviceById.get(r.serviceId)?.name ?? r.serviceId}</td>
-                  <td className="wg-td">{productById.get(r.productId)?.name ?? r.productId}</td>
-                  <td className="wg-td font-bold">{r.qtyPerWash}</td>
-                  <td className="wg-td"><Badge tone={r.active ? 'success' : 'neutral'}>{r.active ? 'Active' : 'Inactive'}</Badge></td></tr>
+                <tr key={r.id}><td className="font-semibold">{serviceById.get(r.serviceId)?.name ?? r.serviceId}</td>
+                  <td>{productById.get(r.productId)?.name ?? r.productId}</td>
+                  <td className="font-bold">{r.qtyPerWash}</td>
+                  <td><Badge tone={r.active ? 'success' : 'neutral'}>{r.active ? 'Active' : 'Inactive'}</Badge></td></tr>
               ))}</tbody>
             </table></div>
           )}
@@ -66,12 +66,12 @@ export default function Consumptions() {
         <Card>
           <h2 className="mb-3 text-sm font-bold">Fiches à consommer</h2>
           {eligible.length === 0 ? <EmptyState icon={<FiLayers />} title="Aucune fiche en attente" description="Toutes les fiches terminées ou livrées sont déjà valorisées, ou aucune n’est encore prête." /> : (
-            <div className="wg-scroll-x rounded-xl border" style={{ borderColor: 'var(--wg-border)' }}><table>
-              <thead><tr><th className="wg-th">Fiche</th><th className="wg-th">Véhicule</th><th className="wg-th">Statut</th><th className="wg-th" /></tr></thead>
+            <div className="overflow-x-auto rounded-xl border"><table className="table min-w-[620px]">
+              <thead><tr><th>Fiche</th><th>Véhicule</th><th>Statut</th><th /></tr></thead>
               <tbody>{eligible.map((w) => (
-                <tr key={w.id}><td className="wg-td font-semibold">{w.number}</td><td className="wg-td">{w.plate}</td>
-                  <td className="wg-td"><Badge>{w.status === 'delivered' ? 'Livrée' : 'Prête'}</Badge></td>
-                  <td className="wg-td"><button className="wg-link text-xs" disabled={!canOperate} onClick={() => safe(async () => { await consumeWash(w.id); })}>Consommer</button></td></tr>
+                <tr key={w.id}><td className="font-semibold">{w.number}</td><td>{w.plate}</td>
+                  <td><Badge>{w.status === 'delivered' ? 'Livrée' : 'Prête'}</Badge></td>
+                  <td><button className="link link-primary text-xs" disabled={!canOperate} onClick={() => safe(async () => { await consumeWash(w.id); })}>Consommer</button></td></tr>
               ))}</tbody>
             </table></div>
           )}
@@ -80,11 +80,11 @@ export default function Consumptions() {
         <Card>
           <h2 className="mb-3 text-sm font-bold">Exécutions valorisées</h2>
           {state.consumptionRuns.length === 0 ? <EmptyState icon={<FiLayers />} title="Aucune consommation" description="Chaque exécution crée un relevé et des mouvements de sortie valorisés." /> : (
-            <div className="wg-scroll-x rounded-xl border" style={{ borderColor: 'var(--wg-border)' }}><table>
-              <thead><tr><th className="wg-th">Date</th><th className="wg-th">Fiche</th><th className="wg-th">Mouvements</th><th className="wg-th">Valeur</th></tr></thead>
+            <div className="overflow-x-auto rounded-xl border"><table className="table min-w-[620px]">
+              <thead><tr><th>Date</th><th>Fiche</th><th>Mouvements</th><th>Valeur</th></tr></thead>
               <tbody>{state.consumptionRuns.map((r) => (
-                <tr key={r.id}><td className="wg-td">{formatDate(r.createdAt)}</td><td className="wg-td font-semibold">{r.washId}</td>
-                  <td className="wg-td">{r.movementCount}</td><td className="wg-td font-bold">{formatFCFA(r.valuedMinor)}</td></tr>
+                <tr key={r.id}><td>{formatDate(r.createdAt)}</td><td className="font-semibold">{r.washId}</td>
+                  <td>{r.movementCount}</td><td className="font-bold">{formatFCFA(r.valuedMinor)}</td></tr>
               ))}</tbody>
             </table></div>
           )}
@@ -93,19 +93,19 @@ export default function Consumptions() {
         <Card>
           <h2 className="mb-3 text-sm font-bold">Sorties de stock</h2>
           {consumptionMovements.length === 0 ? <EmptyState icon={<FiLayers />} title="Aucune sortie" description="Les sorties valorisées alimentent le coût de revient de la période." /> : (
-            <div className="wg-scroll-x rounded-xl border" style={{ borderColor: 'var(--wg-border)' }}><table>
-              <thead><tr><th className="wg-th">Produit</th><th className="wg-th">Quantité</th><th className="wg-th">Coût unitaire</th><th className="wg-th">Valeur</th></tr></thead>
+            <div className="overflow-x-auto rounded-xl border"><table className="table min-w-[620px]">
+              <thead><tr><th>Produit</th><th>Quantité</th><th>Coût unitaire</th><th>Valeur</th></tr></thead>
               <tbody>{consumptionMovements.map((m) => (
-                <tr key={m.id}><td className="wg-td font-semibold">{productById.get(m.productId)?.name ?? m.productId}</td>
-                  <td className="wg-td">{Math.abs(m.qtyDelta)}</td><td className="wg-td">{formatFCFA(m.unitCostMinor)}</td>
-                  <td className="wg-td font-bold">{formatFCFA(Math.abs(m.qtyDelta) * m.unitCostMinor)}</td></tr>
+                <tr key={m.id}><td className="font-semibold">{productById.get(m.productId)?.name ?? m.productId}</td>
+                  <td>{Math.abs(m.qtyDelta)}</td><td>{formatFCFA(m.unitCostMinor)}</td>
+                  <td className="font-bold">{formatFCFA(Math.abs(m.qtyDelta) * m.unitCostMinor)}</td></tr>
               ))}</tbody>
             </table></div>
           )}
         </Card>
       </div>
 
-      <p className="wg-muted mt-4 text-xs">La consommation ne remplace pas la certification : les achats rattachés, mouvements valorisés et commissions validées restent contrôlés avant publication du résultat net.</p>
+      <p className="text-base-content/60 mt-4 text-xs">La consommation ne remplace pas la certification : les achats rattachés, mouvements valorisés et commissions validées restent contrôlés avant publication du résultat net.</p>
 
       <Modal open={open} onClose={() => setOpen(false)} title="Nouvelle norme de consommation">
         <div className="grid gap-3 sm:grid-cols-2">
@@ -120,8 +120,8 @@ export default function Consumptions() {
             <option value="active">Active</option><option value="inactive">Inactive</option>
           </Select>
         </div>
-        <div className="mt-5 flex justify-end gap-2"><button className="wg-btn wg-btn-ghost" onClick={() => setOpen(false)}><FiX /> Annuler</button>
-          <button className="wg-btn wg-btn-primary" disabled={!canOperate} onClick={() => safe(async () => {
+        <div className="mt-5 flex justify-end gap-2"><button className="btn btn-sm" onClick={() => setOpen(false)}><FiX /> Annuler</button>
+          <button className="btn btn-sm btn-primary" disabled={!canOperate} onClick={() => safe(async () => {
             await saveServiceConsumption({ serviceId: f.serviceId, productId: f.productId, qtyPerWash: f.qtyPerWash, active: f.active });
             setF({ serviceId: '', productId: '', qtyPerWash: 1, active: true }); setOpen(false);
           })}>Enregistrer</button></div>

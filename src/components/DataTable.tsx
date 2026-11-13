@@ -68,10 +68,10 @@ export function DataTable<T>({
     <div>
       {searchText && (
         <div className="relative mb-3">
-          <FiSearch className="wg-muted pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
+          <FiSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-base-content/60" aria-hidden="true" />
           <input
             type="search"
-            className="wg-input !pl-9"
+            className="input input-bordered input-sm w-full !pl-9"
             aria-label={searchPlaceholder}
             placeholder={searchPlaceholder}
             value={query}
@@ -82,9 +82,9 @@ export function DataTable<T>({
       {visible.length === 0 ? (
         <EmptyState title={query ? 'Aucun résultat pour cette recherche' : emptyTitle} description={query ? 'Essayez un autre terme.' : emptyDescription} />
       ) : (
-        <div className="wg-scroll-x rounded-xl border" style={{ borderColor: 'var(--wg-border)' }}>
-          <table>
-            <thead>
+        <div className="overflow-x-auto rounded-xl border border-base-300">
+          <table className="table min-w-[620px]">
+            <thead className="uppercase tracking-wider">
               <tr>
                 {columns.map((column) => {
                   const active = sort?.key === column.key;
@@ -92,7 +92,7 @@ export function DataTable<T>({
                   return (
                     <th
                       key={column.key}
-                      className="wg-th"
+                     
                       aria-sort={column.sortValue ? ariaSort : undefined}
                       style={column.align === 'right' ? { textAlign: 'right' } : undefined}
                     >
@@ -111,7 +111,7 @@ export function DataTable<T>({
               {visible.map((row) => (
                 <tr key={rowKey(row)}>
                   {columns.map((column) => (
-                    <td key={column.key} className="wg-td" style={column.align === 'right' ? { textAlign: 'right' } : undefined}>
+                    <td key={column.key} style={column.align === 'right' ? { textAlign: 'right' } : undefined}>
                       {column.render(row)}
                     </td>
                   ))}

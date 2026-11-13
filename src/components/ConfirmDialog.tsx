@@ -2,7 +2,8 @@ import { useEffect, useId, useRef } from 'react';
 import { FiAlertTriangle, FiX } from 'react-icons/fi';
 
 /** Confirmation accessible : remplace window.confirm (non stylable,
- *  non testable). Focus piégé, Échap, clic sur le fond, ARIA dialog. */
+ *  non testable). Focus piégé, Échap, clic sur le fond, ARIA dialog.
+ *  Structure DaisyUI : <dialog class="modal"> + modal-box + modal-backdrop. */
 export function ConfirmDialog({
   open,
   title,
@@ -58,34 +59,33 @@ export function ConfirmDialog({
   if (!open) return null;
 
   return (
-    <div
-      className="wg-overlay fixed inset-0 z-[90] flex items-center justify-center p-4"
-      onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
+    <dialog
+      className="modal modal-open z-[90]"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      aria-describedby={description ? descriptionId : undefined}
     >
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={description ? descriptionId : undefined}
-        className="wg-card wg-elev-2 wg-fade-in w-full max-w-md p-5"
-        style={{ background: 'var(--wg-surface)' }}
-      >
+      <div ref={dialogRef} className="modal-box max-w-md p-5">
         <div className="flex items-start gap-3">
           <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${tone === 'danger' ? 'bg-red-500/15 text-red-400' : 'bg-sky-500/15 text-sky-400'}`}>
             <FiAlertTriangle aria-hidden="true" />
           </span>
           <div className="min-w-0 flex-1">
             <h2 id={titleId} className="text-base font-bold">{title}</h2>
-            {description && <p id={descriptionId} className="wg-muted mt-1.5 text-sm leading-relaxed">{description}</p>}
+            {description && <p id={descriptionId} className="mt-1.5 text-sm leading-relaxed text-base-content/60">{description}</p>}
           </div>
-          <button type="button" className="wg-muted hover:text-sky-400" onClick={onClose} aria-label="Fermer"><FiX size={18} /></button>
+          <button type="button" className="text-base-content/60 hover:text-sky-400" onClick={onClose} aria-label="Fermer"><FiX size={18} /></button>
         </div>
-        <div className="mt-5 flex flex-wrap justify-end gap-2">
-          <button ref={cancelRef} type="button" className="wg-btn wg-btn-ghost" onClick={onClose}>{cancelLabel}</button>
-          <button type="button" className={`wg-btn ${tone === 'danger' ? 'wg-btn-danger' : 'wg-btn-primary'}`} onClick={onConfirm}>{confirmLabel}</button>
+        <div className="modal-action mt-5 gap-2">
+          <button ref={cancelRef} type="button" className="btn btn-sm" onClick={onClose}>{cancelLabel}</button>
+          <button type="button" className={`btn btn-sm ${tone === 'danger' ? 'btn-error btn-outline' : 'btn-primary'}`} onClick={onConfirm}>{confirmLabel}</button>
         </div>
       </div>
-    </div>
+      <div
+        className="modal-backdrop"
+        onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
+      />
+    </dialog>
   );
 }

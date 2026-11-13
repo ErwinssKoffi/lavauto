@@ -24,7 +24,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <Link to="/" className="text-xs font-semibold text-slate-500 hover:text-sky-600">← Retour à l’accueil</Link>
         </header>
         <div className="flex flex-1 items-center justify-center px-6 py-8 sm:px-10 lg:px-16">
-          <div className="w-full max-w-[460px] wg-fade-in">{children}</div>
+          <div className="w-full max-w-[460px] animate-fade-in">{children}</div>
         </div>
         <footer className="px-6 pb-6 text-center text-[11px] text-slate-400 sm:px-10">
           © {new Date().getFullYear()} WashGuard · Montants en FCFA · Dates jj/mm/aaaa

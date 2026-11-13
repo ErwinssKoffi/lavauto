@@ -44,7 +44,7 @@ export default function StockAlertBanner() {
                 </span>
               )}
             </div>
-            <p className="wg-muted mt-0.5 text-[11px]">
+            <p className="mt-0.5 text-[11px] text-base-content/60">
               {alerts.map((a) => `${a.name} (${a.qtyOnHand}/${a.reorderLevel})`).slice(0, 3).join(' · ')}
               {alerts.length > 3 ? ` et ${alerts.length - 3} autre(s)` : ''}.
               Risque d'interruption du service lavage.
@@ -56,7 +56,7 @@ export default function StockAlertBanner() {
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            className="wg-btn wg-btn-ghost !py-1 !text-xs text-amber-300 hover:text-white"
+            className="btn btn-sm !text-xs text-amber-300 hover:text-white"
           >
             {expanded ? (
               <>
@@ -70,7 +70,7 @@ export default function StockAlertBanner() {
           </button>
           <Link
             to="/app/stock"
-            className="wg-btn wg-btn-primary !py-1 !text-xs !bg-amber-500 hover:!bg-amber-400 !text-slate-950 font-bold"
+            className="btn btn-sm !text-xs !bg-amber-500 hover:!bg-amber-400 !text-slate-950 font-bold"
           >
             Gérer le stock
           </Link>
@@ -78,7 +78,7 @@ export default function StockAlertBanner() {
             type="button"
             onClick={() => setDismissed(true)}
             aria-label="Fermer l'alerte"
-            className="wg-muted hover:text-white p-1"
+            className="p-1 text-base-content/60 hover:text-white"
           >
             <FiX size={16} />
           </button>
@@ -102,7 +102,7 @@ export default function StockAlertBanner() {
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className="font-bold text-white">{item.name}</p>
-                      <p className="wg-muted text-[11px]">
+                      <p className="text-[11px] text-base-content/60">
                         Seuil critique défini : {item.reorderLevel} {unit}
                       </p>
                     </div>
@@ -136,13 +136,13 @@ export default function StockAlertBanner() {
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-800/80 pt-2 text-[11px]">
                     <Link
                       to="/app/parametres#stock"
-                      className="wg-link flex items-center gap-1 text-[11px]"
+                      className="link link-primary flex items-center gap-1 text-[11px]"
                     >
                       <FiSettings size={12} /> {dataSource === 'api' || isLocalStockDemo ? 'Modifier le seuil' : 'Voir le seuil'}
                     </Link>
                     <Link
                       to="/app/stock"
-                      className="wg-link text-[11px] font-semibold"
+                      className="link link-primary text-[11px] font-semibold"
                     >
                       Enregistrer un achat / mouvement →
                     </Link>

@@ -14,7 +14,7 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact = fa
       <button
         type="button"
         onClick={() => { void install(); }}
-        className="wg-btn wg-btn-ghost !px-2.5 !py-1.5 text-xs"
+        className="btn btn-sm text-xs"
         title="Installer l’application sur cet appareil"
         aria-label="Installer l’application"
       >
@@ -30,7 +30,7 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact = fa
         <button
           type="button"
           onClick={() => setShowIOSGuide(true)}
-          className="wg-btn wg-btn-ghost !px-2.5 !py-1.5 text-xs"
+          className="btn btn-sm text-xs"
           title="Installer sur iPhone ou iPad"
         >
           <FiDownload size={14} />
@@ -43,21 +43,21 @@ export const PWAInstallButton: React.FC<{ compact?: boolean }> = ({ compact = fa
               role="dialog"
               aria-modal="true"
               aria-label="Installer WashGuard sur iOS"
-              className="wg-card w-full max-w-sm p-5"
+              className="card w-full max-w-sm bg-base-100 p-5 shadow-xl"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: 'var(--wg-border)' }}>
+              <div className="flex items-center justify-between border-b border-base-300 pb-3">
                 <h3 className="text-sm font-bold">Installer sur iPhone / iPad</h3>
-                <button type="button" className="wg-muted hover:text-sky-400" onClick={() => setShowIOSGuide(false)} aria-label="Fermer">
+                <button type="button" className="text-base-content/60 hover:text-sky-400" onClick={() => setShowIOSGuide(false)} aria-label="Fermer">
                   <FiX size={16} />
                 </button>
               </div>
-              <ol className="wg-muted mt-3 space-y-2 text-xs leading-relaxed">
+              <ol className="mt-3 space-y-2 text-xs leading-relaxed text-base-content/60">
                 <li>1. Appuyez sur le bouton <strong className="text-slate-200">Partager</strong> dans la barre Safari.</li>
                 <li>2. Faites défiler et choisissez <strong className="text-slate-200">Sur l’écran d’accueil</strong>.</li>
                 <li>3. Validez pour utiliser la station en plein écran et accéder aux pages en cache hors ligne.</li>
               </ol>
-              <button type="button" onClick={() => setShowIOSGuide(false)} className="wg-btn wg-btn-primary mt-4 w-full">
+              <button type="button" onClick={() => setShowIOSGuide(false)} className="btn btn-sm btn-primary mt-4 w-full">
                 Compris
               </button>
             </div>

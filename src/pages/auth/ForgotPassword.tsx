@@ -60,7 +60,7 @@ export default function ForgotPassword() {
       {authKind === 'local' ? (
         <div className="mt-7 space-y-4">
           <Alert kind="warn">Aucun e-mail de récupération n’est envoyé sans serveur connecté.</Alert>
-          <Link to="/connexion" className="wg-btn wg-btn-ghost w-full !py-3">Retour à la connexion <FiArrowRight aria-hidden="true" /></Link>
+          <Link to="/connexion" className="btn btn-sm w-full !py-3">Retour à la connexion <FiArrowRight aria-hidden="true" /></Link>
         </div>
       ) : sent ? (
         <div className="mt-7 space-y-4">
@@ -74,14 +74,14 @@ export default function ForgotPassword() {
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-xs leading-relaxed text-amber-900">
               <p className="font-bold">Lien affiché en développement</p>
               <p className="mt-1">Aucun e-mail n’est expédié par ce serveur local : ouvrez le lien ci-dessous. En production, le lien n’est jamais renvoyé au navigateur.</p>
-              <a href={resetUrl} className="wg-btn wg-btn-primary mt-3 w-full !py-2.5">
+              <a href={resetUrl} className="btn btn-sm btn-primary mt-3 w-full !py-2.5">
                 Ouvrir le lien de réinitialisation <FiArrowRight aria-hidden="true" />
               </a>
             </div>
           )}
           <button
             type="button"
-            className="wg-btn wg-btn-ghost w-full !py-3 disabled:opacity-60"
+            className="btn btn-sm w-full !py-3 disabled:opacity-60"
             disabled={busy || cooldown > 0}
             onClick={(e) => { void submit(e); }}
           >
@@ -89,7 +89,7 @@ export default function ForgotPassword() {
               ? <><FiClock aria-hidden="true" /> Nouvelle demande dans {cooldown} s</>
               : busy ? 'Envoi…' : 'Demander un nouveau lien'}
           </button>
-          <Link to="/connexion" className="wg-btn wg-btn-ghost w-full !py-3">Retour à la connexion <FiArrowRight aria-hidden="true" /></Link>
+          <Link to="/connexion" className="btn btn-sm w-full !py-3">Retour à la connexion <FiArrowRight aria-hidden="true" /></Link>
         </div>
       ) : (
         <form onSubmit={(e) => { void submit(e); }} className="mt-7 space-y-4" noValidate>
@@ -104,7 +104,7 @@ export default function ForgotPassword() {
               placeholder="vous@exemple.ci" />
           </div>
           {error && <div className="text-xs"><Alert kind="danger">{error}</Alert></div>}
-          <button type="submit" disabled={busy} className="wg-btn wg-btn-primary w-full !py-3 disabled:opacity-60">
+          <button type="submit" disabled={busy} className="btn btn-sm btn-primary w-full !py-3 disabled:opacity-60">
             {busy ? 'Envoi…' : 'Recevoir le lien'} <FiArrowRight aria-hidden="true" />
           </button>
         </form>

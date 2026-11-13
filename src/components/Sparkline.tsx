@@ -95,10 +95,10 @@ export default function Sparkline({
   return (
     <div className="select-none" onMouseLeave={() => setHoveredIndex(null)}>
       <div className="mb-1 flex items-center justify-between gap-2 text-[11px]">
-        <span className="wg-muted truncate">
+        <span className="truncate text-base-content/60">
           {activePoint ? activePoint.label : title}
         </span>
-        <span className={`font-semibold tabular-nums ${activePoint ? palette.text : deltaPct !== null && deltaPct !== 0 ? (deltaPct > 0 ? 'text-emerald-400' : 'text-amber-400') : 'wg-muted'}`}>
+        <span className={`font-semibold tabular-nums ${activePoint ? palette.text : deltaPct !== null && deltaPct !== 0 ? (deltaPct > 0 ? 'text-emerald-400' : 'text-amber-400') : 'text-base-content/60'}`}>
           {activePoint
             ? formatValue(activePoint.value)
             : deltaPct !== null && deltaPct !== 0

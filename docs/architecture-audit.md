@@ -51,7 +51,7 @@ src/lib/
   format.ts                  FCFA, jj/mm/aaaa, export CSV
   plans.ts                   constante `PLANS` (rôle de table `plans`)
   supabase.ts                createClient conditionnel, jamais appelé
-src/index.css                 variables CSS de thème + classes Tailwind
+src/index.css                 règles globales (fond, focus, mouvement réduit, reçu imprimable)
 scripts/check.cjs             harnais JSDOM + esbuild, 66 assertions
 docs/audit.md                 audit de conformité 1.0.1 (précédent)
 docs/onboarding.md            parcours 13 étapes / 8 obligatoires

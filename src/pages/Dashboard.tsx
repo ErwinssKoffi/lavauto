@@ -118,30 +118,30 @@ export default function Dashboard() {
       </div>
 
       <div className="mt-5">
-        {!connected || current ? <Revenue7DaysLineChart data={chartData} /> : <Card><p className="wg-muted text-sm">Courbe indisponible.</p></Card>}
+        {!connected || current ? <Revenue7DaysLineChart data={chartData} /> : <Card><p className="text-base-content/60 text-sm">Courbe indisponible.</p></Card>}
       </div>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-sm font-bold">Dernières opérations</h2>
-            <Link to="/app/lavages" className="wg-link text-xs">Voir les lavages <FiArrowRight className="inline" /></Link>
+            <Link to="/app/lavages" className="link link-primary text-xs">Voir les lavages <FiArrowRight className="inline" /></Link>
           </div>
           {recent.length === 0 ? (
             <EmptyState icon={<FiTruck />} title="Aucune opération enregistrée" description="Les fiches de lavage apparaîtront ici dès l’ouverture de l’exploitation. Aucune donnée d’exemple n’est ajoutée." />
           ) : (
-            <div className="wg-scroll-x">
-              <table>
-                <thead><tr><th className="wg-th">Fiche</th><th className="wg-th">Véhicule</th><th className="wg-th">Client</th><th className="wg-th">Total</th><th className="wg-th">Payé</th><th className="wg-th">Statut</th></tr></thead>
+            <div className="overflow-x-auto">
+              <table className="table min-w-[620px]">
+                <thead><tr><th>Fiche</th><th>Véhicule</th><th>Client</th><th>Total</th><th>Payé</th><th>Statut</th></tr></thead>
                 <tbody>
                   {recent.map((w) => (
                     <tr key={w.id}>
-                      <td className="wg-td font-bold">{w.number}</td>
-                      <td className="wg-td">{w.vehicleLabel}{w.plate && <span className="wg-muted ml-1 text-xs">· {w.plate}</span>}</td>
-                      <td className="wg-td">{w.clientName ?? <span className="wg-muted">Sans client</span>}</td>
-                      <td className="wg-td font-semibold">{formatFCFA(w.total)}</td>
-                      <td className="wg-td">{formatFCFA(w.paid)}</td>
-                      <td className="wg-td"><Badge tone={washStatusTone(w.status)}>{WASH_STATUS_LABELS[w.status]}</Badge></td>
+                      <td className="font-bold">{w.number}</td>
+                      <td>{w.vehicleLabel}{w.plate && <span className="text-base-content/60 ml-1 text-xs">· {w.plate}</span>}</td>
+                      <td>{w.clientName ?? <span className="text-base-content/60">Sans client</span>}</td>
+                      <td className="font-semibold">{formatFCFA(w.total)}</td>
+                      <td>{formatFCFA(w.paid)}</td>
+                      <td><Badge tone={washStatusTone(w.status)}>{WASH_STATUS_LABELS[w.status]}</Badge></td>
                     </tr>
                   ))}
                 </tbody>
@@ -156,16 +156,16 @@ export default function Dashboard() {
             {openCash ? (
               <>
                 <Badge tone="success">Caisse ouverte</Badge>
-                <p className="wg-muted mt-3 text-xs">Ouverte le {formatDate(openCash.openedAt)} par {openCash.openedBy}</p>
+                <p className="text-base-content/60 mt-3 text-xs">Ouverte le {formatDate(openCash.openedAt)} par {openCash.openedBy}</p>
                 <p className="mt-2 text-lg font-bold">{formatFCFA(openCash.openingFloat)}</p>
-                <p className="wg-muted text-[11px]">Fond de caisse</p>
-                <Link to="/app/caisse" className="wg-btn wg-btn-ghost mt-4 w-full">Gérer la caisse</Link>
+                <p className="text-base-content/60 text-[11px]">Fond de caisse</p>
+                <Link to="/app/caisse" className="btn btn-sm mt-4 w-full">Gérer la caisse</Link>
               </>
             ) : (
               <>
                 <Badge tone="warn">Aucune caisse ouverte</Badge>
-                <p className="wg-muted mt-3 text-xs leading-relaxed">Un encaissement en espèces exige une caisse ouverte{!state.station?.cashRequiresOpen ? ' (règle désactivée pour cette station).' : '.'} Le Mobile Money peut être enregistré à tout moment.</p>
-                <Link to="/app/caisse" className="wg-btn wg-btn-ghost mt-4 w-full">Ouvrir la caisse</Link>
+                <p className="text-base-content/60 mt-3 text-xs leading-relaxed">Un encaissement en espèces exige une caisse ouverte{!state.station?.cashRequiresOpen ? ' (règle désactivée pour cette station).' : '.'} Le Mobile Money peut être enregistré à tout moment.</p>
+                <Link to="/app/caisse" className="btn btn-sm mt-4 w-full">Ouvrir la caisse</Link>
               </>
             )}
           </Card>
@@ -173,9 +173,9 @@ export default function Dashboard() {
           <Card>
             <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-bold">Objectif du mois</h2><FiActivity className="text-sky-400" /></div>
             <p className="text-xl font-bold">{monthRevenue === null ? '—' : formatFCFA(monthRevenue)}</p>
-            <p className="wg-muted text-xs">sur {target > 0 ? formatFCFA(target) : 'aucun objectif fixé'}</p>
+            <p className="text-base-content/60 text-xs">sur {target > 0 ? formatFCFA(target) : 'aucun objectif fixé'}</p>
             {monthRevenue !== null && <div className="mt-3"><Progress value={monthRevenue} max={target || 1} tone={target && monthRevenue >= target ? 'success' : 'accent'} /></div>}
-            {target === 0 && <p className="wg-muted mt-2 text-[11px]">Fixez un objectif dans Paramètres ou pendant la mise en route.</p>}
+            {target === 0 && <p className="text-base-content/60 mt-2 text-[11px]">Fixez un objectif dans Paramètres ou pendant la mise en route.</p>}
           </Card>
 
           {can('inventory.view') && <Card>
@@ -188,11 +188,11 @@ export default function Dashboard() {
               </Badge>
             </div>
             {state.stockAlerts.length === 0 ? (
-              <p className="wg-muted text-xs">Tous les consommables sont au-dessus de leur seuil critique.</p>
+              <p className="text-base-content/60 text-xs">Tous les consommables sont au-dessus de leur seuil critique.</p>
             ) : (
               <div className="space-y-2 text-xs">
                 {state.stockAlerts.slice(0, 3).map((a) => (
-                  <div key={a.productId} className="rounded-lg p-2" style={{ background: 'var(--wg-surface-2)' }}>
+                  <div key={a.productId} className="rounded-lg p-2 bg-base-200">
                     <div className="flex justify-between font-bold">
                       <span className="truncate">{a.name}</span>
                       <span className={a.severity === 'rupture' ? 'text-red-400' : 'text-amber-400'}>
@@ -206,9 +206,9 @@ export default function Dashboard() {
                 ))}
               </div>
             )}
-            <div className="mt-3 flex justify-between text-xs pt-1 border-t" style={{ borderColor: 'var(--wg-border)' }}>
-              <Link to="/app/parametres#stock" className="wg-link text-[11px]">Seuils d’alerte</Link>
-              <Link to="/app/stock" className="wg-link font-bold text-[11px]">Gérer les stocks →</Link>
+            <div className="mt-3 flex justify-between text-xs pt-1 border-t">
+              <Link to="/app/parametres#stock" className="link link-primary text-[11px]">Seuils d’alerte</Link>
+              <Link to="/app/stock" className="link link-primary font-bold text-[11px]">Gérer les stocks →</Link>
             </div>
           </Card>}
         </div>
@@ -217,7 +217,7 @@ export default function Dashboard() {
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
         <Card>
           <h2 className="mb-3 flex items-center gap-2 text-sm font-bold"><FiAlertTriangle className="text-amber-400" /> Alertes</h2>
-          {alerts.length === 0 ? <p className="wg-muted text-xs">Aucune alerte pour le moment.</p> : (
+          {alerts.length === 0 ? <p className="text-base-content/60 text-xs">Aucune alerte pour le moment.</p> : (
             <div className="space-y-2">
               {alerts.map((a, i) => <div key={i}><Badge tone={a.tone}>{a.text}</Badge></div>)}
             </div>
@@ -225,11 +225,11 @@ export default function Dashboard() {
         </Card>
         <Card>
           <h2 className="mb-3 text-sm font-bold">Répartition des encaissements du jour</h2>
-          {day.collected === null ? <p className="wg-muted text-xs">Encaissements indisponibles pour ce profil.</p> : day.byMethod.length === 0 ? <p className="wg-muted text-xs">Aucun encaissement aujourd’hui.</p> : (
+          {day.collected === null ? <p className="text-base-content/60 text-xs">Encaissements indisponibles pour ce profil.</p> : day.byMethod.length === 0 ? <p className="text-base-content/60 text-xs">Aucun encaissement aujourd’hui.</p> : (
             <div className="space-y-3">
               {day.byMethod.map((m) => (
                 <div key={m.method}>
-                  <div className="mb-1 flex justify-between text-xs"><span className="font-medium">{PAY_METHOD_LABELS[m.method]}</span><span className="wg-muted">{formatFCFA(m.amount)} · {m.count} paiement(s)</span></div>
+                  <div className="mb-1 flex justify-between text-xs"><span className="font-medium">{PAY_METHOD_LABELS[m.method]}</span><span className="text-base-content/60">{formatFCFA(m.amount)} · {m.count} paiement(s)</span></div>
                   <Progress value={m.amount} max={day.collected || 1} />
                 </div>
               ))}
@@ -241,12 +241,12 @@ export default function Dashboard() {
       <Card className="mt-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-bold">Tendance du mois — dashboard station</h2>
-          {can('analytics.view') && <Link to="/app/consolidation" className="wg-link text-xs"><FiTrendingUp className="inline" /> Consolidation multi-stations</Link>}
+          {can('analytics.view') && <Link to="/app/consolidation" className="link link-primary text-xs"><FiTrendingUp className="inline" /> Consolidation multi-stations</Link>}
         </div>
         {monthTrend.length === 0 ? (
           <EmptyState icon={<FiActivity />} title="Aucune tendance enregistrée" description="Les lavages réels alimenteront ce graphique Recharts, sans donnée d’exemple." />
         ) : (
-          <div className="wg-scroll-x">
+          <div className="overflow-x-auto">
             <BarChart width={720} height={220} data={monthTrend} margin={{ top: 8, right: 12, bottom: 8, left: 8 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
               <XAxis dataKey="date" stroke="#94a3b8" fontSize={10} tickFormatter={(v) => String(v).slice(8, 10)} />
@@ -257,12 +257,12 @@ export default function Dashboard() {
             </BarChart>
           </div>
         )}
-        <p className="wg-muted mt-2 text-xs">Station sélectionnée · encaissements à la date du paiement ou de son annulation.</p>
+        <p className="text-base-content/60 mt-2 text-xs">Station sélectionnée · encaissements à la date du paiement ou de son annulation.</p>
       </Card>
 
       <div className="mt-5 flex flex-wrap gap-3">
-        <Link to="/app/rapports" className="wg-btn wg-btn-ghost"><FiDollarSign /> Rapports et export CSV</Link>
-        <Link to="/app/commissions" className="wg-btn wg-btn-ghost"><FiTruck /> Commissions de la période</Link>
+        <Link to="/app/rapports" className="btn btn-sm"><FiDollarSign /> Rapports et export CSV</Link>
+        <Link to="/app/commissions" className="btn btn-sm"><FiTruck /> Commissions de la période</Link>
       </div>
     </div>
   );

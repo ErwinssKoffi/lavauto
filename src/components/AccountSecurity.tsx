@@ -183,7 +183,7 @@ export function AccountSecurity({ open, onClose }: { open: boolean; onClose: () 
 
       {tab === 'password' && (
         <form onSubmit={(e) => { void submitPassword(e); }} className="space-y-4" noValidate>
-          <p className="wg-muted text-xs leading-relaxed">
+          <p className="text-base-content/60 text-xs leading-relaxed">
             Le mot de passe est vérifié et enregistré côté serveur. Un changement ferme les autres sessions ouvertes.
           </p>
           {authKind === 'local' && (
@@ -219,7 +219,7 @@ export function AccountSecurity({ open, onClose }: { open: boolean; onClose: () 
             error={confirmError}
           />
           {pwdError && <Alert kind="danger">{pwdError}</Alert>}
-          <button type="submit" disabled={saving} className="wg-btn wg-btn-primary w-full disabled:opacity-60">
+          <button type="submit" disabled={saving} className="btn btn-sm btn-primary w-full disabled:opacity-60">
             <FiKey aria-hidden="true" /> {saving ? 'Enregistrement…' : 'Changer mon mot de passe'}
           </button>
         </form>
@@ -228,10 +228,10 @@ export function AccountSecurity({ open, onClose }: { open: boolean; onClose: () 
       {tab === 'sessions' && (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="wg-muted text-xs leading-relaxed">
+            <p className="text-base-content/60 text-xs leading-relaxed">
               Chaque ligne est un appareil connecté. Fermer une session invalide son cookie immédiatement.
             </p>
-            <button type="button" className="wg-btn wg-btn-ghost !px-3 !py-1.5 text-xs" onClick={() => { void loadSessions(); }} disabled={sessionsLoading}>
+            <button type="button" className="btn btn-sm !px-3 !py-1.5 text-xs" onClick={() => { void loadSessions(); }} disabled={sessionsLoading}>
               <FiRefreshCw aria-hidden="true" /> {sessionsLoading ? 'Lecture…' : 'Actualiser'}
             </button>
           </div>
@@ -246,12 +246,12 @@ export function AccountSecurity({ open, onClose }: { open: boolean; onClose: () 
           )}
 
           {sessions && sessions.length === 0 && !sessionsLoading && (
-            <p className="wg-muted text-xs">Aucune session active lisible.</p>
+            <p className="text-base-content/60 text-xs">Aucune session active lisible.</p>
           )}
 
           <ul className="space-y-2">
             {(sessions ?? []).map((session) => (
-              <li key={session.id} className="rounded-xl border p-3" style={{ borderColor: 'var(--wg-border)' }}>
+              <li key={session.id} className="rounded-xl border p-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="flex items-center gap-2 text-sm font-bold">
@@ -259,11 +259,11 @@ export function AccountSecurity({ open, onClose }: { open: boolean; onClose: () 
                       {session.userAgent}
                       {session.current && <Badge tone="success">Cet appareil</Badge>}
                     </p>
-                    <p className="wg-muted mt-1 text-[11px]">
+                    <p className="text-base-content/60 mt-1 text-[11px]">
                       Dernière activité : {session.lastSeenAt ? formatDateTime(session.lastSeenAt) : '—'}
                       {session.ipAddress ? ` · ${session.ipAddress}` : ''}
                     </p>
-                    <p className="wg-muted text-[11px]">
+                    <p className="text-base-content/60 text-[11px]">
                       {session.expiresAt
                         ? `Expire le ${formatDateTime(session.expiresAt)}${session.rememberMe ? ' (session persistante)' : ''}`
                         : 'Durée : jusqu’à la fermeture de l’onglet'}
@@ -271,7 +271,7 @@ export function AccountSecurity({ open, onClose }: { open: boolean; onClose: () 
                   </div>
                   <button
                     type="button"
-                    className="wg-btn wg-btn-danger !px-3 !py-1.5 text-xs disabled:opacity-50"
+                    className="btn btn-sm btn-error btn-outline !px-3 !py-1.5 text-xs disabled:opacity-50"
                     disabled={revoking === session.id || authKind !== 'api'}
                     onClick={() => { void handleRevoke(session); }}
                   >
@@ -284,7 +284,7 @@ export function AccountSecurity({ open, onClose }: { open: boolean; onClose: () 
 
           <button
             type="button"
-            className="wg-btn wg-btn-ghost w-full disabled:opacity-60"
+            className="btn btn-sm w-full disabled:opacity-60"
             disabled={revoking === 'others' || authKind === 'local'}
             onClick={() => { void handleRevokeOthers(); }}
           >
@@ -296,10 +296,10 @@ export function AccountSecurity({ open, onClose }: { open: boolean; onClose: () 
       {tab === 'activity' && (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="wg-muted text-xs leading-relaxed">
+            <p className="text-base-content/60 text-xs leading-relaxed">
               Vingt derniers événements d’authentification de votre compte. Aucun mot de passe ni jeton n’y figure.
             </p>
-            <button type="button" className="wg-btn wg-btn-ghost !px-3 !py-1.5 text-xs" onClick={() => { void loadActivity(); }} disabled={eventsLoading}>
+            <button type="button" className="btn btn-sm !px-3 !py-1.5 text-xs" onClick={() => { void loadActivity(); }} disabled={eventsLoading}>
               <FiRefreshCw aria-hidden="true" /> {eventsLoading ? 'Lecture…' : 'Actualiser'}
             </button>
           </div>
@@ -309,24 +309,24 @@ export function AccountSecurity({ open, onClose }: { open: boolean; onClose: () 
             <Alert kind="warn">Le journal détaillé n’existe qu’avec le serveur WashGuard (mode API).</Alert>
           )}
           {events && events.length === 0 && !eventsLoading && authKind === 'api' && (
-            <p className="wg-muted text-xs">Aucun événement enregistré pour ce compte.</p>
+            <p className="text-base-content/60 text-xs">Aucun événement enregistré pour ce compte.</p>
           )}
 
           <ul className="space-y-2">
             {(events ?? []).map((event, index) => {
               const meta = EVENT_LABELS[event.event] ?? { label: event.event, tone: 'warn' as const };
               return (
-                <li key={`${event.at}-${index}`} className="flex items-start gap-3 rounded-xl border p-3" style={{ borderColor: 'var(--wg-border)' }}>
+                <li key={`${event.at}-${index}`} className="flex items-start gap-3 rounded-xl border p-3">
                   <span className={`mt-0.5 ${meta.tone === 'danger' ? 'text-red-400' : meta.tone === 'success' ? 'text-emerald-400' : 'text-amber-400'}`}>
                     {meta.tone === 'success' ? <FiCheckCircle aria-hidden="true" /> : meta.tone === 'danger' ? <FiAlertTriangle aria-hidden="true" /> : <FiActivity aria-hidden="true" />}
                   </span>
                   <div className="min-w-0">
                     <p className="text-sm font-semibold">{meta.label}</p>
-                    <p className="wg-muted text-[11px]">
+                    <p className="text-base-content/60 text-[11px]">
                       {formatDateTime(event.at)} · {event.device || 'Appareil inconnu'}
                       {event.ipAddress ? ` · ${event.ipAddress}` : ''}
                     </p>
-                    {event.detail && <p className="wg-muted mt-1 break-words text-[11px]">{event.detail}</p>}
+                    {event.detail && <p className="text-base-content/60 mt-1 break-words text-[11px]">{event.detail}</p>}
                   </div>
                 </li>
               );

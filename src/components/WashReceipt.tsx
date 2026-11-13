@@ -78,12 +78,12 @@ export function WashReceiptModal({ receipt, onClose }: { receipt: WashReceipt; o
   };
   return <>
     <Modal open onClose={onClose} title={`Reçu ${receipt.number}`} wide>
-      <p className="wg-muted mb-3 text-xs">Instantané de la fiche chargée. Actualisez les lavages avant d’émettre un nouveau reçu si une opération vient d’être enregistrée ailleurs.</p>
+      <p className="text-base-content/60 mb-3 text-xs">Instantané de la fiche chargée. Actualisez les lavages avant d’émettre un nouveau reçu si une opération vient d’être enregistrée ailleurs.</p>
       {error && <div className="mb-3"><Alert kind="danger">{error}</Alert></div>}
       <ReceiptView receipt={receipt} />
       <div className="mt-4 flex flex-wrap justify-end gap-2">
-        <button className="wg-btn wg-btn-ghost" onClick={() => window.print()}><FiPrinter /> Imprimer</button>
-        <button className="wg-btn wg-btn-primary" disabled={busy} onClick={() => { void save(); }}><FiDownload /> {busy ? 'Préparation…' : 'Télécharger le PDF'}</button>
+        <button className="btn btn-sm" onClick={() => window.print()}><FiPrinter /> Imprimer</button>
+        <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => { void save(); }}><FiDownload /> {busy ? 'Préparation…' : 'Télécharger le PDF'}</button>
       </div>
     </Modal>
     {createPortal(<div className="wash-receipt-print-root"><ReceiptView receipt={receipt} /></div>, document.body)}
