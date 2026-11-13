@@ -7,8 +7,6 @@ import AuthLayout from './AuthLayout';
 import { Alert, Badge } from '../../components/ui';
 import { PasswordField } from '../../components/PasswordField';
 import { useStore } from '../../lib/store';
-import { formatFCFA } from '../../lib/format';
-import { PlanDetails } from '../../components/PlanDetails';
 import {
   emailIssue, emailSuggestion, passwordIssue, phoneIssue,
 } from '../../lib/passwordPolicy';
@@ -49,11 +47,14 @@ export default function SignUp() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const initialPlan = params.get('plan');
-  const [requestedPlanId, setRequestedPlanId] = useState<'essai' | 'standard' | 'premium'>(
+  // Formule captée depuis la vitrine (`/inscription?plan=…`) ; le choix détaillé
+  // se fait ensuite dans Abonnement, après création de l'espace.
+  const [requestedPlanId] = useState<'essai' | 'standard' | 'premium'>(
     initialPlan === 'standard' || initialPlan === 'premium' ? initialPlan : 'essai',
   );
   const availablePlans = plans.filter((plan) => ['essai', 'standard', 'premium'].includes(plan.id));
   const selectedAvailable = availablePlans.some((plan) => plan.id === requestedPlanId);
+  const requestedPlan = availablePlans.find((plan) => plan.id === requestedPlanId);
   const [form, setForm] = useState({
     companyName: '', stationName: '', phone: '', city: '',
     ownerName: '', email: '', password: '', confirm: '',
@@ -119,37 +120,31 @@ export default function SignUp() {
     <AuthLayout>
       <Badge tone="accent">{authKind === 'local' ? 'Espace local' : 'Inscription par e-mail'}</Badge>
       <h1 className="mt-4 text-3xl font-extrabold tracking-tight">Créer mon espace</h1>
-      <p className="mt-2 text-sm text-base-content/60">Comparez les formules, puis créez votre entreprise et votre compte.</p>
+      <p className="mt-2 text-sm text-base-content/60">Deux temps : votre exploitation, puis votre compte de propriétaire.</p>
 
-      <form onSubmit={(e) => { void submit(e); }} className="mt-6 space-y-5" noValidate>
-        <fieldset className="rounded-2xl border border-base-300 p-4">
-          <legend className="px-1 text-sm font-bold">Votre formule souhaitée</legend>
-          <p className="mb-3 text-xs leading-relaxed text-base-content/60">L’essai donne accès à tous les modules pendant 14 jours. Standard et Premium sont des demandes, activées seulement après validation administrateur. Aucun paiement automatique.</p>
-          {plansError && <Alert kind="danger">Formules indisponibles : {plansError}</Alert>}
-          {!plansError && availablePlans.length === 0 && <p role="status" className="text-xs text-base-content/60">Chargement des formules…</p>}
-          <div className="space-y-3">
-            {availablePlans.map((plan) => <label key={plan.id} className={`block cursor-pointer rounded-xl border p-3 ${requestedPlanId === plan.id ? 'border-primary bg-primary/10' : 'border-base-300'}`}>
-              <span className="flex items-center justify-between gap-2 text-sm font-bold">
-                <span className="flex items-center gap-2"><input type="radio" name="plan" value={plan.id} checked={requestedPlanId === plan.id}
-                  onChange={() => setRequestedPlanId(plan.id as 'essai' | 'standard' | 'premium')} /> {plan.name}</span>
-                <span>{plan.id === 'essai' ? 'Gratuit · 14 jours' : `${formatFCFA(plan.priceMonthly)} / mois`}</span>
-              </span>
-              <div className="mt-2 text-base-content/70"><PlanDetails plan={plan} compact /></div>
-            </label>)}
-          </div>
-          <p className="mt-3 text-[11px] leading-relaxed text-base-content/60">Comptes actifs : propriétaire inclus. Tarifs indicatifs à valider commercialement. Une validation payante anticipée met fin immédiatement à l’essai. À son échéance sans validation, les données restent consultables et les écritures ordinaires sont bloquées.</p>
-        </fieldset>
+      <form onSubmit={(e) => { void submit(e); }} className="mt-7 space-y-6" noValidate>
+        {requestedPlan && requestedPlan.id !== 'essai' && (
+          <p className="inline-flex items-center gap-1.5 rounded-full border border-base-300 bg-base-100 px-3 py-1 text-[11px] font-semibold text-base-content/70">
+            <FiCheckCircle className="text-primary" aria-hidden="true" />
+            Formule {requestedPlan.name} demandée · validation administrateur
+          </p>
+        )}
+        {!selectedAvailable && (
+          <p className="text-[11px] text-base-content/60" role="status">
+            {plansError ? `Formules indisponibles : ${plansError}` : 'Chargement des formules…'}
+          </p>
+        )}
 
         {/* Temps 1 */}
-        <section className="rounded-2xl border border-base-300 p-4">
-          <div className="mb-4 flex items-center gap-2">
+        <section className="rounded-2xl border border-base-300 p-5">
+          <div className="mb-5 flex items-center gap-2">
             <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/15 text-primary"><FiBriefcase size={14} aria-hidden="true" /></span>
             <div>
               <h2 className="text-sm font-bold">Votre entreprise et sa station</h2>
               <p className="text-[11px] text-base-content/60">Ces informations identifient votre exploitation.</p>
             </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className={labelCls} htmlFor="companyName">Nom de l’entreprise *</label>
               <input id="companyName" required maxLength={120} className={`${fieldCls} ${inlineError('companyName') ? 'border-error/40 focus:border-error focus:ring-error/20' : 'border-base-300 focus:border-primary focus:ring-primary/20'}`}
@@ -182,15 +177,15 @@ export default function SignUp() {
         </section>
 
         {/* Temps 2 */}
-        <section className="rounded-2xl border border-base-300 p-4">
-          <div className="mb-4 flex items-center gap-2">
+        <section className="rounded-2xl border border-base-300 p-5">
+          <div className="mb-5 flex items-center gap-2">
             <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/15 text-primary"><FiUser size={14} aria-hidden="true" /></span>
             <div>
               <h2 className="text-sm font-bold">Votre compte de propriétaire</h2>
               <p className="text-[11px] text-base-content/60">Il pourra créer les autres comptes depuis Employés.</p>
             </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className={labelCls} htmlFor="ownerName">Votre nom *</label>
               <input id="ownerName" required maxLength={120} className={`${fieldCls} ${inlineError('ownerName') ? 'border-error/40 focus:border-error focus:ring-error/20' : 'border-base-300 focus:border-primary focus:ring-primary/20'}`}
