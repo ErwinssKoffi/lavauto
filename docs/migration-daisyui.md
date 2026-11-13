@@ -90,7 +90,7 @@
 | --- | --- |
 | `npm run typecheck` | ✅ 0 erreur |
 | `npm run lint` | ✅ 26 règles |
-| `npm run check` | ✅ 253 OK / 0 KO |
+| `npm run check` | ✅ 254 OK / 0 KO |
 | `npm run test:unit` | ✅ 291 tests / 35 fichiers |
 | `npm run build` | ✅ build Vite + PWA |
 
@@ -122,7 +122,7 @@ Décidée après la première migration (DaisyUI 4 / Tailwind 3), pour utiliser 
 
 ### 9.2 Thèmes
 
-`@plugin "daisyui" { themes: washguard-dark --default --prefersdark, washguard, abyss, …, wireframe; }` (liste explicite des 37 thèmes) puis deux blocs `@plugin "daisyui/theme"` (`washguard`, `washguard-dark`). Les tokens deviennent `--color-*`, `--radius-*`, `--size-field`, `--border`, `--depth`, `--noise`.
+`@plugin "daisyui" { themes: cupcake --default --prefersdark, washguard-dark, washguard, abyss, …, wireframe; }` (liste explicite des 37 thèmes) — `cupcake` tient désormais la racine (voir §15) puis deux blocs `@plugin "daisyui/theme"` (`washguard`, `washguard-dark`). Les tokens deviennent `--color-*`, `--radius-*`, `--size-field`, `--border`, `--depth`, `--noise`.
 
 **`themes: all` a été abandonné** : cette branche de `pluginOptionsHandler.js` impose `light` comme `--default` et `dark` comme `--prefersdark` en dur, en ignorant les clés `default:` / `prefersdark:` des thèmes personnalisés. Résultat : `:where(:root)` portait la palette `light` et le repli `prefers-color-scheme: dark` la palette `dark`. La liste explicite rend la racine à WashGuard :
 
@@ -131,7 +131,7 @@ Décidée après la première migration (DaisyUI 4 / Tailwind 3), pour utiliser 
 @plugin "daisyui/theme" { name: "washguard-dark"; default: true; prefersdark: true; … }
 ```
 
-soit `:where(:root),[data-theme=washguard-dark]{…}` et `@media (prefers-color-scheme: dark){:root:not([data-theme]){…washguard-dark…}}`. Coût mesuré : CSS 148,7 → 190,4 kB (23,3 → 30,2 kB gzip), légèrement moins que `themes: all`. `npm run check` compare la liste déclarée au catalogue `src/lib/themes.ts` et refuse `themes: all`.
+soit, à l'origine, `:where(:root),[data-theme=washguard-dark]{…}` et `@media (prefers-color-scheme: dark){:root:not([data-theme]){…washguard-dark…}}`. Coût mesuré : CSS 148,7 → 190,4 kB (23,3 → 30,2 kB gzip), légèrement moins que `themes: all`. `npm run check` compare la liste déclarée au catalogue `src/lib/themes.ts` et refuse `themes: all`.
 
 ### 9.3 Ruptures de classes corrigées
 
@@ -162,7 +162,7 @@ Trois ajustements restent **hors couche** (donc prioritaires sur la couche `util
 | --- | --- |
 | `npm run typecheck` | ✅ 0 erreur |
 | `npm run lint` | ✅ 26 règles |
-| `npm run check` | ✅ 253 OK / 0 KO |
+| `npm run check` | ✅ 254 OK / 0 KO |
 | `npm run test:unit` | ✅ 291 tests / 35 fichiers |
 | `npm run build` | ✅ Vite + PWA · CSS 192,3 kB / gzip 30,2 kB |
 
@@ -208,8 +208,7 @@ Conversion appliquée à **31 fichiers** (≈ 310 occurrences) : `slate` → `ba
 | Zone | Traitement |
 | --- | --- |
 | `/app` (16 écrans), dialogs, `ui.tsx`, `DataTable`, `feedback`, `PasswordField`, `StockAlertBanner`, `PwaControls`, charts | tokens DaisyUI uniquement |
-| `pages/Landing.tsx` | conservée en sombre, racine épinglée `data-theme="washguard-dark"` |
-| `pages/auth/*` + `AuthLayout.tsx` | conservées telles quelles, racine épinglée `data-theme="washguard"` (formulaire clair, panneau photo sombre) |
+| `pages/Landing.tsx` + `pages/auth/*` + `AuthLayout.tsx` | converties aussi (voir §15) : vitrine et authentification suivent le thème actif |
 | Voiles de modale | `bg-black/60` conservé (convention) |
 | Graphiques (recharts) | **tout** en variables CSS via `src/lib/chartTheme.ts` : CA → `primary`, encaissé → `success`, dépenses → `warning`, chrome → `base-content`/`base-300`/`base-100` |
 
@@ -241,3 +240,25 @@ Garde-fou : le contrôle « palette DaisyUI partout » refuse toute classe de pa
 | `rgba(56, 189, 248, 0.1)` (fond d'écart de caisse) | `color-mix(in oklab, var(--color-primary) 12%, transparent)` |
 
 Trois tests unitaires (`tests/unit/chart-theme.test.ts`) vérifient que chaque valeur est bien un `var(--color-…)`, que les trois séries restent distinctes et que les opacités du dégradé restent cohérentes.
+
+
+---
+
+## 15. Thème `cupcake` sur tout le projet
+
+Le thème par défaut est **cupcake** (thème intégré DaisyUI), appliqué partout : application, vitrine et authentification.
+
+| Élément | Avant | Après |
+| --- | --- | --- |
+| `themes:` | `washguard-dark --default --prefersdark, washguard, …` | `cupcake --default --prefersdark, washguard-dark, washguard, …` |
+| `DEFAULT_THEME` | `'washguard-dark'` | `'cupcake'` |
+| `index.html` | `<html class="dark" data-theme="washguard-dark">` | `<html data-theme="cupcake">` |
+| Script inline | repli `washguard` / `washguard-dark` | repli `cupcake`, `class="dark"` pilotée par le schéma enregistré |
+| `meta theme-color` | `#080f1d` | `#faf7f5` (puis mis à jour dynamiquement) |
+| Vitrine (`Landing`) | racine épinglée `data-theme="washguard-dark"`, ~150 lignes `slate`/`sky` | tokens DaisyUI, dégradés photo en `neutral` + `neutral-content` |
+| Auth (`AuthLayout` + `pages/auth/*`) | racine épinglée `data-theme="washguard"`, `bg-white text-slate-900` | `bg-base-100 text-base-content`, panneau photo `neutral/95 → neutral/50` |
+| Bascule rapide | `washguard` ↔ `washguard-dark` via `DEFAULT_THEME` | `washguard` ↔ `washguard-dark` explicite (ne repasse plus par `DEFAULT_THEME`) |
+
+Le sélecteur conserve les 37 thèmes : un utilisateur qui préfère l'ancien look choisit `WashGuard sombre` dans le menu, et ce choix est persisté.
+
+Conséquences vérifiées : `:where(:root),[data-theme=cupcake]{…}`, repli `prefers-color-scheme` sur cupcake, 37 thèmes compilés, CSS 188,6 kB (29,0 kB gzip) — plus léger qu'avant, la vitrine n'ayant plus de variantes sombres codées en dur.

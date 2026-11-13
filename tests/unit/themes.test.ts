@@ -20,11 +20,11 @@ describe('catalogue de thèmes DaisyUI', () => {
     expect(THEME_OPTIONS).toHaveLength(37);
   });
 
-  it('n’a aucun doublon et garde WashGuard sombre par défaut', () => {
+  it('n’a aucun doublon et applique cupcake par défaut', () => {
     const names = THEME_OPTIONS.map((t) => t.name);
     expect(new Set(names).size).toBe(names.length);
-    expect(DEFAULT_THEME).toBe('washguard-dark');
-    expect(themeScheme(DEFAULT_THEME)).toBe('dark');
+    expect(DEFAULT_THEME).toBe('cupcake');
+    expect(themeScheme(DEFAULT_THEME)).toBe('light');
     expect(isKnownTheme(DEFAULT_THEME)).toBe(true);
   });
 

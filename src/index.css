@@ -12,13 +12,14 @@
    `themes: all` : avec `all`, DaisyUI réserve `:where(:root)` au thème `light`
    et `prefers-color-scheme` au thème `dark` en dur (pluginOptionsHandler.js),
    en ignorant les clés `default:` / `prefersdark:` de nos blocs ci-dessous.
-   Les thèmes WashGuard doivent pourtant tenir ces deux rôles :
-   `washguard-dark` est le thème par défaut de l'application (DEFAULT_THEME),
-   appliqué via `data-theme` sur <html> et synchronisé dans store.tsx.
+   Le thème par défaut du projet est **cupcake** (DEFAULT_THEME) : il tient donc
+   les deux rôles (`:where(:root)` et `prefers-color-scheme`). Les deux thèmes
+   WashGuard restent disponibles dans le sélecteur, et la bascule rapide
+   soleil/lune y ramène l'utilisateur en un clic.
    La liste est vérifiée par `npm run check` (cohérence avec src/lib/themes.ts
    et avec les fichiers de node_modules/daisyui/theme).                      */
 @plugin "daisyui" {
-  themes: washguard-dark --default --prefersdark, washguard, abyss, acid, aqua, autumn, black, bumblebee, business, caramellatte, cmyk, coffee, corporate, cupcake, cyberpunk, dark, dim, dracula, emerald, fantasy, forest, garden, halloween, lemonade, light, lofi, luxury, night, nord, pastel, retro, silk, sunset, synthwave, valentine, winter, wireframe;
+  themes: cupcake --default --prefersdark, washguard-dark, washguard, abyss, acid, aqua, autumn, black, bumblebee, business, caramellatte, cmyk, coffee, corporate, cyberpunk, dark, dim, dracula, emerald, fantasy, forest, garden, halloween, lemonade, light, lofi, luxury, night, nord, pastel, retro, silk, sunset, synthwave, valentine, winter, wireframe;
 }
 
 @plugin "daisyui/theme" {
@@ -61,8 +62,8 @@
 
 @plugin "daisyui/theme" {
   name: "washguard-dark";
-  default: true;
-  prefersdark: true;
+  default: false;
+  prefersdark: false;
   color-scheme: dark;
 
   --color-base-100: #101b2d;

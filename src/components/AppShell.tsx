@@ -211,7 +211,7 @@ export default function AppShell() {
               <kbd className="hidden xl:inline-flex">Ctrl K</kbd>
             </button>
             <PWAInstallButton compact />
-            <button type="button" onClick={toggleTheme} className="btn btn-sm px-2.5!" aria-label="Changer de thème" title="Thème WashGuard clair / sombre">
+            <button type="button" onClick={toggleTheme} className="btn btn-sm px-2.5!" aria-label="Basculer clair / sombre" title="Basculer entre les thèmes WashGuard clair et sombre">
               {theme === 'dark' ? <FiSun size={16} /> : <FiMoon size={16} />}
             </button>
             <ThemePicker />

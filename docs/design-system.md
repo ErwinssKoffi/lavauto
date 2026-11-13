@@ -32,13 +32,14 @@ Deux thèmes personnalisés remplacent les anciens tokens CSS, déclarés avec l
 | Thème | `data-theme` | Usage |
 | --- | --- | --- |
 | WashGuard clair | `washguard` | palette historique claire (`base-100 #ffffff`, texte `#0f172a`) |
-| WashGuard sombre | `washguard-dark` | palette historique sombre (`base-100 #101b2d`, texte `#e9f0fb`) — **thème par défaut** (`default: true`) |
+| WashGuard sombre | `washguard-dark` | palette historique sombre (`base-100 #101b2d`, texte `#e9f0fb`) — cible de la bascule rapide |
+| **Cupcake** | `cupcake` | thème intégré DaisyUI, **thème par défaut de tout le projet** (`--default` + `--prefersdark`) |
 
-`@plugin "daisyui" { themes: washguard-dark --default --prefersdark, washguard, abyss, …, wireframe; }` : **liste explicite** des 37 thèmes (35 intégrés + les 2 WashGuard), plutôt que `themes: all`.
+`@plugin "daisyui" { themes: cupcake --default --prefersdark, washguard-dark, washguard, abyss, …, wireframe; }` : **liste explicite** des 37 thèmes (35 intégrés + les 2 WashGuard), plutôt que `themes: all`.
 
 Pourquoi pas `all` : dans `daisyui/functions/pluginOptionsHandler.js`, la branche `themes === "all"` réserve `:where(:root)` au thème `light` et `prefers-color-scheme: dark` au thème `dark`, **sans lire** les clés `default:` / `prefersdark:` des blocs `@plugin "daisyui/theme"`. La racine du document appartenait donc à `light`, et le repli sombre à `dark` — deux palettes qui ne sont pas celles de la marque. Avec la liste explicite, nos clés sont appliquées : `:where(:root),[data-theme=washguard-dark]{…}` et `@media (prefers-color-scheme: dark){:root:not([data-theme]){…washguard-dark…}}`.
 
-`washguard-dark` reste le thème de l'application : `<html>` porte `data-theme="washguard-dark"` avant tout script, et `DEFAULT_THEME` vaut `'washguard-dark'`. Coût mesuré : 190,4 kB de CSS (30,2 kB gzip), soit ~2,5 kB de moins que la version `themes: all` (qui dupliquait `light`/`dark` dans les sélecteurs de repli).
+**cupcake est le thème de tout le projet** : `<html>` porte `data-theme="cupcake"` avant tout script, `DEFAULT_THEME` vaut `'cupcake'`, et les clés `--default` + `--prefersdark` lui donnent `:where(:root)` et le repli `prefers-color-scheme`. Coût mesuré : 188,6 kB de CSS (29,0 kB gzip).
 
 | Variable DaisyUI 5 | Rôle | Ancien token |
 | --- | --- | --- |
@@ -55,7 +56,7 @@ Réglages complémentaires :
 - **Bordure par défaut** : Tailwind 4 utilise `currentColor` ; une règle `@layer base { *, ::before, ::after, ::backdrop { border-color: var(--color-base-300); } }` rétablit une bordure thématique pour les simples `border`.
 - **Fond applicatif** : `body { background: color-mix(in oklab, var(--color-base-100) 94%, #000) }` — légèrement plus profond que la surface des cartes, et **dérivé du thème actif** : les 37 thèmes sont donc respectés sans aucune couleur codée en dur (l'ancienne variable `--page-bg` figée sur deux valeurs a été supprimée).
 - **Ajustements hors couche** : DaisyUI 5 émet ses composants dans la couche `utilities`, donc une règle `@layer components` serait perdante. Trois règles volontairement **non calquées** (donc prioritaires) ajustent le texte des `btn-sm` (`--fontsize: .875rem`), le rayon des badges (pastille `999px`) et la capitalisation des en-têtes de tableaux.
-- **Sélecteur de thème** (`src/components/ThemeSwitcher.tsx`) : menu de la topbar listant les deux thèmes WashGuard puis les 35 thèmes DaisyUI. Chaque ligne porte son propre `data-theme`, donc les pastilles montrent les couleurs réelles du thème proposé. Champ de **recherche** (insensible aux accents : « lofi » trouve `Lo-Fi`), navigation par **flèches haut/bas**, `Échap` referme et rend le focus au bouton, thème actif amené à l'écran à l'ouverture. Persistance `localStorage` : `washguard.theme.name` (thème exact) et `washguard.theme` (`dark`/`light`, conservé pour la compatibilité et le script inline de `index.html`). La bascule rapide soleil/lune ne revient qu'aux thèmes WashGuard.
+- **Sélecteur de thème** (`src/components/ThemeSwitcher.tsx`) : menu de la topbar listant les deux thèmes WashGuard puis les 35 thèmes DaisyUI ; la pastille active est celui des 37 qui est en cours (cupcake par défaut). Chaque ligne porte son propre `data-theme`, donc les pastilles montrent les couleurs réelles du thème proposé. Champ de **recherche** (insensible aux accents : « lofi » trouve `Lo-Fi`), navigation par **flèches haut/bas**, `Échap` referme et rend le focus au bouton, thème actif amené à l'écran à l'ouverture. Persistance `localStorage` : `washguard.theme.name` (thème exact) et `washguard.theme` (`dark`/`light`, conservé pour la compatibilité et le script inline de `index.html`). La bascule rapide soleil/lune ne revient qu'aux thèmes WashGuard.
 - **Barre du navigateur mobile** : à chaque changement de thème, le store recopie `--color-base-100` du thème actif dans `<meta name="theme-color">`.
 - **`@theme`** : police `Inter` (`--font-sans`) et animation `--animate-fade-in` (keyframes `fadeIn`).
 - **`@import "tailwindcss" source(none)` + `@source`** : seuls `index.html` et `src/**/*.{ts,tsx}` produisent des classes (ni la documentation ni les tests ne gonflent le CSS).
@@ -97,12 +98,7 @@ Avec 37 thèmes sélectionnables, une classe `slate`/`sky`/`amber` codée en dur
 | `text-white` sur une surface colorée | `text-primary-content`, `text-error-content`… | contraste garanti |
 | `bg-white`, `bg-slate-50` | `bg-base-100`, `bg-base-200` | champs, pages |
 
-Deux zones gardent volontairement une **identité sombre fixe** ; elles épinglent localement leur thème pour que les composants partagés restent lisibles quel que soit le choix de l'utilisateur :
-
-- `pages/Landing.tsx` → `data-theme="washguard-dark"` sur la racine (vitrine sombre) ;
-- `pages/auth/AuthLayout.tsx` → `data-theme="washguard"` sur la racine (colonne formulaire claire + panneau photo sombre en couleurs littérales).
-
-Les voiles de modale conservent `bg-black/60` (convention, indépendante du thème).
+**La vitrine et l'authentification suivent désormais le thème comme le reste** : plus aucune zone épinglée. Les dégradés par-dessus les photos utilisent `neutral` (+ `neutral-content` pour le texte), ce qui reste lisible sur photo claire sans couleur littérale ; les voiles de modale conservent `bg-black/60` (convention, indépendante du thème).
 
 Les graphiques (recharts / SVG) suivent intégralement le thème, **séries comprises**, via `src/lib/chartTheme.ts` :
 
@@ -118,7 +114,7 @@ Les graphiques (recharts / SVG) suivent intégralement le thème, **séries comp
 
 Le dégradé sous les courbes (`CHART_AREA_OPACITY` : 0,3 → 0,02) utilise `stopOpacity` sur la couleur du thème, au lieu d'un `rgba()` figé. Plus aucun hexadécimal ni `rgba()` ne subsiste dans le code applicatif : c'est vérifié par `npm run check`.
 
-Le contrôle `npm run check` « palette DaisyUI partout » parcourt tous les `.tsx` et échoue sur toute classe `text|bg|border|ring|from|via|to|shadow-{slate,sky,amber,emerald,red,white…}` hors de ces deux zones.
+Le contrôle `npm run check` « palette DaisyUI partout » parcourt **tous** les `.tsx` et échoue sur toute classe `text|bg|border|ring|from|via|to|shadow-{slate,sky,amber,emerald,red,white…}` ainsi que sur tout `#hex` ou `rgba()` (seul `bg-black/NN` des voiles est toléré).
 
 ## 3. Composants réels
 
@@ -198,7 +194,7 @@ Responsive : sidebar desktop / drawer mobile, topbar qui tronque, tableaux `tabl
 | --- | --- |
 | `npm run typecheck` | ✅ 0 erreur (TS strict) |
 | `npm run lint` | ✅ 26 règles statiques |
-| `npm run check` | ✅ **253 contrôles OK / 0 KO** (dont le rendu des 15 écrans en JSDOM) |
+| `npm run check` | ✅ **254 contrôles OK / 0 KO** (dont le rendu des 15 écrans en JSDOM) |
 | `npm run test:unit` | ✅ 291 tests / 35 fichiers |
 | `npm run build` | ✅ build Vite + PWA (39 entrées pré-cachées) · CSS 192,3 kB / gzip 30,2 kB |
 

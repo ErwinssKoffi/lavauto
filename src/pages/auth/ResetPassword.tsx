@@ -75,7 +75,7 @@ export default function ResetPassword() {
     <AuthLayout>
       <Badge tone="accent"><FiLock /> Nouveau mot de passe</Badge>
       <h1 className="mt-4 text-3xl font-extrabold tracking-tight">Définir un mot de passe</h1>
-      <p className="mt-2 text-sm text-slate-500">
+      <p className="mt-2 text-sm text-base-content/60">
         Choisissez un mot de passe long et unique. Il fermera toutes les sessions ouvertes sur ce compte.
       </p>
 
@@ -90,7 +90,7 @@ export default function ResetPassword() {
           <Link to="/mot-de-passe-oublie" className="btn btn-sm btn-primary w-full py-3!">Demander un nouveau lien <FiArrowRight aria-hidden="true" /></Link>
         </div>
       ) : tokenState === 'checking' ? (
-        <p className="mt-7 text-xs text-slate-500" role="status">Vérification du lien…</p>
+        <p className="mt-7 text-xs text-base-content/60" role="status">Vérification du lien…</p>
       ) : tokenState === 'invalid' ? (
         <div className="mt-7 space-y-4">
           <Alert kind="warn">Ce lien de réinitialisation est invalide, déjà utilisé ou expiré. Aucun mot de passe n’a été modifié.</Alert>
@@ -99,7 +99,7 @@ export default function ResetPassword() {
       ) : (
         <form onSubmit={(e) => { void submit(e); }} className="mt-7 space-y-4" noValidate>
           {expiredLabel && (
-            <p className="text-[11px] text-slate-400">Lien valable jusqu’au {expiredLabel}.</p>
+            <p className="text-[11px] text-base-content/60">Lien valable jusqu’au {expiredLabel}.</p>
           )}
           <PasswordField
             id="new-password"
@@ -124,14 +124,14 @@ export default function ResetPassword() {
           <button type="submit" disabled={busy} className="btn btn-sm btn-primary w-full py-3! disabled:opacity-60">
             {busy ? 'Enregistrement…' : 'Enregistrer le mot de passe'} <FiArrowRight aria-hidden="true" />
           </button>
-          <div className="flex items-start gap-2 rounded-xl bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-500">
-            <FiShield className="mt-0.5 shrink-0 text-sky-600" aria-hidden="true" />
+          <div className="flex items-start gap-2 rounded-xl bg-base-200 p-3 text-[11px] leading-relaxed text-base-content/60">
+            <FiShield className="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
             <p>Le lien est à usage unique. Une fois le mot de passe enregistré, vous serez invité à vous reconnecter.</p>
           </div>
         </form>
       )}
 
-      <p className="mt-6 flex items-center justify-center gap-1.5 text-center text-[11px] text-slate-400">
+      <p className="mt-6 flex items-center justify-center gap-1.5 text-center text-[11px] text-base-content/60">
         <FiCheckCircle aria-hidden="true" /> Aucun mot de passe n’est affiché ni journalisé.
       </p>
     </AuthLayout>

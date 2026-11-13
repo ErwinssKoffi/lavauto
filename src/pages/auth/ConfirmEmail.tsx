@@ -34,7 +34,7 @@ export default function ConfirmEmail() {
       <h1 className="mt-4 text-3xl font-extrabold tracking-tight">Vérification de l’e-mail</h1>
 
       {state === 'checking' && (
-        <p className="mt-6 text-sm text-slate-500" role="status">Vérification de votre lien…</p>
+        <p className="mt-6 text-sm text-base-content/60" role="status">Vérification de votre lien…</p>
       )}
 
       {state === 'done' && (
@@ -58,7 +58,7 @@ export default function ConfirmEmail() {
               </span>
             </span>
           </Alert>
-          <p className="text-xs leading-relaxed text-slate-500">
+          <p className="text-xs leading-relaxed text-base-content/60">
             Aucune donnée n’a été modifiée. Demandez un nouveau lien depuis la page de connexion, ou connectez-vous si votre adresse est déjà confirmée.
           </p>
           <Link to="/connexion" className="btn btn-sm btn-primary w-full py-3!">Retour à la connexion <FiArrowRight aria-hidden="true" /></Link>

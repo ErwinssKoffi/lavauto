@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fr" class="dark" data-theme="washguard-dark">
+<html lang="fr" data-theme="cupcake">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" href="/favicon.ico" sizes="any" />
@@ -9,25 +9,24 @@
     <meta name="description" content="WashGuard — la gestion complète de votre station de lavage : lavages, caisse, employés, commissions et rapports. En FCFA, en français." />
     <meta property="og:title" content="WashGuard — Gestion de station de lavage" />
     <meta property="og:description" content="WashGuard — la gestion complète de votre station de lavage : lavages, caisse, employés, commissions et rapports. En FCFA, en français." />
-    <meta name="theme-color" content="#080f1d" />
+    <meta name="theme-color" content="#faf7f5" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="WashGuard" />
-    <!-- Thème appliqué avant le premier rendu : pas de flash sombre pour les
-         utilisateurs qui ont choisi le thème clair. -->
+    <!-- Thème appliqué avant le premier rendu : aucun flash, et le thème
+         choisi par l'utilisateur est respecté dès la première peinture.
+         Le thème par défaut du projet est `cupcake` (DEFAULT_THEME). -->
     <script>
       (function () {
         try {
-          var saved = localStorage.getItem('washguard.theme');
           var name = localStorage.getItem('washguard.theme.name');
-          var light = saved === 'light';
-          document.documentElement.classList.toggle('dark', !light);
-          document.documentElement.setAttribute(
-            'data-theme',
-            typeof name === 'string' && /^[a-z0-9-]+$/.test(name) ? name : (light ? 'washguard' : 'washguard-dark'),
-          );
-        } catch (e) { /* stockage indisponible : thème sombre par défaut */ }
+          var scheme = localStorage.getItem('washguard.theme');
+          var known = typeof name === 'string' && /^[a-z0-9-]+$/.test(name);
+          document.documentElement.setAttribute('data-theme', known ? name : 'cupcake');
+          // La classe `dark` est conservée pour compatibilité (scrollbars, tiers).
+          document.documentElement.classList.toggle('dark', scheme === 'dark');
+        } catch (e) { /* stockage indisponible : cupcake par défaut */ }
       })();
     </script>
     <title>WashGuard — Gestion de station de lavage</title>

@@ -60,7 +60,7 @@ export const DAISY_THEMES: ThemeOption[] = [
 
 export const THEME_OPTIONS: ThemeOption[] = [...WASHGUARD_THEMES, ...DAISY_THEMES];
 
-export const DEFAULT_THEME = 'washguard-dark';
+export const DEFAULT_THEME = 'cupcake';
 
 const BY_NAME = new Map(THEME_OPTIONS.map((t) => [t.name, t]));
 

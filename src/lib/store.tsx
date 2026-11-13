@@ -578,8 +578,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [themeName, setThemeName] = useState<string>(() => {
     try {
       const savedName = localStorage.getItem('washguard.theme.name');
-      if (isKnownTheme(savedName)) return savedName;
-      return localStorage.getItem('washguard.theme') === 'light' ? 'washguard' : DEFAULT_THEME;
+      return isKnownTheme(savedName) ? savedName : DEFAULT_THEME;
     } catch { return DEFAULT_THEME; }
   });
   const theme = themeScheme(themeName);
@@ -1124,7 +1123,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   // Bascule rapide : uniquement entre les deux thèmes WashGuard, quelle que
   // soit la palette exotique éventuellement sélectionnée.
   const toggleTheme = useCallback(() => {
-    setThemeName((current) => (themeScheme(current) === 'dark' ? 'washguard' : DEFAULT_THEME));
+    // Bascule rapide clair/sombre : elle reste sur la paire de la marque, quel
+    // que soit le thème choisi par ailleurs (cupcake par défaut).
+    setThemeName((current) => (themeScheme(current) === 'dark' ? 'washguard' : 'washguard-dark'));
   }, []);
 
   // Persistance + application au document. `data-theme` est la source de vérité

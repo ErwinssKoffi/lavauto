@@ -420,7 +420,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     fs.existsSync(path.join(ROOT, 'src/pages/auth/ForgotPassword.tsx')) &&
     fs.existsSync(path.join(ROOT, 'src/pages/auth/ResetPassword.tsx')));
   check('langue fr + devise FCFA', html.includes('lang="fr"') && read('src/lib/format.ts').includes('FCFA'));
-  check('thème sombre par défaut / clair disponible', html.includes('data-theme="washguard-dark"') && html.includes('class="dark"') && read('src/index.css').includes('@plugin "daisyui/theme"') && read('src/main.tsx').includes("washguard.theme"));
+  check('thème cupcake par défaut, appliqué avant le premier rendu', html.includes('data-theme="cupcake"') && html.includes("'cupcake'") && !html.includes('data-theme="washguard-dark"') && read('src/index.css').includes('@plugin "daisyui/theme"') && read('src/main.tsx').includes("washguard.theme"));
   check('photo unique pour les écrans auth', read('src/pages/auth/AuthLayout.tsx').includes('/images/lav-auto.jpeg') && fs.existsSync(path.join(ROOT,'public/images/lav-auto.jpeg')));
   check('client Supabase prêt, non branché', read('src/lib/supabase.ts').includes('isSupabaseConfigured') && fs.existsSync(path.join(ROOT,'.env.example')));
   check('plus aucun fichier CRA / template', !fs.existsSync(path.join(ROOT,'src/App.jsx')) && !fs.existsSync(path.join(ROOT,'public/index.html')) && !fs.existsSync(path.join(ROOT,'jsconfig.json')));
@@ -517,7 +517,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     const installed = fs.readdirSync(path.join(ROOT, 'node_modules/daisyui/theme'))
       .filter((file) => file.endsWith('.css'))
       .map((file) => file.replace(/\.css$/, ''));
-  check('configuration DaisyUI : 37 thèmes déclarés, WashGuard en défaut et en prefers-dark', (() => {
+  check('configuration DaisyUI : 37 thèmes déclarés, cupcake en défaut et en prefers-dark', (() => {
     const css = read('src/index.css').replace(/\/\*[\s\S]*?\*\//g, '');
     const block = css.match(/@plugin\s+"daisyui"\s*\{([\s\S]*?)\}/);
     if (!block) return false;
@@ -529,24 +529,26 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     const catalogue = [...read('src/lib/themes.ts').matchAll(/name: '([a-z0-9-]+)'/g)].map((m) => m[1]);
     const sameList = declared.length === catalogue.length &&
       declared.slice().sort().join() === catalogue.slice().sort().join();
-    // `themes: all` réserverait :where(:root) à `light` : refusé, la racine
-    // doit appartenir à washguard-dark (DEFAULT_THEME de l'application).
+    // `themes: all` réserverait :where(:root) à `light` : refusé, la racine doit
+    // appartenir à cupcake (DEFAULT_THEME du projet).
     const usesAll = /(^|[\s,:])all\b/.test(body);
+    const cupcakeDefault = /cupcake\s+--default(\s+--prefersdark)?\b/.test(body) && /cupcake\s+--default\s+--prefersdark\b/.test(body);
     const darkBlock = css.match(/@plugin\s+"daisyui\/theme"\s*\{\s*name:\s*"washguard-dark";([\s\S]*?)color-scheme/);
-    return sameList && !usesAll && Boolean(darkBlock) &&
-      /default:\s*true/.test(darkBlock[1]) &&
-      /prefersdark:\s*true/.test(darkBlock[1]);
+    return sameList && !usesAll && cupcakeDefault && Boolean(darkBlock) &&
+      /default:\s*false/.test(darkBlock[1]) &&
+      /prefersdark:\s*false/.test(darkBlock[1]);
   })());
     return names.length === installed.length + 2 &&
       installed.every((name) => names.includes(name)) &&
       names.includes('washguard') && names.includes('washguard-dark') &&
-      themesSrc.includes("export const DEFAULT_THEME = 'washguard-dark'") &&
+      themesSrc.includes("export const DEFAULT_THEME = 'cupcake'") &&
       shellSrc.includes('<ThemePicker />') &&
       read('src/lib/store.tsx').includes("localStorage.setItem('washguard.theme.name'") &&
       html.includes("localStorage.getItem('washguard.theme.name')");
   })());
-  check('palette DaisyUI partout : aucune couleur codée en dur (classe, hex, rgba) hors zones à identité fixe', (() => {
-    const zoned = /(pages\/Landing\.tsx|pages\/auth\/|AuthLayout\.tsx)/;
+  check('palette DaisyUI partout : aucune couleur codée en dur (classe, hex, rgba)', (() => {
+    // Plus aucune zone exemptée : vitrine et auth suivent le thème comme le reste.
+    const zoned = /$^/;
     const palette = /(?<![\w-])(text|bg|border|ring|from|via|to|fill|stroke|shadow)-(white|black|slate|zinc|gray|sky|blue|indigo|cyan|amber|emerald|green|red)(-[0-9]{2,3})?\/?[\w.[\]/-]*/g;
     const repos = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
       const full = path.join(dir, entry.name);
@@ -649,6 +651,10 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     const { dom, w } = makeDom('/app/tableau-de-bord', base());
     const errs = await mount(acode, w);
     const click = (el) => el.dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true, view: w }));
+    check('thème cupcake appliqué dès le montage (aucune préférence enregistrée)',
+      w.document.documentElement.getAttribute('data-theme') === 'cupcake' &&
+      !w.document.documentElement.classList.contains('dark'),
+      String(w.document.documentElement.getAttribute('data-theme')));
     const pickerButton = () => w.document.querySelector('button[aria-label="Choisir un thème"]');
     const rows = () => [...w.document.querySelectorAll('button[data-theme]')];
     check('sélecteur de thème : bouton présent dans la topbar, 0 erreur console',

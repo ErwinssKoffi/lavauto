@@ -76,16 +76,16 @@ export default function SignIn() {
     <AuthLayout>
       <Badge tone="accent"><FiLock /> {authKind === 'local' ? 'Connexion locale' : 'Connexion par e-mail'}</Badge>
       <h1 className="mt-4 text-3xl font-extrabold tracking-tight">Bonjour</h1>
-      <p className="mt-2 text-sm text-slate-500">Connectez-vous pour retrouver votre station.</p>
+      <p className="mt-2 text-sm text-base-content/60">Connectez-vous pour retrouver votre station.</p>
 
       {notice && <div className="mt-4"><Alert kind={notice.tone}>{notice.text}</Alert></div>}
       {authError && <div className="mt-4"><Alert kind="warn">{authError}</Alert></div>}
 
       <form onSubmit={(e) => { void submit(e); }} className="mt-7 space-y-4" noValidate>
         <div>
-          <label className="mb-1.5 block text-xs font-bold text-slate-600" htmlFor="email">Adresse e-mail</label>
+          <label className="mb-1.5 block text-xs font-bold text-base-content/70" htmlFor="email">Adresse e-mail</label>
           <div className="relative">
-            <FiMail className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+            <FiMail className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-base-content/60" aria-hidden="true" />
             <input
               id="email"
               ref={emailRef}
@@ -100,15 +100,15 @@ export default function SignIn() {
               onBlur={() => setEmailTouched(true)}
               aria-invalid={emailError ? true : undefined}
               aria-describedby={emailError ? 'email-error' : undefined}
-              className={`w-full rounded-xl border bg-slate-50 py-3 pl-10 pr-4 text-sm outline-none transition focus:bg-white focus:ring-4 ${
+              className={`w-full rounded-xl border bg-base-200 py-3 pl-10 pr-4 text-sm outline-none transition focus:bg-base-100 focus:ring-4 ${
  emailError
- ? 'border-red-300 focus:border-red-500 focus:ring-red-100'
- : 'border-slate-200 focus:border-sky-500 focus:ring-sky-100'
+ ? 'border-error/40 focus:border-error focus:ring-error/20'
+ : 'border-base-300 focus:border-primary focus:ring-primary/20'
  }`}
               placeholder="proprietaire@mastation.ci"
             />
           </div>
-          {emailError && <p className="mt-1.5 text-[11px] font-semibold text-red-600" id="email-error" role="alert">{emailError}</p>}
+          {emailError && <p className="mt-1.5 text-[11px] font-semibold text-error" id="email-error" role="alert">{emailError}</p>}
         </div>
 
         <PasswordField
@@ -118,7 +118,7 @@ export default function SignIn() {
           onChange={setPassword}
           autoComplete="current-password"
           labelAction={(
-            <Link to="/mot-de-passe-oublie" className="text-[11px] font-semibold text-sky-600 hover:underline">
+            <Link to="/mot-de-passe-oublie" className="text-[11px] font-semibold text-primary hover:underline">
               Mot de passe oublié ?
             </Link>
           )}
@@ -132,9 +132,9 @@ export default function SignIn() {
       </form>
 
       {/* Aucune connexion tierce : Google / Facebook n'existent pas. */}
-      <div className="mt-5 rounded-xl border border-sky-100 bg-sky-50 p-3.5 text-xs leading-relaxed text-slate-600">
+      <div className="mt-5 rounded-xl border border-primary/30 bg-primary/10 p-3.5 text-xs leading-relaxed text-base-content/70">
         <div className="flex items-start gap-2">
-          <FiInfo className="mt-0.5 shrink-0 text-sky-600" aria-hidden="true" />
+          <FiInfo className="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
           {authKind === 'local' ? (
             <p><strong>Mot de passe oublié ?</strong> Aucun e-mail ni lien de récupération n’est disponible en mode stockage navigateur.</p>
           ) : (
@@ -143,17 +143,17 @@ export default function SignIn() {
         </div>
       </div>
 
-      <div className="mt-3 flex items-center justify-center gap-2 text-[11px] text-slate-400">
+      <div className="mt-3 flex items-center justify-center gap-2 text-[11px] text-base-content/60">
         <FiShield aria-hidden="true" /> {authKind === 'local' ? 'Session en mémoire, non sécurisée' : 'Sessions révocables · Mot de passe vérifié côté serveur'}
       </div>
       {authKind !== 'local' && (
-        <p className="mt-2 text-center text-[11px] leading-relaxed text-slate-400">
+        <p className="mt-2 text-center text-[11px] leading-relaxed text-base-content/60">
           Poste partagé ? Fermez votre session depuis le menu du compte, ou fermez toutes les autres sessions dans « Sécurité du compte ».
         </p>
       )}
 
-      <p className="mt-6 text-center text-sm text-slate-500">
-        Pas encore de compte ? <Link to="/inscription" className="font-bold text-sky-600 hover:underline">Créer mon espace</Link>
+      <p className="mt-6 text-center text-sm text-base-content/60">
+        Pas encore de compte ? <Link to="/inscription" className="font-bold text-primary hover:underline">Créer mon espace</Link>
       </p>
     </AuthLayout>
   );
