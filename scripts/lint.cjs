@@ -38,6 +38,18 @@ const rules = [
     !src.includes('VITE_SUPABASE_SERVICE_ROLE') &&
     !read('.env.example').includes('VITE_SUPABASE_SERVICE_ROLE') &&
     !/(sb_secret_|service_role\s*[=:]\s*['"][^'"]+)/.test(src)],
+  ['aucune clé Supabase réelle versionnée', () => {
+    const surfaces = [
+      src,
+      read('.env.example'),
+      read('.github/workflows/ci.yml'),
+      read('.github/workflows/deploy.yml'),
+      read('playwright.config.ts'),
+      read('playwright.logo.config.ts'),
+    ].join('\n');
+    return !/sb_(?:publishable|secret)_[A-Za-z0-9_-]{12,}/.test(surfaces) &&
+      !/eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/.test(surfaces);
+  }],
   ['AppState et store sans mots de passe', () =>
     !/passwords\s*:/.test(types) && !/passwords\s*:/.test(store) &&
     !/passwords\s*:/.test(employees)],

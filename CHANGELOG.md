@@ -1,5 +1,12 @@
 # Changelog
 
+## Non publié — Câblage runtime Supabase vers `cgxrqorwmmcyqescatzs`
+
+- **Constat :** le projet Vercel `lavauto` ne possédait aucune variable `VITE_*`. L’intégration Supabase y avait déposé des variables `NEXT_PUBLIC_SUPABASE_*` / `SUPABASE_*` / `POSTGRES_*` qui ne sont pas lues par Vite, et `NEXT_PUBLIC_SUPABASE_URL` visait `https://ulgmjhnvsjovkjfegirl.supabase.co`, un autre projet. Le site déployé restait donc en mode local par défaut.
+- **Correctif Vercel :** ajout de `VITE_SUPABASE_URL=https://cgxrqorwmmcyqescatzs.supabase.co`, de la clé **publishable** du même projet (type chiffré, jamais versionnée), de `VITE_SUPABASE_STORAGE_BUCKET=station-assets` et de `VITE_DATA_SOURCE=local` pour `production`, `preview` et `development`. Les variables d’intégration pointant vers l’autre projet n’ont pas été supprimées ; l’intégration Supabase de Vercel doit être reconnectée à la cible depuis le tableau de bord.
+- **Bascule non effectuée :** `cgxrqorwmmcyqescatzs` compte 51 migrations ; `053`–`057` ne sont pas appliquées et le frontend connecté appelle `my_station_*` (`054`), `my_station_setup` (`056`) et `my_subscription_access` / `my_subscription_usage` (`057`). Passer `VITE_DATA_SOURCE` à `supabase` maintenant casserait le tableau de bord, les rapports et les abonnements. La bascule reste une décision distincte, après application autorisée et recette.
+- **Contrôle :** `scripts/verify-env.cjs` (`npm run verify:env`, `npm run verify:env:bundle`) valide la cible unique, refuse `sb_secret_` / JWT `service_role` / bucket inattendu / constante de test hors harnais, et n’affiche que l’hôte public et une empreinte SHA-256. Il est branché sur la CI et sur le workflow de déploiement, qui fige désormais l’URL cible. 15 tests Vitest (`tests/unit/runtime-env-wiring.test.ts`), lint et typecheck verts ; un build local avec la configuration connectée ne contient que `cgxrqorwmmcyqescatzs` et aucune clé privilégiée.
+
 ## Non publié — Périmètre multi-stations et validation
 
 - Sélection explicite de la station accessible, lectures et mutations bornées à cette station, protection contre les réponses Auth ou réseau arrivées après changement de contexte. En mode connecté, l'état métier n'est plus restauré ni persisté dans le cache local du navigateur.

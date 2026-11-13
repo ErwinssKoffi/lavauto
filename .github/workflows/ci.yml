@@ -20,6 +20,8 @@ jobs:
         run: npm run typecheck
       - name: Vérification des fonctions Edge avec Deno
         run: npx --yes deno@2.9.6 check --no-config supabase/functions/invite-user/index.ts supabase/functions/whatsapp-dispatch/index.ts supabase/functions/whatsapp-webhook/index.ts
+      - name: Câblage des variables runtime
+        run: npm run verify:env
       - name: Garde-fous statiques
         run: npm run lint
       - name: Tests unitaires Vitest
@@ -38,6 +40,8 @@ jobs:
           WG_ATOMIC_TEST_SOCKET="$tmp" PGPORT=55433 npm run test:postgres:concurrency
       - name: Build production
         run: npm run build
+      - name: Bundle sans clé ni projet étranger
+        run: npm run verify:env:bundle
       - name: Navigateur Chromium
         run: npx playwright install --with-deps chromium
       - name: Parcours Playwright (données locales)

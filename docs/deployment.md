@@ -23,6 +23,32 @@
 
 Aucune clé `service_role`, aucun secret Supabase, aucun `sb_secret` et aucun mot de passe ne doit être exposé au navigateur ni versionné. Les valeurs `VITE_DATA_SOURCE`, `VITE_SUPABASE_STORAGE_BUCKET` et `VITE_WG_TEST_AUTH` sont fixées directement dans `.github/workflows/deploy.yml` ; elles ne sont pas des secrets.
 
+### Câblage vérifié le 13/11/2026
+
+L’audit du projet Vercel `lavauto` (`prj_XCwI9GZL9Z77l9uiTAdlXY8KuPat`) a montré que **le préfixe attendu par Vite n’était pas câblé** : l’intégration Supabase n’avait créé que des variables `NEXT_PUBLIC_SUPABASE_*` / `SUPABASE_*` / `POSTGRES_*`, et `NEXT_PUBLIC_SUPABASE_URL` visait **`https://ulgmjhnvsjovkjfegirl.supabase.co`**, un projet différent de la cible. Aucune variable `VITE_*` n’existait, donc `isSupabaseConfigured` restait faux et le site déployé fonctionnait en mode local.
+
+Correctifs appliqués dans Vercel, pour `production`, `preview` et `development` :
+
+| Variable | Type | Valeur |
+| --- | --- | --- |
+| `VITE_SUPABASE_URL` | plain | `https://cgxrqorwmmcyqescatzs.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY` | chiffrée | clé publishable du projet `cgxrqorwmmcyqescatzs` (jamais copiée dans le dépôt) |
+| `VITE_SUPABASE_STORAGE_BUCKET` | plain | `station-assets` |
+| `VITE_DATA_SOURCE` | plain | `local` — bascule volontaire, voir ci-dessous |
+
+`VITE_DATA_SOURCE=local` est **volontaire** : le journal distant de `cgxrqorwmmcyqescatzs` compte 51 migrations, alors que le frontend connecté appelle `my_station_*` (`054`), `my_station_setup` (`056`) et `my_subscription_access` / `my_subscription_usage` (`057`), absentes. Activer `supabase` aujourd’hui casserait le tableau de bord, les rapports et les abonnements. La bascule se fait en changeant **une seule** variable, après application autorisée de `053`–`057` et recette.
+
+Les variables d’intégration `NEXT_PUBLIC_*` / `SUPABASE_*` / `POSTGRES_*` pointant vers `ulgmjhnvsjovkjfegirl` n’ont pas été supprimées : elles sont inutilisées par Vite, mais l’intégration Supabase de Vercel doit être déconnectée puis reconnectée à `cgxrqorwmmcyqescatzs` depuis le tableau de bord (le connecteur ne l’expose pas). Ne jamais réutiliser le `SUPABASE_SERVICE_ROLE_KEY` de cette intégration.
+
+Le dépôt embarque un contrôle reproductible, sans réseau et sans afficher de clé :
+
+```bash
+npm run verify:env          # URL, clé, bucket, mode, absence de variable privilégiée
+npm run verify:env:bundle   # + analyse de dist/ (projet étranger, sb_secret_, JWT service_role)
+```
+
+`scripts/verify-env.cjs` refuse tout autre projet que `cgxrqorwmmcyqescatzs`, toute clé `sb_secret_` / JWT `service_role`, tout bucket différent de `station-assets` et `VITE_WG_TEST_AUTH` hors harnais local. Il n’imprime que l’hôte public et une empreinte SHA-256 tronquée. La CI et le workflow de déploiement l’exécutent ; `tests/unit/runtime-env-wiring.test.ts` couvre les cas positifs et négatifs.
+
 ### Secrets et variables à créer dans GitHub
 
 `Settings → Secrets and variables → Actions` du dépôt `ErwinssKoffi/lavauto` :
@@ -65,14 +91,16 @@ Le frontend n'appelle jamais `localhost` depuis le navigateur en production. Sur
 - `cleanUrls: false` et rewrite `/(.*)` → `/index.html` pour React Router, en attente de validation Vercel ;
 - en-têtes `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`.
 
-Le projet Vercel lié à `main` est `lavauto` (scope `durandobi634-8314s-projects`). La production observée est `https://lavauto-five.vercel.app`. Aucune variable de projet ou partagée n’était listée lors de la lecture ; le code sans configuration est en mode local, mais le bundle déployé n’a pas été inspecté, donc le mode public exact reste à confirmer. Préserver les données locales des navigateurs avant tout changement d’origine ou de mode.
+Le projet Vercel lié à `main` est `lavauto` (scope `durandobi634-8314s-projects`). La production observée est `https://lavauto-five.vercel.app`. Depuis le 13/11/2026, les quatre variables `VITE_*` décrites en §1 existent et visent `cgxrqorwmmcyqescatzs` ; `VITE_DATA_SOURCE` reste `local` tant que `053`–`057` ne sont pas appliquées. Le `dist/` produit localement avec la configuration connectée contient l’URL cible et la clé publishable, aucun `sb_secret_`, aucun JWT `service_role` et aucune référence à `ulgmjhnvsjovkjfegirl`. Préserver les données locales des navigateurs avant tout changement d’origine ou de mode.
 
 `.github/workflows/deploy.yml` s'exécute sur `workflow_dispatch`, `repository_dispatch` (`deploy_production`) ou `push` vers `main`. Il :
 
-1. lit les secrets `VERCEL_*` et les variables `VITE_SUPABASE_*` ;
+1. lit les secrets `VERCEL_*` et **fige** `VITE_SUPABASE_URL` sur `https://cgxrqorwmmcyqescatzs.supabase.co` — une variable de dépôt obsolète ne peut plus détourner le build ;
 2. ignore proprement le déploiement si `VERCEL_TOKEN` est absent (au lieu d'échouer) ;
-3. vérifie que `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` sont renseignés et que `VITE_WG_TEST_AUTH` reste vide ;
-4. enchaîne `npm ci`, `vercel pull --yes --environment=production`, `vercel build --prod`, `vercel deploy --prebuilt --prod`.
+3. vérifie `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID`, exécute `node scripts/verify-env.cjs --production` et impose `VITE_WG_TEST_AUTH` vide ;
+4. enchaîne `npm ci`, `vercel pull --yes --environment=production`, `vercel build --prod`, puis vérifie le bundle (`.vercel/output/static`) avant `vercel deploy --prebuilt --prod`.
+
+`VITE_DATA_SOURCE` vaut `local` par défaut ; la variable de dépôt `VITE_DATA_SOURCE=supabase` active le mode connecté, et la clé `VITE_SUPABASE_ANON_KEY` devient alors obligatoire.
 
 Le workflow initial contenait une erreur YAML (`run: echo "… : …"` avec `:` suivi d'un espace dans un scalaire non quoté) qui faisait échouer chaque exécution en 0 s sans créer de job. Le `run` est désormais un bloc littéral et le fichier est validé par `@action-validator/cli` (0 erreur).
 

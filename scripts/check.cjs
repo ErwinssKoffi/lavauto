@@ -2272,11 +2272,34 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     return ci.includes('playwright install --with-deps chromium') &&
       ci.includes('npm run test:unit') && ci.includes('npm run check') &&
       deploy.includes('VERCEL_TOKEN') && !deploy.includes('vercel-token:') &&
-      deploy.includes('VITE_DATA_SOURCE: supabase') &&
-      deploy.includes('VITE_SUPABASE_URL') && deploy.includes('VITE_SUPABASE_ANON_KEY') &&
+      deploy.includes('https://cgxrqorwmmcyqescatzs.supabase.co') &&
+      deploy.includes('VITE_SUPABASE_ANON_KEY') &&
       deploy.includes("VITE_WG_TEST_AUTH: ''") &&
+      deploy.includes('verify-env.cjs') &&
       deploy.includes('repository_dispatch') && !deploy.includes('run: echo "Déploiement ignoré :') &&
       vercel.includes('"rewrites"') && vercel.includes('X-Frame-Options');
+  })());
+
+  check('P11 : câblage runtime vers le projet unique, vérifiable sans exposer de clé', (() => {
+    const verify = read('scripts/verify-env.cjs');
+    const example = read('.env.example');
+    const deploy = read('.github/workflows/deploy.yml');
+    const ci = read('.github/workflows/ci.yml');
+    const pkg = read('package.json');
+    const lint = read('scripts/lint.cjs');
+    const surfaces = [example, deploy, ci].join('\n');
+    return verify.includes("DEFAULT_PROJECT_REF = 'cgxrqorwmmcyqescatzs'") &&
+      verify.includes('sb_publishable_') && verify.includes('service_role') &&
+      verify.includes('station-assets') && verify.includes('scanBundle') &&
+      example.includes('VITE_SUPABASE_URL=https://cgxrqorwmmcyqescatzs.supabase.co') &&
+      example.includes('VITE_SUPABASE_ANON_KEY=') &&
+      example.includes('verify:env') &&
+      pkg.includes('"verify:env"') && pkg.includes('"verify:env:bundle"') &&
+      ci.includes('npm run verify:env') && ci.includes('npm run verify:env:bundle') &&
+      deploy.includes('node scripts/verify-env.cjs --production') &&
+      lint.includes('aucune clé Supabase réelle versionnée') &&
+      !/sb_(?:publishable|secret)_[A-Za-z0-9_-]{12,}/.test(surfaces) &&
+      !/eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/.test(surfaces);
   })());
 
   check('P10 : rollback SQL, migrations 045/046/047/049/050 et correctif 048 retiré', (() => {

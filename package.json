@@ -10,6 +10,8 @@
     "typecheck": "tsc -b --noEmit",
     "lint": "node scripts/lint.cjs",
     "check": "node scripts/check.cjs",
+    "verify:env": "node scripts/verify-env.cjs",
+    "verify:env:bundle": "node scripts/verify-env.cjs --bundle dist",
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:list": "playwright test --list",
