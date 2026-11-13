@@ -45,6 +45,7 @@ Réglages complémentaires :
 
 - `borderColor.DEFAULT` = `oklch(var(--b3))` : un simple `border` reste sensible au thème, comme l'ancienne règle globale. Les surcharges `!border-amber-500/40` continuent de fonctionner.
 - `--page-bg` (`src/index.css`) : fond applicatif volontairement distinct de `base-100` pour conserver la profondeur visuelle d'origine.
+- **Densité** : `src/index.css` réaligne les variantes `-sm` de DaisyUI sur la métrique d'origine (2,4 rem au lieu de 2 rem pour `btn-sm`, `input-sm`, `select-sm` et `textarea-sm`) et recapitalise les en-têtes de tableaux (`.table thead`, 0,06 em). Aucun composant n'est modifié : seules les dimensions changent, pour que les 16 écrans gardent leur lisibilité de terrain.
 - `darkMode: 'class'` est conservé ; `store.tsx` synchronise à la fois la classe `dark` et `data-theme`, et `index.html` applique le thème **avant** le premier rendu (aucun flash).
 
 Seules règles globales restantes dans `src/index.css` : fond de page, `::selection`, anneau `:focus-visible`, barres de défilement, `prefers-reduced-motion` et les styles du **reçu imprimable**, volontairement isolés du thème.

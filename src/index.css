@@ -34,6 +34,30 @@ body {
   font-feature-settings: 'kern', 'tnum';
 }
 
+/* ─── Densité WashGuard appliquée aux primitives DaisyUI ──────────────────
+   Les contrôles de terrain doivent garder leur hauteur d'origine (~38 px) :
+   on aligne donc les variantes `-sm` de DaisyUI sur l'ancienne métrique
+   plutôt que d'ajouter une classe de hauteur sur chaque écran. Aucun
+   composant n'est remplacé : seules les dimensions sont ajustées.          */
+@layer components {
+  .btn.btn-sm {
+    height: 2.4rem;
+    min-height: 2.4rem;
+  }
+  .input.input-sm,
+  .select.select-sm {
+    height: 2.4rem;
+  }
+  .textarea.textarea-sm {
+    min-height: 2.4rem;
+  }
+  /* En-têtes de tableaux : capitales espacées, comme le tableau d'origine. */
+  .table :where(thead) {
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+}
+
 ::selection { background: oklch(var(--p) / 0.18); color: oklch(var(--bc)); }
 
 /* Anneau de focus visible au clavier uniquement (accessibilité clavier). */

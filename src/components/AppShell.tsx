@@ -210,17 +210,17 @@ export default function AppShell() {
               <kbd className="hidden xl:inline-flex">Ctrl K</kbd>
             </button>
             <PWAInstallButton compact />
-            <button type="button" onClick={toggleTheme} className="btn btn-sm btn-square" aria-label="Changer de thème" title="Thème clair / sombre">
+            <button type="button" onClick={toggleTheme} className="btn btn-sm !px-2.5" aria-label="Changer de thème" title="Thème clair / sombre">
               {theme === 'dark' ? <FiSun size={16} /> : <FiMoon size={16} />}
             </button>
-            <a href="/#faq" className="btn btn-sm btn-square" title="Questions fréquentes" aria-label="Questions fréquentes"><FiHelpCircle size={16} /></a>
+            <a href="/#faq" className="btn btn-sm !px-2.5" title="Questions fréquentes" aria-label="Questions fréquentes"><FiHelpCircle size={16} /></a>
 
             {/* Cloche d'alertes stock en temps réel */}
             {can('inventory.view') && <div className="relative">
               <button
                 type="button"
                 onClick={() => setAlertsOpen((v) => !v)}
-                className={`btn btn-sm btn-square relative ${state.stockAlerts.length > 0 ? '!text-amber-400' : ''}`}
+                className={`btn btn-sm !px-2.5 relative ${state.stockAlerts.length > 0 ? '!text-amber-400' : ''}`}
                 aria-label="Alertes stock"
                 title={state.stockAlerts.length > 0 ? `${state.stockAlerts.length} produit(s) sous le seuil critique` : 'Stock normal'}
               >

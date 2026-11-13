@@ -168,7 +168,7 @@ export function Modal({ open, onClose, title, children, wide = false }: { open: 
       <div className={`modal-box p-5 ${wide ? 'max-w-3xl' : 'max-w-lg'}`}>
         <div className="mb-4 flex items-center justify-between border-b border-base-300 pb-4">
           <h3 id={titleId} className="text-base font-bold">{title}</h3>
-          <button type="button" className="btn btn-ghost btn-sm btn-square" onClick={onClose} aria-label="Fermer"><FiX size={18} /></button>
+          <button type="button" className="btn btn-ghost btn-sm !px-2.5" onClick={onClose} aria-label="Fermer"><FiX size={18} /></button>
         </div>
         {children}
       </div>
