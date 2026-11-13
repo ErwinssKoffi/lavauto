@@ -545,7 +545,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
       read('src/lib/store.tsx').includes("localStorage.setItem('washguard.theme.name'") &&
       html.includes("localStorage.getItem('washguard.theme.name')");
   })());
-  check('palette DaisyUI partout : aucune couleur codée en dur hors zones à identité fixe', (() => {
+  check('palette DaisyUI partout : aucune couleur codée en dur (classe, hex, rgba) hors zones à identité fixe', (() => {
     const zoned = /(pages\/Landing\.tsx|pages\/auth\/|AuthLayout\.tsx)/;
     const palette = /(?<![\w-])(text|bg|border|ring|from|via|to|fill|stroke|shadow)-(white|black|slate|zinc|gray|sky|blue|indigo|cyan|amber|emerald|green|red)(-[0-9]{2,3})?\/?[\w.[\]/-]*/g;
     const repos = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -558,7 +558,11 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
       for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
         // Voiles de modale : noirs par convention, indépendants du thème.
         const found = line.replace(/bg-black\/\d+/g, '').match(palette);
+        // Aucune couleur hexadécimale ni rgba() : les graphiques passent par
+        // src/lib/chartTheme.ts (variables CSS du thème).
+        const literals = line.match(/#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)/g);
         if (found) offenders.push(`${path.relative(ROOT, file)} → ${found.join(' ')}`);
+        else if (literals) offenders.push(`${path.relative(ROOT, file)} → ${literals.join(' ')}`);
       }
     }
     if (offenders.length) console.log('     ' + offenders.slice(0, 4).join(' | '));

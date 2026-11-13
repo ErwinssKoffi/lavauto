@@ -15,6 +15,7 @@ import { WASH_STATUS_LABELS, PAY_METHOD_LABELS } from '../types';
 import { washStatusTone, finishedWashes } from '../lib/washLifecycle';
 import Revenue7DaysLineChart from '../components/Revenue7DaysLineChart';
 import Sparkline from '../components/Sparkline';
+import { CHART_COLORS } from '../lib/chartTheme';
 
 export default function Dashboard() {
   const { state, dataSource, stationMetrics, stationMetricsError, refreshStationMetrics, subscriptionAccess } = useStore();
@@ -252,8 +253,8 @@ export default function Dashboard() {
               <XAxis dataKey="date" stroke="var(--color-base-content)" fontSize={10} tickFormatter={(v) => String(v).slice(8, 10)} />
               <YAxis stroke="var(--color-base-content)" fontSize={10} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
               <Tooltip contentStyle={{ background: 'var(--color-base-100)', border: '1px solid var(--color-base-300)', color: 'var(--color-base-content)', borderRadius: '10px', fontSize: '12px' }} />
-              <Bar dataKey="revenue" name="Chiffre d’affaires" fill="#38bdf8" radius={[4, 4, 0, 0]} isAnimationActive={false} />
-              {monthTrend.every((point) => point.collected !== null) && <Bar dataKey="collected" name="Encaissé" fill="#34d399" radius={[4, 4, 0, 0]} isAnimationActive={false} />}
+              <Bar dataKey="revenue" name="Chiffre d’affaires" fill={CHART_COLORS.revenue} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+              {monthTrend.every((point) => point.collected !== null) && <Bar dataKey="collected" name="Encaissé" fill={CHART_COLORS.collected} radius={[4, 4, 0, 0]} isAnimationActive={false} />}
             </BarChart>
           </div>
         )}

@@ -7,6 +7,7 @@ import { FiTrendingUp } from 'react-icons/fi';
 import { formatFCFA } from '../lib/format';
 import type { DayChartPoint } from '../lib/metrics';
 import { Badge, Card } from './ui';
+import { CHART_COLORS } from '../lib/chartTheme';
 
 export default function Revenue7DaysLineChart({ data }: { data: DayChartPoint[] }) {
 
@@ -127,21 +128,21 @@ export default function Revenue7DaysLineChart({ data }: { data: DayChartPoint[] 
               type="monotone"
               dataKey="revenue"
               name="Chiffre d’affaires"
-              stroke="#38bdf8"
+              stroke={CHART_COLORS.revenue}
               strokeWidth={3}
-              dot={{ r: 4, fill: '#0284c7', stroke: '#38bdf8', strokeWidth: 2 }}
-              activeDot={{ r: 7, stroke: '#38bdf8', strokeWidth: 3, fill: '#ffffff' }}
+              dot={{ r: 4, fill: CHART_COLORS.revenue, stroke: CHART_COLORS.revenue, strokeWidth: 2 }}
+              activeDot={{ r: 7, stroke: CHART_COLORS.revenue, strokeWidth: 3, fill: CHART_COLORS.surface }}
               isAnimationActive={false}
             />
             {hasCollections && <Line
               type="monotone"
               dataKey="collected"
               name="Montant encaissé"
-              stroke="#34d399"
+              stroke={CHART_COLORS.collected}
               strokeWidth={2}
               strokeDasharray="4 2"
-              dot={{ r: 3.5, fill: '#059669', stroke: '#34d399', strokeWidth: 1.5 }}
-              activeDot={{ r: 6, stroke: '#34d399', strokeWidth: 2, fill: '#ffffff' }}
+              dot={{ r: 3.5, fill: CHART_COLORS.collected, stroke: CHART_COLORS.collected, strokeWidth: 1.5 }}
+              activeDot={{ r: 6, stroke: CHART_COLORS.collected, strokeWidth: 2, fill: CHART_COLORS.surface }}
               isAnimationActive={false}
             />}
           </LineChart>

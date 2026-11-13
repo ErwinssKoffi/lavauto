@@ -234,7 +234,9 @@ export default function Cash() {
           <div
             className="mb-4 rounded-xl border p-3 text-xs leading-relaxed"
             style={{
-              background: counted - theoretical > 0 ? 'rgba(56, 189, 248, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+              background: counted - theoretical > 0
+                ? 'color-mix(in oklab, var(--color-primary) 12%, transparent)'
+                : 'color-mix(in oklab, var(--color-error) 12%, transparent)',
               borderColor: counted - theoretical > 0 ? 'var(--color-primary)' : 'var(--color-error)',
             }}
           >

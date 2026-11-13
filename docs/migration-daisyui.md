@@ -91,7 +91,7 @@
 | `npm run typecheck` | ✅ 0 erreur |
 | `npm run lint` | ✅ 26 règles |
 | `npm run check` | ✅ 253 OK / 0 KO |
-| `npm run test:unit` | ✅ 288 tests / 34 fichiers |
+| `npm run test:unit` | ✅ 291 tests / 35 fichiers |
 | `npm run build` | ✅ build Vite + PWA |
 
 ## 8. Différences visuelles connues (assumées)
@@ -163,7 +163,7 @@ Trois ajustements restent **hors couche** (donc prioritaires sur la couche `util
 | `npm run typecheck` | ✅ 0 erreur |
 | `npm run lint` | ✅ 26 règles |
 | `npm run check` | ✅ 253 OK / 0 KO |
-| `npm run test:unit` | ✅ 288 tests / 34 fichiers |
+| `npm run test:unit` | ✅ 291 tests / 35 fichiers |
 | `npm run build` | ✅ Vite + PWA · CSS 192,3 kB / gzip 30,2 kB |
 
 
@@ -211,9 +211,9 @@ Conversion appliquée à **31 fichiers** (≈ 310 occurrences) : `slate` → `ba
 | `pages/Landing.tsx` | conservée en sombre, racine épinglée `data-theme="washguard-dark"` |
 | `pages/auth/*` + `AuthLayout.tsx` | conservées telles quelles, racine épinglée `data-theme="washguard"` (formulaire clair, panneau photo sombre) |
 | Voiles de modale | `bg-black/60` conservé (convention) |
-| Graphiques (recharts) | chrome (axes, grille, infobulles) en `var(--color-base-*)` ; couleurs de série conservées en hexadécimal |
+| Graphiques (recharts) | **tout** en variables CSS via `src/lib/chartTheme.ts` : CA → `primary`, encaissé → `success`, dépenses → `warning`, chrome → `base-content`/`base-300`/`base-100` |
 
-Garde-fou : le contrôle « palette DaisyUI partout » refuse toute classe de palette Tailwind hors des deux zones épinglées (testé en injectant `bg-slate-900 text-amber-400` → KO, puis restauration).
+Garde-fou : le contrôle « palette DaisyUI partout » refuse toute classe de palette Tailwind **et** tout `#hex`/`rgba()` hors des deux zones épinglées (testé en injectant `bg-slate-900 text-amber-400` puis `stroke="#38bdf8"` → KO, restaurations vérifiées).
 
 
 ---
@@ -225,3 +225,19 @@ Garde-fou : le contrôle « palette DaisyUI partout » refuse toute classe de pa
 - `<meta name="theme-color">` est recopié depuis `--color-base-100` à chaque changement de thème
   (barre du navigateur mobile / écran de démarrage PWA), avec repli silencieux si la valeur n'est
   pas calculable (JSDOM, navigateur ancien).
+
+
+---
+
+## 14. Graphiques pilotés par le thème
+
+`src/lib/chartTheme.ts` centralise la palette des graphiques en variables CSS (`--color-primary`, `--color-success`, `--color-warning`, `--color-error`, `--color-base-*`). Les quatre composants concernés (`Sparkline`, `Revenue7DaysLineChart`, `Dashboard`, `Consolidation`) n'ont plus aucun hexadécimal : le dégradé d'aire passe par `stopOpacity`, les infobulles et les points actifs par `base-100`.
+
+| Avant | Après |
+| --- | --- |
+| `#38bdf8` (CA) | `var(--color-primary)` |
+| `#34d399` (encaissé) | `var(--color-success)` |
+| `#fbbf24` (dépenses) | `var(--color-warning)` |
+| `rgba(56, 189, 248, 0.1)` (fond d'écart de caisse) | `color-mix(in oklab, var(--color-primary) 12%, transparent)` |
+
+Trois tests unitaires (`tests/unit/chart-theme.test.ts`) vérifient que chaque valeur est bien un `var(--color-…)`, que les trois séries restent distinctes et que les opacités du dégradé restent cohérentes.

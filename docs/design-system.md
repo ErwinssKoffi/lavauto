@@ -104,7 +104,19 @@ Deux zones gardent volontairement une **identité sombre fixe** ; elles épingle
 
 Les voiles de modale conservent `bg-black/60` (convention, indépendante du thème).
 
-Les graphiques (recharts) suivent aussi le thème pour tout ce qui est **chrome** : axes et grille en `var(--color-base-content)` / `var(--color-base-300)`, infobulles en `var(--color-base-100)` / `var(--color-base-content)`. Seules les **couleurs de série** (ligne CA `#38bdf8`, encaissé `#34d399`, dépenses `#fbbf24`) restent des hexadécimaux fixes : ce sont des identités de données, lisibles sur fond clair comme sombre.
+Les graphiques (recharts / SVG) suivent intégralement le thème, **séries comprises**, via `src/lib/chartTheme.ts` :
+
+| Clé | Variable | Série |
+| --- | --- | --- |
+| `revenue` | `var(--color-primary)` | chiffre d'affaires |
+| `collected` | `var(--color-success)` | montants encaissés |
+| `expenses` | `var(--color-warning)` | dépenses |
+| `error` | `var(--color-error)` | déficit, écart de caisse |
+| `axis` / `content` | `var(--color-base-content)` | axes, libellés |
+| `grid` | `var(--color-base-300)` | grille |
+| `surface` | `var(--color-base-100)` | infobulles, points actifs |
+
+Le dégradé sous les courbes (`CHART_AREA_OPACITY` : 0,3 → 0,02) utilise `stopOpacity` sur la couleur du thème, au lieu d'un `rgba()` figé. Plus aucun hexadécimal ni `rgba()` ne subsiste dans le code applicatif : c'est vérifié par `npm run check`.
 
 Le contrôle `npm run check` « palette DaisyUI partout » parcourt tous les `.tsx` et échoue sur toute classe `text|bg|border|ring|from|via|to|shadow-{slate,sky,amber,emerald,red,white…}` hors de ces deux zones.
 
@@ -187,7 +199,7 @@ Responsive : sidebar desktop / drawer mobile, topbar qui tronque, tableaux `tabl
 | `npm run typecheck` | ✅ 0 erreur (TS strict) |
 | `npm run lint` | ✅ 26 règles statiques |
 | `npm run check` | ✅ **253 contrôles OK / 0 KO** (dont le rendu des 15 écrans en JSDOM) |
-| `npm run test:unit` | ✅ 288 tests / 34 fichiers |
+| `npm run test:unit` | ✅ 291 tests / 35 fichiers |
 | `npm run build` | ✅ build Vite + PWA (39 entrées pré-cachées) · CSS 192,3 kB / gzip 30,2 kB |
 
 Le contrôle « thème » de `scripts/check.cjs` vérifie désormais : `:focus-visible` et `prefers-reduced-motion` toujours présents, `@import "tailwindcss"`, les plugins `daisyui` et `daisyui/theme` (exactement deux thèmes), les variables `--color-*`, `@theme` et `--animate-fade-in`, et **l'absence** de toute classe `.wg-` ou variable `--wg-` résiduelle dans `src/` (garde-fou sur chaque fichier `.ts`/`.tsx`/`.css`).

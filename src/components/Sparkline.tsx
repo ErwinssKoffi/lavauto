@@ -1,32 +1,18 @@
 import React, { useId, useState } from 'react';
+import { CHART_AREA_OPACITY, CHART_COLORS } from '../lib/chartTheme';
 
 export interface SparklinePoint {
   label: string;
   value: number;
 }
 
+// Tons alignés sur le thème actif : la courbe suit `primary` / `success` /
+// `warning`, et le dégradé est obtenu par `stopOpacity` plutôt que par des
+// couleurs rgba figées.
 const TONE_PALETTE = {
-  sky: {
-    stroke: '#38bdf8',
-    fillTop: 'rgba(56, 189, 248, 0.30)',
-    fillBottom: 'rgba(56, 189, 248, 0.02)',
-    dot: '#0ea5e9',
-    text: 'text-primary',
-  },
-  emerald: {
-    stroke: '#34d399',
-    fillTop: 'rgba(52, 211, 153, 0.30)',
-    fillBottom: 'rgba(52, 211, 153, 0.02)',
-    dot: '#10b981',
-    text: 'text-success',
-  },
-  amber: {
-    stroke: '#fbbf24',
-    fillTop: 'rgba(251, 191, 36, 0.28)',
-    fillBottom: 'rgba(251, 191, 36, 0.02)',
-    dot: '#f59e0b',
-    text: 'text-warning',
-  },
+  sky: { color: CHART_COLORS.revenue, text: 'text-primary' },
+  emerald: { color: CHART_COLORS.collected, text: 'text-success' },
+  amber: { color: CHART_COLORS.expenses, text: 'text-warning' },
 } as const;
 
 function buildSmoothPath(coords: { x: number; y: number }[]): string {
@@ -115,8 +101,8 @@ export default function Sparkline({
       >
         <defs>
           <linearGradient id={`spark-${gradientId}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={palette.fillTop} />
-            <stop offset="100%" stopColor={palette.fillBottom} />
+            <stop offset="0%" stopColor={palette.color} stopOpacity={CHART_AREA_OPACITY.top} />
+            <stop offset="100%" stopColor={palette.color} stopOpacity={CHART_AREA_OPACITY.bottom} />
           </linearGradient>
         </defs>
 
@@ -135,7 +121,7 @@ export default function Sparkline({
         <path
           d={linePath}
           fill="none"
-          stroke={palette.stroke}
+          stroke={palette.color}
           strokeWidth="2.2"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -146,7 +132,7 @@ export default function Sparkline({
             cx={activePoint.x}
             cy={activePoint.y}
             r="3.8"
-            fill={palette.dot}
+            fill={palette.color}
             stroke="var(--color-base-100)"
             strokeWidth="1.5"
           />
@@ -155,7 +141,7 @@ export default function Sparkline({
             cx={last.x}
             cy={last.y}
             r="3"
-            fill={palette.dot}
+            fill={palette.color}
             stroke="var(--color-base-100)"
             strokeWidth="1.2"
           />

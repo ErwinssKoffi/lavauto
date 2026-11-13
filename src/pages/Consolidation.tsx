@@ -9,11 +9,12 @@ import { formatDate, formatFCFA, todayISO } from '../lib/format';
 import {
   Alert, Badge, Card, EmptyState, Input, PageHeader, StatCard,
 } from '../components/ui';
+import { CHART_COLORS } from '../lib/chartTheme';
 
 const CHART_WIDTH = 720;
 const CHART_HEIGHT = 260;
-const AXIS = 'var(--color-base-content)';
-const GRID = 'var(--color-base-300)';
+const AXIS = CHART_COLORS.axis;
+const GRID = CHART_COLORS.grid;
 const TOOLTIP_STYLE = {
   background: 'var(--color-base-100)', border: '1px solid var(--color-base-300)', color: 'var(--color-base-content)',
   borderRadius: '10px', fontSize: '12px',
@@ -117,9 +118,9 @@ export default function Consolidation() {
                 <YAxis stroke={AXIS} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} fontSize={11} />
                 <Tooltip contentStyle={TOOLTIP_STYLE} labelFormatter={(v) => formatDate(String(v))} />
                 <Legend />
-                <Line type="monotone" dataKey="revenue" name="Chiffre d’affaires" stroke="#38bdf8" dot={false} isAnimationActive={false} />
-                <Line type="monotone" dataKey="collected" name="Encaissé" stroke="#34d399" dot={false} isAnimationActive={false} />
-                <Line type="monotone" dataKey="expenses" name="Dépenses" stroke="#fbbf24" dot={false} isAnimationActive={false} />
+                <Line type="monotone" dataKey="revenue" name="Chiffre d’affaires" stroke={CHART_COLORS.revenue} dot={false} isAnimationActive={false} />
+                <Line type="monotone" dataKey="collected" name="Encaissé" stroke={CHART_COLORS.collected} dot={false} isAnimationActive={false} />
+                <Line type="monotone" dataKey="expenses" name="Dépenses" stroke={CHART_COLORS.expenses} dot={false} isAnimationActive={false} />
               </LineChart>
             </div>
           )}
@@ -137,7 +138,7 @@ export default function Consolidation() {
                 <XAxis dataKey="name" stroke={AXIS} fontSize={10} interval={0} />
                 <YAxis stroke={AXIS} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} fontSize={11} />
                 <Tooltip contentStyle={TOOLTIP_STYLE} />
-                <Bar dataKey="revenue" name="Chiffre d’affaires" fill="#38bdf8" radius={[6, 6, 0, 0]} isAnimationActive={false} />
+                <Bar dataKey="revenue" name="Chiffre d’affaires" fill={CHART_COLORS.revenue} radius={[6, 6, 0, 0]} isAnimationActive={false} />
               </BarChart>
             </div>
           )}
