@@ -90,7 +90,7 @@
 | --- | --- |
 | `npm run typecheck` | ✅ 0 erreur |
 | `npm run lint` | ✅ 26 règles |
-| `npm run check` | ✅ 249 OK / 0 KO |
+| `npm run check` | ✅ 250 OK / 0 KO |
 | `npm run test:unit` | ✅ 288 tests / 34 fichiers |
 | `npm run build` | ✅ build Vite + PWA |
 
@@ -122,9 +122,16 @@ Décidée après la première migration (DaisyUI 4 / Tailwind 3), pour utiliser 
 
 ### 9.2 Thèmes
 
-`@plugin "daisyui" { themes: all; }` (les 35 thèmes intégrés sont embarqués) puis deux blocs `@plugin "daisyui/theme"` (`washguard`, `washguard-dark`). Les tokens deviennent `--color-*`, `--radius-*`, `--size-field`, `--border`, `--depth`, `--noise`.
+`@plugin "daisyui" { themes: washguard-dark --default --prefersdark, washguard, abyss, …, wireframe; }` (liste explicite des 37 thèmes) puis deux blocs `@plugin "daisyui/theme"` (`washguard`, `washguard-dark`). Les tokens deviennent `--color-*`, `--radius-*`, `--size-field`, `--border`, `--depth`, `--noise`.
 
-Avec `themes: all`, `light` reprend le sélecteur `:where(:root)` : le repli sans attribut est donc le thème clair intégré. Ce n'est pas un problème ici, `<html data-theme="washguard-dark">` étant écrit en dur dans `index.html` (avant tout script) puis maintenu par `store.tsx`. Coût mesuré : CSS 148,7 → 192,3 kB (23,3 → 30,2 kB gzip).
+**`themes: all` a été abandonné** : cette branche de `pluginOptionsHandler.js` impose `light` comme `--default` et `dark` comme `--prefersdark` en dur, en ignorant les clés `default:` / `prefersdark:` des thèmes personnalisés. Résultat : `:where(:root)` portait la palette `light` et le repli `prefers-color-scheme: dark` la palette `dark`. La liste explicite rend la racine à WashGuard :
+
+```css
+@plugin "daisyui" { themes: washguard-dark --default --prefersdark, washguard, … ; }
+@plugin "daisyui/theme" { name: "washguard-dark"; default: true; prefersdark: true; … }
+```
+
+soit `:where(:root),[data-theme=washguard-dark]{…}` et `@media (prefers-color-scheme: dark){:root:not([data-theme]){…washguard-dark…}}`. Coût mesuré : CSS 148,7 → 190,4 kB (23,3 → 30,2 kB gzip), légèrement moins que `themes: all`. `npm run check` compare la liste déclarée au catalogue `src/lib/themes.ts` et refuse `themes: all`.
 
 ### 9.3 Ruptures de classes corrigées
 
@@ -155,7 +162,7 @@ Trois ajustements restent **hors couche** (donc prioritaires sur la couche `util
 | --- | --- |
 | `npm run typecheck` | ✅ 0 erreur |
 | `npm run lint` | ✅ 26 règles |
-| `npm run check` | ✅ 249 OK / 0 KO |
+| `npm run check` | ✅ 250 OK / 0 KO |
 | `npm run test:unit` | ✅ 288 tests / 34 fichiers |
 | `npm run build` | ✅ Vite + PWA · CSS 192,3 kB / gzip 30,2 kB |
 
@@ -164,7 +171,7 @@ Trois ajustements restent **hors couche** (donc prioritaires sur la couche `util
 
 ## 10. Sélecteur de thème
 
-`themes: all` rend les 35 thèmes intégrés disponibles : ils sont exposés dans la topbar par `src/components/ThemeSwitcher.tsx`.
+Les 35 thèmes intégrés sont déclarés explicitement dans `@plugin "daisyui" { themes: … }` et exposés dans la topbar par `src/components/ThemeSwitcher.tsx`.
 
 | Élément | Détail |
 | --- | --- |

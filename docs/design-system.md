@@ -34,7 +34,11 @@ Deux thèmes personnalisés remplacent les anciens tokens CSS, déclarés avec l
 | WashGuard clair | `washguard` | palette historique claire (`base-100 #ffffff`, texte `#0f172a`) |
 | WashGuard sombre | `washguard-dark` | palette historique sombre (`base-100 #101b2d`, texte `#e9f0fb`) — **thème par défaut** (`default: true`) |
 
-`@plugin "daisyui" { themes: all; }` : les 37 thèmes (35 intégrés + les 2 WashGuard) sont disponibles et peuvent être appliqués localement via `data-theme` sur n'importe quel élément. Coût mesuré : **+43,5 kB de CSS brut (+6,9 kB gzip)**. `washguard-dark` reste le thème de l'application : `<html>` porte `data-theme="washguard-dark"` en dur dans `index.html`, avant tout script.
+`@plugin "daisyui" { themes: washguard-dark --default --prefersdark, washguard, abyss, …, wireframe; }` : **liste explicite** des 37 thèmes (35 intégrés + les 2 WashGuard), plutôt que `themes: all`.
+
+Pourquoi pas `all` : dans `daisyui/functions/pluginOptionsHandler.js`, la branche `themes === "all"` réserve `:where(:root)` au thème `light` et `prefers-color-scheme: dark` au thème `dark`, **sans lire** les clés `default:` / `prefersdark:` des blocs `@plugin "daisyui/theme"`. La racine du document appartenait donc à `light`, et le repli sombre à `dark` — deux palettes qui ne sont pas celles de la marque. Avec la liste explicite, nos clés sont appliquées : `:where(:root),[data-theme=washguard-dark]{…}` et `@media (prefers-color-scheme: dark){:root:not([data-theme]){…washguard-dark…}}`.
+
+`washguard-dark` reste le thème de l'application : `<html>` porte `data-theme="washguard-dark"` avant tout script, et `DEFAULT_THEME` vaut `'washguard-dark'`. Coût mesuré : 190,4 kB de CSS (30,2 kB gzip), soit ~2,5 kB de moins que la version `themes: all` (qui dupliquait `light`/`dark` dans les sélecteurs de repli).
 
 | Variable DaisyUI 5 | Rôle | Ancien token |
 | --- | --- | --- |
@@ -139,7 +143,7 @@ Responsive : sidebar desktop / drawer mobile, topbar qui tronque, tableaux `tabl
 | Exclu | Raison |
 | --- | --- |
 | shadcn/ui, Radix, Headless UI | DaisyUI couvre 100 % des besoins actuels sans runtime JS supplémentaire |
-| Sélecteur de thème dans l'interface | `themes: all` rend les 35 thèmes disponibles, mais l'app expose volontairement un simple basculement clair/sombre WashGuard |
+| Sélecteur de thème dans l'interface | les 35 thèmes intégrés sont disponibles et exposés par `ThemePicker` dans la topbar ; la bascule rapide soleil/lune reste limitée aux thèmes WashGuard |
 | Remplacement de `react-icons` | aucune dépendance UI à remplacer, les icônes ne sont pas concernées |
 | Modification de `src/lib/store.tsx` (métier), `metrics.ts`, `format.ts`, `types.ts`, `plans.ts` | seule la synchronisation `data-theme` a été ajoutée au thème |
 | Découpage de `ui.tsx` | API publique gelée sur consigne explicite (TD-22) |
@@ -153,7 +157,7 @@ Responsive : sidebar desktop / drawer mobile, topbar qui tronque, tableaux `tabl
 | --- | --- |
 | `npm run typecheck` | ✅ 0 erreur (TS strict) |
 | `npm run lint` | ✅ 26 règles statiques |
-| `npm run check` | ✅ **249 contrôles OK / 0 KO** (dont le rendu des 15 écrans en JSDOM) |
+| `npm run check` | ✅ **250 contrôles OK / 0 KO** (dont le rendu des 15 écrans en JSDOM) |
 | `npm run test:unit` | ✅ 288 tests / 34 fichiers |
 | `npm run build` | ✅ build Vite + PWA (39 entrées pré-cachées) · CSS 192,3 kB / gzip 30,2 kB |
 

@@ -517,6 +517,26 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     const installed = fs.readdirSync(path.join(ROOT, 'node_modules/daisyui/theme'))
       .filter((file) => file.endsWith('.css'))
       .map((file) => file.replace(/\.css$/, ''));
+  check('configuration DaisyUI : 37 thèmes déclarés, WashGuard en défaut et en prefers-dark', (() => {
+    const css = read('src/index.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    const block = css.match(/@plugin\s+"daisyui"\s*\{([\s\S]*?)\}/);
+    if (!block) return false;
+    const body = block[1].replace(/^\s*themes\s*:/, '');
+    const declared = body
+      .split(',')
+      .map((entry) => entry.trim().split(/\s+/)[0].replace(/;+$/, ''))
+      .filter(Boolean);
+    const catalogue = [...read('src/lib/themes.ts').matchAll(/name: '([a-z0-9-]+)'/g)].map((m) => m[1]);
+    const sameList = declared.length === catalogue.length &&
+      declared.slice().sort().join() === catalogue.slice().sort().join();
+    // `themes: all` réserverait :where(:root) à `light` : refusé, la racine
+    // doit appartenir à washguard-dark (DEFAULT_THEME de l'application).
+    const usesAll = /(^|[\s,:])all\b/.test(body);
+    const darkBlock = css.match(/@plugin\s+"daisyui\/theme"\s*\{\s*name:\s*"washguard-dark";([\s\S]*?)color-scheme/);
+    return sameList && !usesAll && Boolean(darkBlock) &&
+      /default:\s*true/.test(darkBlock[1]) &&
+      /prefersdark:\s*true/.test(darkBlock[1]);
+  })());
     return names.length === installed.length + 2 &&
       installed.every((name) => names.includes(name)) &&
       names.includes('washguard') && names.includes('washguard-dark') &&
