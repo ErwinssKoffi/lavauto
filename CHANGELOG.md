@@ -1,5 +1,14 @@
 # Changelog
 
+## Non publié — Connexion, inscription et sécurité du compte
+
+- Politique de mot de passe partagée (`src/lib/passwordPolicy.ts`) appliquée par les formulaires **et** par le serveur : 8 à 200 caractères, lettre et chiffre exigés, mots de passe courants et adresse e-mail refusés. Jauge de robustesse et liste de règles en direct, sans jamais bloquer uniquement côté navigateur.
+- Nouveaux écrans : connexion (affichage du mot de passe, verrouillage majuscules, validation d’e-mail, messages d’expiration), inscription (erreurs par champ, suggestion de domaine e-mail, confirmation de mot de passe), réinitialisation (vérification du lien avant saisie) et `/confirmer-email`. Aucune case « se souvenir de moi », aucun fournisseur OAuth ajouté.
+- Serveur : limitation de débit en mémoire (`429` + `Retry-After`), sessions enrichies (appareil, IP, dernière activité, échéance glissante plafonnée), révocation d’une session, fermeture des autres sessions, changement de mot de passe authentifié, jetons de réinitialisation à usage unique avec consommation atomique et fermeture de toutes les sessions après usage, réponse neutre sur les comptes inconnus.
+- Journal `auth_events` (inscription, connexion réussie ou refusée, déconnexion, mots de passe, révocations, limitation) et panneau **Sécurité du compte** (mot de passe, sessions actives, activité) accessible depuis le menu du compte pour tous les rôles.
+- Confirmation d’e-mail optionnelle (`WASHGUARD_REQUIRE_EMAIL_CONFIRMATION=1`) ; les liens ne sont renvoyés au navigateur que hors production ou avec `WASHGUARD_EXPOSE_AUTH_LINKS=1`. **Aucun e-mail réel n’est envoyé** par ce dépôt et aucune migration distante n’est appliquée.
+- Tests : `tests/unit/auth-security.test.ts` (politique, e-mail, téléphone, limiteur), parcours HTTP exercés sur le serveur local, `npm run check` vert (242 contrôles). Le harnais `check` résout désormais le module virtuel `virtual:pwa-register` par un double inerte afin de pouvoir charger `src/main.tsx` sans les plugins Vite.
+
 ## Non publié — Périmètre multi-stations et validation
 
 - Sélection explicite de la station accessible, lectures et mutations bornées à cette station, protection contre les réponses Auth ou réseau arrivées après changement de contexte. En mode connecté, l'état métier n'est plus restauré ni persisté dans le cache local du navigateur.

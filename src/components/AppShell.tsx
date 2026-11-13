@@ -13,6 +13,7 @@ import { findEntry, groupsForRole } from './navigation';
 import { ROLE_LABELS, type Role } from '../types';
 import { usePermissions } from '../lib/usePermissions';
 import StockAlertBanner from './StockAlertBanner';
+import { AccountSecurity } from './AccountSecurity';
 import { PWAInstallButton } from './PwaControls';
 
 const SIDEBAR_KEY = 'washguard.sidebar.collapsed';
@@ -24,6 +25,7 @@ export default function AppShell() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [securityOpen, setSecurityOpen] = useState(false);
   const [closedGroups, setClosedGroups] = useState<string[]>([]);
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem(SIDEBAR_KEY) === '1'; } catch { return false; }
@@ -295,6 +297,7 @@ export default function AppShell() {
                     <p className="wg-muted truncate text-[11px]">{state.session?.email}</p>
                   </div>
                   <div className="my-1 border-t" style={{ borderColor: 'var(--wg-border)' }} />
+                  <button type="button" className="wg-btn wg-btn-ghost w-full !justify-start" onClick={() => { setMenuOpen(false); setSecurityOpen(true); }}><FiShield size={15} /> Sécurité du compte</button>
                   {(role === 'proprietaire' || role === 'gerant') && (
                     <button type="button" className="wg-btn wg-btn-ghost w-full !justify-start" onClick={() => { setMenuOpen(false); navigate('/app/parametres'); }}><FiSliders size={15} /> Paramètres</button>
                   )}
@@ -339,6 +342,7 @@ export default function AppShell() {
       </div>
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} role={role} permissions={permissions} />
+      <AccountSecurity open={securityOpen} onClose={() => setSecurityOpen(false)} />
     </div>
   );
 }

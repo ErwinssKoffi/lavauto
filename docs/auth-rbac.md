@@ -4,6 +4,26 @@
 
 > Les sections P04 ci-dessous conservent des constats **historiques** (branche et comptages de l’époque). Les protections d’identité, d’abonnement et de révocation de `057` et la nouvelle Edge Function sont locales et **non déployées** ; le frontend n’est pas déployé en production. Un aperçu Vercel automatique de la PR ne constitue pas une recette. Aucun test Auth/e-mail réel n’a été effectué pour ces changements ; toute recette ou mise en service nécessite une autorisation distincte. Le projet `BarberShop` (`fpapxbfsiiwgpvsefsec`) reste intact. Aucun secret ni clé `service_role` n’a été versionné.
 
+## Mise à jour locale : sécurité de connexion (mode API)
+
+Cette section décrit le **mode API** (serveur Express + PostgreSQL embarqué PGlite), celui du serveur de développement. Elle ne décrit pas un déploiement : aucun envoi d’e-mail réel n’est configuré, et `053`–`057` restent non appliquées sur `lavauto`.
+
+| Fonction | Comportement vérifié localement | Limite connue |
+| --- | --- | --- |
+| Politique de mot de passe | Module partagé `src/lib/passwordPolicy.ts` : 8 à 200 caractères, au moins une lettre et un chiffre, refus des mots de passe courants et de l’adresse elle-même. Appliqué par les formulaires **et** par le serveur. | Pas de vérification contre une base de fuites (HIBP). |
+| Limitation de débit | Compteurs en mémoire : 8 échecs par compte et par quart d’heure, 25 par adresse IP, 10 inscriptions par heure, 5 demandes de réinitialisation par compte, 30 essais de jeton. Réponse `429` avec en-tête `Retry-After`. | Un seul processus : un déploiement multi-instances doit ajouter un limiteur partagé (Redis/WAF). Le compteur est perdu au redémarrage. |
+| Sessions | Jeton aléatoire de 32 octets, empreinte SHA-256 en base, cookie `HttpOnly` `SameSite=Lax` (`Secure` en production). Métadonnées : appareil, IP, dernière activité, échéance. Expiration glissante (30 jours avec persistance, 12 heures sinon) plafonnée à 180 jours. | La rotation du jeton à chaque requête n’est pas implémentée. |
+| Sessions actives | Menu du compte → **Sécurité du compte** : liste des sessions, révocation d’une session précise (la session courante peut être fermée) et fermeture de toutes les autres. | Mode Supabase Auth : seule la fermeture des autres appareils est disponible, la liste n’est pas exposée. Mode local : session en mémoire seulement. |
+| Changement de mot de passe | `POST /api/auth/change-password` : mot de passe actuel exigé, politique revérifiée, autres sessions fermées, jetons de réinitialisation invalidés, compteur d’échecs remis à zéro. Accessible à tout compte connecté. | En mode local, seule l’empreinte de démonstration du navigateur est remplacée. |
+| Réinitialisation | Jeton à usage unique, valable 1 heure, consommation atomique, un seul lien actif par compte. Après usage : **toutes** les sessions sont fermées et le cookie effacé. Réponse neutre si le compte n’existe pas. | Aucun e-mail n’est expédié : en développement le lien est renvoyé dans la réponse (`WASHGUARD_EXPOSE_AUTH_LINKS`). En production le lien n’est **jamais** renvoyé au navigateur et l’envoi reste à configurer. |
+| Confirmation d’e-mail | Optionnelle : `WASHGUARD_REQUIRE_EMAIL_CONFIRMATION=1` crée les comptes non confirmés, refuse la connexion (`email_unconfirmed`) et active la page `/confirmer-email`. | Désactivée par défaut (aucun expéditeur SMTP dans ce dépôt). |
+| Journal d’authentification | Table `auth_events` : inscription, connexion réussie ou refusée, déconnexion, changements de mot de passe, révocations, limitation de débit. Visibles dans **Sécurité du compte → Activité** (20 derniers événements du compte). Aucun mot de passe ni jeton. | Borné à 5 000 lignes, lisible par le seul titulaire du compte ; aucun export. |
+| Expiration de session | `/api/auth/me` renvoie `expired: true` lorsqu’un cookie inconnu ou expiré est présenté ; l’UI affiche « Votre session a expiré. Reconnectez-vous. » | Aucune prolongation silencieuse au-delà du plafond absolu. |
+
+Variables d’environnement utiles (voir `.env.example`) : `WASHGUARD_PUBLIC_URL` (base des liens), `WASHGUARD_EXPOSE_AUTH_LINKS=1` (liens dans la réponse hors production), `WASHGUARD_REQUIRE_EMAIL_CONFIRMATION=1` (confirmation obligatoire), `WASHGUARD_PGDATA` (répertoire de la base locale).
+
+Tests : `npm run test:unit` couvre `tests/unit/auth-security.test.ts` (politique et limiteur) et `npm run check` rejoue les parcours d’inscription en DOM. Les parcours HTTP ont été exercés manuellement sur le serveur local (inscription, doublon, connexion, limitation, sessions, changement et réinitialisation de mot de passe, confirmation) ; aucun test automatisé ne les couvre encore.
+
 ## Mise à jour locale : identité et invitations (`057`)
 
 - Les mutations directes des profils, affectations et invitations par les rôles utilisateurs sont retirées ; des policies restrictives empêchent aussi leur réouverture accidentelle par une policy permissive. Les RPC d’administration restent soumises aux permissions et aux gardes d’abonnement. Un profil supprimé logiquement ne peut plus obtenir d’entreprise ou de permission même si `active=true`.

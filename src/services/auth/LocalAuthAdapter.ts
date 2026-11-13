@@ -8,7 +8,10 @@ import { DEMO_PASSWORDS_KEY, DEMO_STATE_KEY, readDemoState, serializeDemoState, 
 import {
   clearDemoPasswords, hasDemoPassword, setDemoPassword, verifyDemoPassword,
 } from '../../lib/demoPasswords';
-import type { AuthChange, AuthPort, AuthResult, AuthSubscription } from './AuthPort';
+import type {
+  AuthActivityEntry, AuthChange, AuthPort, AuthResult, AuthSubscription, ResetTokenInspection,
+  SecuritySession,
+} from './AuthPort';
 import {
   dbRoleToUi, uiRoleToDb, type AuthIdentity, type CompanyUser, type Invitation,
   type InvitePayload, type SignUpPayload, type UpdateUserPayload,
@@ -276,6 +279,79 @@ export class LocalAuthAdapter implements AuthPort {
 
   async updatePassword(_password: string): Promise<void> {
     throw new ApiError('reset_email_required', 'Le lien de réinitialisation par e-mail est disponible avec Supabase Auth (mode connecté).');
+  }
+
+  /** Aucun e-mail en mode local : un lien ne peut pas être vérifié. */
+  async verifyResetToken(_token: string): Promise<ResetTokenInspection> {
+    return { valid: false, expiresAt: null };
+  }
+
+  /**
+   * Changement de mot de passe de la démonstration : l'empreinte locale est
+   * réellement remplacée après vérification du mot de passe actuel. Aucune
+   * session n'est fermée puisqu'il n'existe qu'une session en mémoire.
+   */
+  async changePassword(currentPassword: string, newPassword: string): Promise<{ revoked: number }> {
+    const identity = this.identity;
+    if (!identity) throw new ApiError('unauthenticated', 'Connectez-vous pour modifier votre mot de passe.');
+    const email = identity.email.trim().toLowerCase();
+    if (!hasDemoPassword(email)) {
+      throw new ApiError('demo_password_missing',
+        'Aucun mot de passe de démonstration n’est enregistré pour ce compte. Réinitialisez la démonstration depuis Paramètres.');
+    }
+    if (!verifyDemoPassword(email, currentPassword)) {
+      throw new ApiError('invalid_credentials', 'Mot de passe actuel incorrect.');
+    }
+    if (currentPassword === newPassword) {
+      throw new ApiError('same_password', 'Le nouveau mot de passe doit être différent de l’actuel.');
+    }
+    try {
+      setDemoPassword(email, newPassword);
+    } catch {
+      throw new ApiError('demo_storage_unavailable', 'Impossible d’enregistrer le nouveau mot de passe dans ce navigateur.');
+    }
+    const now = new Date().toISOString();
+    this.hooks.setState((s) => ({
+      ...s,
+      auditLogs: [{ id: uid('log'), at: now, actor: identity.fullName,
+        action: 'Mot de passe modifié', detail: 'Démonstration locale' }, ...s.auditLogs].slice(0, 200),
+    }));
+    return { revoked: 0 };
+  }
+
+  /** La session de démonstration vit en mémoire : elle ne peut pas être listée ni révoquée à distance. */
+  async listSessions(): Promise<SecuritySession[]> {
+    if (!this.identity) return [];
+    return [{
+      id: 'demo-session',
+      createdAt: new Date().toISOString(),
+      lastSeenAt: new Date().toISOString(),
+      expiresAt: '',
+      userAgent: 'Onglet de démonstration',
+      ipAddress: '',
+      rememberMe: false,
+      current: true,
+    }];
+  }
+
+  async revokeSession(_sessionId: string): Promise<{ signedOut: boolean }> {
+    throw new ApiError('not_available', 'La session de démonstration ne peut pas être révoquée à distance.');
+  }
+
+  async revokeOtherSessions(): Promise<number> {
+    return 0;
+  }
+
+  async listAuthActivity(_limit = 20): Promise<AuthActivityEntry[]> {
+    return [];
+  }
+
+  async confirmEmail(_token: string): Promise<void> {
+    throw new ApiError('not_available', 'La confirmation par e-mail n’existe pas en mode stockage navigateur.');
+  }
+
+  async resendConfirmation(_email: string): Promise<{ confirmUrl?: string; linkExposed?: boolean }> {
+    throw new ApiError('not_available', 'Aucun e-mail n’est envoyé en mode stockage navigateur.');
   }
 
   async listUsers(): Promise<{ identity: AuthIdentity; users: CompanyUser[] }> {

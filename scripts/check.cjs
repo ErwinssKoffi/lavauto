@@ -100,8 +100,20 @@ if (MODE === 'supabase') {
     });
   };
 }
+// esbuild n'a pas les plugins Vite : les modules virtuels de la PWA sont
+// remplacés par un double inerte, sans quoi le harnais ne peut pas charger
+// `src/main.tsx`.
+const pwaStubPlugin = {
+  name: 'washguard-pwa-stub',
+  setup(builder) {
+    builder.onResolve({ filter: /^virtual:pwa-register$/ }, () => ({ path: 'pwa-stub', namespace: 'wg-stub' }));
+    builder.onLoad({ filter: /.*/, namespace: 'wg-stub' }, () => ({
+      contents: 'export function registerSW(){return ()=>{};}', loader: 'js',
+    }));
+  },
+};
 const buildWith = (stdin, define=DEFINE) => esbuild.build({ stdin, bundle:true, write:false, platform:'node', format:'cjs', target:'node22',
-  loader:{'.css':'empty'}, define, jsx:'automatic', absWorkingDir:ROOT, logLevel:'silent' });
+  loader:{'.css':'empty'}, define, jsx:'automatic', absWorkingDir:ROOT, logLevel:'silent', plugins:[pwaStubPlugin] });
 const build = (stdin) => buildWith(stdin);
 
 let pass = 0, fail = 0;
