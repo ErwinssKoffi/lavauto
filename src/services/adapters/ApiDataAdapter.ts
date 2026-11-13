@@ -287,7 +287,13 @@ export class ApiDataAdapter implements DataAdapter {
   };
 
   async listPlans(): Promise<Plan[]> {
-    const res = await apiFetch<{ plans: Plan[] }>('/api/plans');
+    const res = await apiFetch<{ plans?: Plan[] } | null>('/api/plans');
+    if (!res || !Array.isArray(res.plans)) {
+      throw new HttpClientError(
+        200, 'invalid_payload',
+        'La liste des formules renvoyée par l’API est illisible.', undefined, 'unknown',
+      );
+    }
     setPlansCache(res.plans);
     return res.plans;
   }
