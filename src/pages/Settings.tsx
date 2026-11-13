@@ -230,7 +230,9 @@ export default function Settings() {
       <Card className="mt-5">
         <SectionTitle hint="État du branchement et données locales de démonstration.">Environnement</SectionTitle>
         <div className="flex flex-wrap items-center gap-3">
-          <Badge tone={sbConfigured ? 'success' : 'warn'}><FiDatabase /> Supabase : {sbConfigured ? 'configuré' : 'non branché (mode local)'}</Badge>
+          <Badge tone={dataSource === 'supabase' && sbConfigured ? 'success' : 'warn'}><FiDatabase /> Supabase : {dataSource === 'supabase' && sbConfigured
+            ? 'connecté'
+            : sbConfigured ? 'configuré · mode local' : 'non branché (mode local)'}</Badge>
           <Badge><FiShield /> Thème sombre par défaut, clair disponible</Badge>
           <Badge><FiLock /> Montants FCFA · dates jj/mm/aaaa</Badge>
         </div>
