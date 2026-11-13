@@ -16,6 +16,7 @@ import SignIn from './pages/auth/SignIn';
 import SignUp from './pages/auth/SignUp';
 import ForgotPassword from './pages/auth/ForgotPassword';
 import ResetPassword from './pages/auth/ResetPassword';
+import ConfirmEmail from './pages/auth/ConfirmEmail';
 import Onboarding from './pages/Onboarding';
 import Dashboard from './pages/Dashboard';
 import Washes from './pages/Washes';
@@ -151,6 +152,7 @@ export default function App() {
         <Route path="/inscription" element={<AuthRoute><SignUp /></AuthRoute>} />
         <Route path="/mot-de-passe-oublie" element={<AuthRoute><ForgotPassword /></AuthRoute>} />
         <Route path="/reinitialiser-mot-de-passe" element={<ResetPassword />} />
+        <Route path="/confirmer-email" element={<ConfirmEmail />} />
         <Route path="/auth/*" element={<Navigate to="/connexion" replace />} />
         <Route path="/app" element={<AppRoute><AppShell /></AppRoute>}>
           <Route index element={<Navigate to="tableau-de-bord" replace />} />

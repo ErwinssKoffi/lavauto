@@ -29,6 +29,38 @@ export interface AuthResult {
   identity: AuthIdentity | null;
   confirmationRequired?: boolean;
   message?: string;
+  /** Lien de confirmation renvoyé uniquement lorsque le serveur l'expose
+   *  (développement) ; jamais en production. */
+  confirmUrl?: string;
+}
+
+// ─── Sécurité du compte (connexion, sessions, mot de passe) ─────────────────
+
+/** Une session active. Le jeton n'est jamais exposé au navigateur. */
+export interface SecuritySession {
+  id: string;
+  createdAt: string;
+  lastSeenAt: string;
+  expiresAt: string;
+  /** Libellé lisible (« Chrome · Android »), jamais la chaîne brute. */
+  userAgent: string;
+  ipAddress: string;
+  rememberMe: boolean;
+  /** Session utilisée par cet onglet. */
+  current: boolean;
+}
+
+export interface AuthActivityEntry {
+  event: string;
+  detail: string;
+  at: string;
+  ipAddress: string;
+  device: string;
+}
+
+export interface ResetTokenInspection {
+  valid: boolean;
+  expiresAt: string | null;
 }
 
 export interface AuthPort {
@@ -40,6 +72,22 @@ export interface AuthPort {
   signOut(): Promise<void>;
   requestPasswordReset(email: string): Promise<{ resetUrl?: string } | void>;
   updatePassword(password: string, token?: string): Promise<void>;
+  /** Vérifie un lien de réinitialisation sans le consommer. */
+  verifyResetToken(token: string): Promise<ResetTokenInspection>;
+  /** Changement de mot de passe d'un utilisateur connecté (mot de passe actuel exigé). */
+  changePassword(currentPassword: string, newPassword: string): Promise<{ revoked: number }>;
+  /** Sessions actives du compte connecté. */
+  listSessions(): Promise<SecuritySession[]>;
+  /** Ferme une session précise de ce compte. */
+  revokeSession(sessionId: string): Promise<{ signedOut: boolean }>;
+  /** Ferme toutes les autres sessions ; renvoie le nombre fermé. */
+  revokeOtherSessions(): Promise<number>;
+  /** Journal d'authentification personnel (20 derniers événements par défaut). */
+  listAuthActivity(limit?: number): Promise<AuthActivityEntry[]>;
+  /** Consomme un lien de confirmation d'e-mail. */
+  confirmEmail(token: string): Promise<void>;
+  /** Demande un nouveau lien de confirmation, sans révéler l'existence du compte. */
+  resendConfirmation(email: string): Promise<{ confirmUrl?: string; linkExposed?: boolean }>;
   listUsers(): Promise<{ identity: AuthIdentity; users: CompanyUser[] }>;
   listInvitations(): Promise<Invitation[]>;
   invite(payload: InvitePayload): Promise<{ id: string; message?: string; inviteUrl?: string }>;
