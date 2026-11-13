@@ -123,7 +123,9 @@ export default function AppShell() {
                         onClick={() => setMobileOpen(false)}
                         aria-label={collapsed ? entry.label : undefined}
                         title={collapsed ? entry.label : undefined}
-                        className={({ isActive }) => `flex w-full items-center gap-3 rounded-xl px-3 py-2 text-[13px] font-medium leading-snug no-underline transition hover:bg-primary/10 hover:text-base-content ${isActive ? 'bg-primary font-semibold text-primary-content shadow-lg shadow-primary/20' : 'text-base-content/60'}`}
+                        className={({ isActive }) => `relative flex w-full items-center gap-3 rounded-xl px-3 py-2 text-[13px] font-medium leading-snug no-underline transition ${isActive
+                          ? 'bg-primary/10 font-semibold text-primary before:absolute before:top-1/2 before:left-0 before:h-5 before:w-[3px] before:-translate-y-1/2 before:rounded-full before:bg-primary'
+                          : 'text-base-content/60 hover:bg-base-200 hover:text-base-content'}`}
                       >
                         <span className="text-base" aria-hidden="true">{entry.icon}</span>
                         {!collapsed && (
@@ -182,13 +184,13 @@ export default function AppShell() {
       {mobileOpen && (
         <div className="fixed inset-0 z-[70] lg:hidden">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
-          <aside className="absolute inset-y-0 left-0 w-[270px] border-r border-base-300 shadow-2xl">{sidebar}</aside>
+          <aside className="absolute inset-y-0 left-0 w-[270px] border-r border-base-300 shadow-e3">{sidebar}</aside>
         </div>
       )}
 
       <div className={`transition-[padding] duration-200 ${collapsed ? 'lg:pl-[76px]' : 'lg:pl-64'}`}>
         {/* Topbar */}
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-base-300 bg-base-100/90 px-4 backdrop-blur-xl sm:px-6">
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-base-300 bg-base-100/85 px-4 backdrop-blur-xl sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <button type="button" className="text-base-content/60 lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Ouvrir le menu"><FiMenu size={20} /></button>
             <div className="min-w-0">
@@ -234,7 +236,7 @@ export default function AppShell() {
                 )}
               </button>
               {alertsOpen && (
-                <div className="card absolute right-0 top-12 z-50 w-72 bg-base-100 p-3 shadow-xl sm:w-80">
+                <div className="card absolute right-0 top-12 z-50 w-72 bg-base-100 p-3 shadow-e3 sm:w-80">
                   <div className="flex items-center justify-between border-b border-base-300 pb-2">
                     <div className="flex items-center gap-1.5 font-bold text-xs text-base-content">
                       <FiBell className="text-warning" />
@@ -292,7 +294,7 @@ export default function AppShell() {
                 </div>
               </button>
               {menuOpen && (
-                <div className="card absolute right-0 top-12 z-50 w-56 bg-base-100 p-2 shadow-xl">
+                <div className="card absolute right-0 top-12 z-50 w-56 bg-base-100 p-2 shadow-e3">
                   <div className="px-3 py-2">
                     <p className="text-xs font-bold">{state.session?.name}</p>
                     <p className="truncate text-[11px] text-base-content/60">{state.session?.email}</p>
@@ -311,15 +313,15 @@ export default function AppShell() {
 
         <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
           {can('inventory.view') && <StockAlertBanner key={`${state.session?.userId}:${state.session?.stationId}`} />}
-          {role !== 'super_admin' && subscriptionStatus === 'loading' && <div role="status" className="card mb-5 bg-base-100 px-4 py-3 text-xs shadow-xl">Vérification de l’abonnement ; les écritures ordinaires sont momentanément bloquées.</div>}
-          {role !== 'super_admin' && subscriptionStatus !== 'loading' && !canWriteSubscription && <div role="status" className="card mb-5 flex flex-row flex-wrap items-center justify-between gap-3 bg-base-100 px-4 py-3 text-xs shadow-xl border-warning/40!">
+          {role !== 'super_admin' && subscriptionStatus === 'loading' && <div role="status" className="card mb-5 bg-base-100 px-4 py-3 text-xs shadow-e2">Vérification de l’abonnement ; les écritures ordinaires sont momentanément bloquées.</div>}
+          {role !== 'super_admin' && subscriptionStatus !== 'loading' && !canWriteSubscription && <div role="status" className="card mb-5 flex flex-row flex-wrap items-center justify-between gap-3 bg-base-100 px-4 py-3 text-xs shadow-e2 border-warning/40!">
             <span><strong>{subscriptionAccess ? 'Abonnement en lecture seule.' : 'Abonnement non confirmé.'}</strong>{' '}
               {subscriptionAccess ? 'Les données restent consultables ; les écritures ordinaires sont bloquées jusqu’à validation. Après expiration, un retrait WhatsApp peut être demandé sous réserve des droits.' : `Les écritures ordinaires sont bloquées. ${subscriptionError ?? ''}`}</span>
             <span className="flex gap-3">{can('subscription.manage') && <NavLink to="/app/abonnement" className="link link-primary">Voir l’abonnement →</NavLink>}
               {((dataSource === 'supabase' && authKind === 'supabase') || (dataSource === 'api' && authKind === 'api')) && <button className="link link-primary" onClick={() => { void refreshSubscriptionAccess().catch(() => undefined); }}>Relire</button>}</span>
           </div>}
           {!state.station?.activated && role !== 'super_admin' && location.pathname !== '/app/mise-en-route' && (
-            <div className="card mb-5 flex flex-row flex-wrap items-center justify-between gap-3 bg-base-100 px-4 py-3 shadow-xl border-warning/30!">
+            <div className="card mb-5 flex flex-row flex-wrap items-center justify-between gap-3 bg-base-100 px-4 py-3 shadow-e2 border-warning/30!">
               <div className="flex items-center gap-2 text-xs">
                 <span className="text-warning"><FiHelpCircle size={16} /></span>
                 <span><strong>Mise en route en cours.</strong> {missing.length} étape(s) obligatoire(s) manquante(s) — l’exploitation reste fermée.</span>

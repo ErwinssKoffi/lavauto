@@ -122,7 +122,7 @@ Décidée après la première migration (DaisyUI 4 / Tailwind 3), pour utiliser 
 
 ### 9.2 Thèmes
 
-`@plugin "daisyui" { themes: cupcake --default --prefersdark, washguard-dark, washguard, abyss, …, wireframe; }` (liste explicite des 37 thèmes) — `cupcake` tient désormais la racine (voir §15) puis deux blocs `@plugin "daisyui/theme"` (`washguard`, `washguard-dark`). Les tokens deviennent `--color-*`, `--radius-*`, `--size-field`, `--border`, `--depth`, `--noise`.
+`@plugin "daisyui" { themes: cupcake, washguard-dark, washguard, abyss, …, wireframe; }` (liste explicite des 37 thèmes) puis deux blocs `@plugin "daisyui/theme"` (`washguard`, `washguard-dark`) ; c'est `washguard-dark` qui tient la racine via `default: true` + `prefersdark: true` (voir §15). Les tokens deviennent `--color-*`, `--radius-*`, `--size-field`, `--border`, `--depth`, `--noise`.
 
 **`themes: all` a été abandonné** : cette branche de `pluginOptionsHandler.js` impose `light` comme `--default` et `dark` comme `--prefersdark` en dur, en ignorant les clés `default:` / `prefersdark:` des thèmes personnalisés. Résultat : `:where(:root)` portait la palette `light` et le repli `prefers-color-scheme: dark` la palette `dark`. La liste explicite rend la racine à WashGuard :
 
@@ -219,8 +219,10 @@ Garde-fou : le contrôle « palette DaisyUI partout » refuse toute classe de pa
 
 ## 13. Chrome du navigateur et fond applicatif
 
-- `--page-bg` (deux valeurs figées `#f4f7fb` / `#080f1d`) a été supprimé : `body` utilise
-  `color-mix(in oklab, var(--color-base-100) 94%, #000)`, donc le fond suit les 37 thèmes.
+- `--page-bg` (deux valeurs figées `#f4f7fb` / `#080f1d`) a été supprimé : `body` porte
+  `background-color: var(--color-base-200)` — **un cran plus profond que les cartes** (`base-100`) —
+  surmonté d'un halo `radial-gradient(120% 70% at 50% -25%, primary 10%, transparent 62%)` fixé.
+  Le fond et le halo suivent les 37 thèmes sans couleur codée en dur.
 - `<meta name="theme-color">` est recopié depuis `--color-base-100` à chaque changement de thème
   (barre du navigateur mobile / écran de démarrage PWA), avec repli silencieux si la valeur n'est
   pas calculable (JSDOM, navigateur ancien).
@@ -244,54 +246,96 @@ Trois tests unitaires (`tests/unit/chart-theme.test.ts`) vérifient que chaque v
 
 ---
 
-## 15. Thème `cupcake` sur tout le projet
+## 15. Signature Edition : le bleu nuit redevient le défaut
 
-Le thème par défaut est **cupcake** (thème intégré DaisyUI), appliqué partout : application, vitrine et authentification.
+La génération précédente était pastel (`cupcake`). La Signature Edition revient à l'identité de la marque — bleu nuit + cyan — mais avec un usage **discipliné** de l'accent (voir §17) et une échelle de surfaces unifiée (voir §16). C'est un changement de thème par défaut, **pas** un changement d'architecture : DaisyUI 5, les 37 thèmes, `data-theme` et l'API de `ui.tsx` sont inchangés.
 
-| Élément | Avant | Après |
+| Élément | Génération cupcake (v2) | Signature Edition (v3) |
 | --- | --- | --- |
-| `themes:` | `washguard-dark --default --prefersdark, washguard, …` | `cupcake --default --prefersdark, washguard-dark, washguard, …` |
-| `DEFAULT_THEME` | `'washguard-dark'` | `'cupcake'` |
-| `index.html` | `<html class="dark" data-theme="washguard-dark">` | `<html data-theme="cupcake">` |
-| Script inline | repli `washguard` / `washguard-dark` | repli `cupcake`, `class="dark"` pilotée par le schéma enregistré |
-| `meta theme-color` | `#080f1d` | `#faf7f5` (puis mis à jour dynamiquement) |
-| Vitrine (`Landing`) | racine épinglée `data-theme="washguard-dark"`, ~150 lignes `slate`/`sky` | tokens DaisyUI, dégradés photo en `neutral` + `neutral-content` |
-| Auth (`AuthLayout` + `pages/auth/*`) | racine épinglée `data-theme="washguard"`, `bg-white text-slate-900` | `bg-base-100 text-base-content`, panneau photo `neutral/95 → neutral/50` |
-| Bascule rapide | `washguard` ↔ `washguard-dark` via `DEFAULT_THEME` | **dernier thème clair ↔ dernier thème sombre** (`cupcake` ↔ `dim` par défaut), mémorisés dans `washguard.theme.light` / `.dark` |
+| `themes:` | `cupcake --default --prefersdark, washguard-dark, washguard, …` | `cupcake, washguard-dark, washguard, …` (aucun drapeau shell) |
+| Bloc `washguard-dark` | `default: false`, `prefersdark: false` | **`default: true`, `prefersdark: true`** |
+| `DEFAULT_THEME` | `'cupcake'` | **`'washguard-dark'`** |
+| Paire de bascule | `cupcake` ↔ `dim` | **`washguard` ↔ `washguard-dark`** |
+| `index.html` | `<html data-theme="cupcake">` | `<html class="dark" data-theme="washguard-dark">` |
+| Script inline | repli `cupcake` | repli `washguard-dark`, `class="dark"` pilotée par le schéma |
+| `meta theme-color` | `#faf7f5` | `#080f1b` |
+| Surfaces | mélange `base-100`/`base-200` selon les écrans | page = `base-200`, carte = `base-100` + `border-base-300` |
+| Ombres | `shadow-lg` / `shadow-xl` / `shadow-2xl` (27 occurrences) | `shadow-e1/e2/e3` uniquement (0 occurrence des trois autres dans `src/`) |
+| Accent cyan | 16 pavés `bg-primary` pleins, dont la nav | 13 (boutons/CTA) ; nav, palette et onglets en `bg-primary/10` + `text-primary` + rail 3 px |
 
-Le sélecteur conserve les 37 thèmes : un utilisateur qui préfère l'ancien look choisit `WashGuard sombre` dans le menu, et ce choix est persisté.
+Le sélecteur conserve évidemment les 37 thèmes : qui préfère le pastel choisit `Cupcake` ou `Dim` dans le menu, et ce choix est persisté.
 
-Conséquences vérifiées : `:where(:root),[data-theme=cupcake]{…}`, repli `prefers-color-scheme` sur cupcake, 37 thèmes compilés, CSS 188,6 kB (29,0 kB gzip) — plus léger qu'avant, la vitrine n'ayant plus de variantes sombres codées en dur.
+Conséquences vérifiées : `:where(:root),[data-theme=washguard-dark]{…}`, repli `prefers-color-scheme` sur la Signature sombre, 37 thèmes compilés, CSS 190,1 kB (29,3 kB gzip), `.shadow-e1/e2/e3` présents dans `dist/assets/index-*.css`, primaires `#22d3ee` (nuit) et `#0e7490` (clair).
 
 
 ---
 
-## 16. Bascule rapide clair / sombre (cupcake ↔ dim)
+## 16. Échelle de surfaces et élévations nommées
 
-L'icône soleil/lune de la topbar n'impose plus la palette bleu nuit de la marque : elle alterne entre les **deux derniers thèmes utilisés**, un clair et un sombre.
+Une seule profondeur pour tous les écrans (`/app`, authentification, vitrine) :
+
+| Niveau | Classe | Exemple |
+| --- | --- | --- |
+| Page | `bg-base-200` (posé une fois sur `body`) | aucun écran ne redéfinit son fond |
+| Carte / panneau | `bg-base-100 border border-base-300` | `Card`, `StatCard`, `modal-box`, tiroirs, `DataTable` |
+| Séparateur | `base-300` | filets, contours de champs |
+| Texte | `base-content`, `/70`, `/60` | titres, corps, légendes |
+
+Trois ombres seulement, déclarées dans `@theme` et donc thémées (`color-mix` sur `--color-neutral`, jamais du noir pur) :
+
+```css
+--shadow-e1: 0 1px 2px -1px color-mix(in oklab, var(--color-neutral) 55%, transparent);
+--shadow-e2: 0 14px 30px -18px color-mix(in oklab, var(--color-neutral) 60%, transparent),
+             0 1px 2px -1px color-mix(in oklab, var(--color-neutral) 45%, transparent);
+--shadow-e3: 0 30px 60px -30px color-mix(in oklab, var(--color-neutral) 75%, transparent),
+             0 2px 6px -2px color-mix(in oklab, var(--color-neutral) 50%, transparent);
+```
+
+`e1` = carte posée, `e2` = menu / bannière / bouton principal, `e3` = palette `Ctrl/Cmd + K`, tiroir, toast, carte mise en avant. `Card`, `StatCard` (filet dégradé `primary` + chiffres `tabular-nums`) et `ToastHost` ont été mis à jour sans toucher à l'API publique.
+
+
+---
+
+## 17. Discipline du cyan
+
+| Usage | Classe | Règle |
+| --- | --- | --- |
+| Action principale | `btn-primary`, `bg-primary text-primary-content` | un seul pavé plein visible par écran |
+| État actif | `bg-primary/10` (ou `/12`) + `font-semibold text-primary` + rail `before:w-[3px]` | nav, palette, onglets |
+| Emphase | `text-primary` | liens, KPI, valeurs clés |
+| Ambiance | `primary/10`–`primary/20` | halo de page, dégradés, filets |
+
+Sont sortis de `src/` : les pavés `bg-primary` de la navigation latérale, de la ligne active de la palette de commandes et des onglets de la vitrine ; `hover:bg-primary` (no-op) ; `shadow-primary/25` sur les CTA ; `focus:ring-offset-slate-950` (remplacé par `ring-offset-base-100`).
+
+
+---
+
+## 18. Bascule rapide clair / sombre (washguard ↔ washguard-dark)
+
+L'icône soleil/lune de la topbar alterne entre les **deux derniers thèmes utilisés**, un clair et un sombre.
 
 | Élément | Comportement |
 | --- | --- |
-| Valeurs par défaut | `DEFAULT_LIGHT_THEME = 'cupcake'`, `DEFAULT_DARK_THEME = 'dim'` |
+| Valeurs par défaut | `DEFAULT_LIGHT_THEME = 'washguard'`, `DEFAULT_DARK_THEME = 'washguard-dark'` |
 | Mémoire | `washguard.theme.light` et `washguard.theme.dark`, relus au montage et validés par `isKnownTheme` + `themeScheme` |
 | Choix explicite | `setTheme('dracula')` mémorise `dracula` comme pendant sombre ; le soleil ramène au clair mémorisé, la lune revient à `dracula` |
 | Cohérence | la bascule ne change jamais de schéma sans changer de thème, et le thème courant reste persisté dans `washguard.theme.name` |
 
-Vérifié par cinq contrôles JSDOM (« bascule rapide ») : `cupcake → dim`, retour `dim → cupcake`, mémorisation de `dracula`, puis `dracula → cupcake → dracula`.
+Vérifié par cinq contrôles JSDOM (« bascule rapide ») : `washguard-dark → washguard`, retour `washguard → washguard-dark`, mémorisation de `dracula`, puis `dracula → washguard → dracula`.
 
 
 ---
 
-## 17. Migration des préférences : `washguard.theme.v`
+## 19. Migration des préférences : `washguard.theme.v`
 
-Un navigateur qui avait déjà choisi un thème (ou l'ancien réglage `dark`) aurait conservé sa préférence et n'aurait **jamais** vu cupcake. La préférence est donc versionnée :
+Un navigateur qui avait déjà choisi un thème (ou l'ancien réglage `dark`) aurait conservé sa préférence et n'aurait **jamais** vu la Signature. La préférence est donc versionnée :
 
 | Clé | Rôle |
 | --- | --- |
-| `washguard.theme.v` | version du format (`'2'` = génération cupcake), écrite à chaque application de thème |
+| `washguard.theme.v` | version du format (`'3'` = génération Signature), écrite à chaque application de thème |
 | `washguard.theme.name` | thème exact, **lu seulement** si la version correspond |
 | `washguard.theme.light` / `.dark` | paire de la bascule rapide |
 
-Au premier chargement de cette génération, toute préférence sans version est ignorée : l'application démarre sur cupcake, réécrit `washguard.theme.name` et `washguard.theme.v`, puis respecte à nouveau les choix de l'utilisateur. La constante `THEME_PREFERENCE_VERSION` (dans `src/lib/themes.ts`) et la valeur du script inline de `index.html` sont comparées par `npm run check`.
+Au premier chargement de cette génération, toute préférence sans version (ou estampillée `'2'`, génération cupcake) est ignorée : l'application démarre sur `washguard-dark`, réécrit `washguard.theme.name` et `washguard.theme.v`, puis respecte à nouveau les choix de l'utilisateur. La constante `THEME_PREFERENCE_VERSION` (dans `src/lib/themes.ts`) et la valeur du script inline de `index.html` sont comparées par `npm run check`.
 
-Trois contrôles JSDOM couvrent le cas : ancienne préférence (`washguard.theme.name = washguard-dark`, sans version) → cupcake ; réécriture de la version ; préférence versionnée (`nord`) → respectée.
+Trois contrôles JSDOM couvrent le cas : préférence antérieure (`washguard.theme.name = washguard-dark` puis aucun thème versionné) → Signature sombre ; réécriture de la version ; préférence versionnée (`nord`) → respectée.

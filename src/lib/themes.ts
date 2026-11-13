@@ -61,25 +61,27 @@ export const DAISY_THEMES: ThemeOption[] = [
 export const THEME_OPTIONS: ThemeOption[] = [...WASHGUARD_THEMES, ...DAISY_THEMES];
 
 /**
- * Thème appliqué au premier lancement : `cupcake`.
- * `DEFAULT_DARK_THEME` est le pendant sombre de la bascule rapide soleil/lune
- * (l'esthétique pastel est conservée en mode sombre, plutôt que de revenir à la
- * palette bleu nuit de la marque).
+ * Thèmes de la marque — **Signature Edition**.
+ *
+ * `washguard-dark` (bleu nuit + cyan) est le thème appliqué au premier
+ * lancement ; `washguard` en est le pendant clair et forme, avec lui, la paire
+ * de la bascule rapide soleil/lune. Les 35 autres thèmes DaisyUI restent
+ * disponibles dans le sélecteur, mais ne sont plus proposés par défaut.
  */
-export const DEFAULT_LIGHT_THEME = 'cupcake';
-export const DEFAULT_DARK_THEME = 'dim';
-export const DEFAULT_THEME = DEFAULT_LIGHT_THEME;
+export const DEFAULT_LIGHT_THEME = 'washguard';
+export const DEFAULT_DARK_THEME = 'washguard-dark';
+export const DEFAULT_THEME = DEFAULT_DARK_THEME;
 
 /**
  * Version du format de préférence enregistrée.
  *
  * Incrémenter invalide les thèmes mémorisés par les versions précédentes : au
  * premier chargement de cette génération, l'application repart donc sur
- * `DEFAULT_THEME` (cupcake), puis les choix de l'utilisateur sont de nouveau
- * respectés. La même valeur est vérifiée dans le script inline de `index.html`
+ * `DEFAULT_THEME` (washguard-dark), puis les choix de l'utilisateur sont de
+ * nouveau respectés. La même valeur est vérifiée dans le script inline de `index.html`
  * et par `npm run check`.
  */
-export const THEME_PREFERENCE_VERSION = '2';
+export const THEME_PREFERENCE_VERSION = '3';
 
 const BY_NAME = new Map(THEME_OPTIONS.map((t) => [t.name, t]));
 

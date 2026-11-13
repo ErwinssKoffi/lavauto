@@ -53,7 +53,7 @@ Le projet est **cohérent, compilable et fonctionnel**. Les corrections listées
 | Caisse : espèces conditionnées à une caisse ouverte, Mobile Money libre | ✅ `assertCashRule`, testé |
 | Dépenses annulées avec motif, jamais supprimées | ✅ `status: 'annulee'` + `cancelReason` |
 | Commissions : lavages **terminés**, barème station ou exception, CSV paie | ✅ testé (10 % → 300 FCFA, 20 % → 600 FCFA) |
-| Français, FCFA, jj/mm/aaaa, thème `cupcake` par défaut (37 thèmes sélectionnables) | ✅ contrôles statiques et de formatage |
+| Français, FCFA, jj/mm/aaaa, Signature sombre (`washguard-dark`) par défaut, 37 thèmes sélectionnables | ✅ contrôles statiques et de formatage |
 
 ---
 

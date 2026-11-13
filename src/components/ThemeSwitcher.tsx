@@ -121,7 +121,7 @@ export function ThemePicker() {
           role="dialog"
           aria-label="Choix du thème"
           onKeyDown={onPanelKeyDown}
-          className="card absolute right-0 top-12 z-50 w-72 max-w-[calc(100vw-2rem)] bg-base-100 p-2 shadow-xl"
+          className="card absolute right-0 top-12 z-50 w-72 max-w-[calc(100vw-2rem)] bg-base-100 p-2 shadow-e3"
         >
           <label className="input input-sm mb-1 w-full">
             <FiSearch size={13} className="text-base-content/50" aria-hidden="true" />

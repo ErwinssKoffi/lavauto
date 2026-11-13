@@ -420,14 +420,14 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     fs.existsSync(path.join(ROOT, 'src/pages/auth/ForgotPassword.tsx')) &&
     fs.existsSync(path.join(ROOT, 'src/pages/auth/ResetPassword.tsx')));
   check('langue fr + devise FCFA', html.includes('lang="fr"') && read('src/lib/format.ts').includes('FCFA'));
-  check('préférence de thème versionnée : les anciens choix ne bloquent plus cupcake', (() => {
+  check('préférence de thème versionnée : les anciens choix ne bloquent plus la Signature', (() => {
     const version = (read('src/lib/themes.ts').match(/THEME_PREFERENCE_VERSION = '([^']+)'/) || [])[1];
     return Boolean(version) &&
       read('src/lib/store.tsx').includes("localStorage.getItem('washguard.theme.v') === THEME_PREFERENCE_VERSION") &&
       read('src/lib/store.tsx').includes("localStorage.setItem('washguard.theme.v', THEME_PREFERENCE_VERSION)") &&
       html.includes(`localStorage.getItem('washguard.theme.v') === '${version}'`);
   })());
-  check('thème cupcake par défaut, appliqué avant le premier rendu', html.includes('data-theme="cupcake"') && html.includes("'cupcake'") && !html.includes('data-theme="washguard-dark"') && read('src/index.css').includes('@plugin "daisyui/theme"') && read('src/main.tsx').includes("washguard.theme"));
+  check('Signature sombre par défaut, appliquée avant le premier rendu', html.includes('data-theme="washguard-dark"') && html.includes('class="dark"') && read('src/index.css').includes('@plugin "daisyui/theme"') && read('src/main.tsx').includes("washguard.theme"));
   check('photo unique pour les écrans auth', read('src/pages/auth/AuthLayout.tsx').includes('/images/lav-auto.jpeg') && fs.existsSync(path.join(ROOT,'public/images/lav-auto.jpeg')));
   check('client Supabase prêt, non branché', read('src/lib/supabase.ts').includes('isSupabaseConfigured') && fs.existsSync(path.join(ROOT,'.env.example')));
   check('plus aucun fichier CRA / template', !fs.existsSync(path.join(ROOT,'src/App.jsx')) && !fs.existsSync(path.join(ROOT,'public/index.html')) && !fs.existsSync(path.join(ROOT,'jsconfig.json')));
@@ -524,7 +524,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     const installed = fs.readdirSync(path.join(ROOT, 'node_modules/daisyui/theme'))
       .filter((file) => file.endsWith('.css'))
       .map((file) => file.replace(/\.css$/, ''));
-  check('configuration DaisyUI : 37 thèmes déclarés, cupcake en défaut et en prefers-dark', (() => {
+  check('configuration DaisyUI : 37 thèmes déclarés, Signature sombre en défaut et en prefers-dark', (() => {
     const css = read('src/index.css').replace(/\/\*[\s\S]*?\*\//g, '');
     const block = css.match(/@plugin\s+"daisyui"\s*\{([\s\S]*?)\}/);
     if (!block) return false;
@@ -536,20 +536,20 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     const catalogue = [...read('src/lib/themes.ts').matchAll(/name: '([a-z0-9-]+)'/g)].map((m) => m[1]);
     const sameList = declared.length === catalogue.length &&
       declared.slice().sort().join() === catalogue.slice().sort().join();
-    // `themes: all` réserverait :where(:root) à `light` : refusé, la racine doit
-    // appartenir à cupcake (DEFAULT_THEME du projet).
+    // `themes: all` réserverait :where(:root) à `light` : refusé. La racine doit
+    // appartenir à washguard-dark (DEFAULT_THEME, Signature Edition).
     const usesAll = /(^|[\s,:])all\b/.test(body);
-    const cupcakeDefault = /cupcake\s+--default(\s+--prefersdark)?\b/.test(body) && /cupcake\s+--default\s+--prefersdark\b/.test(body);
+    const noStrayFlags = !/\s--(default|prefersdark)\b/.test(body);
     const darkBlock = css.match(/@plugin\s+"daisyui\/theme"\s*\{\s*name:\s*"washguard-dark";([\s\S]*?)color-scheme/);
-    return sameList && !usesAll && cupcakeDefault && Boolean(darkBlock) &&
-      /default:\s*false/.test(darkBlock[1]) &&
-      /prefersdark:\s*false/.test(darkBlock[1]);
+    return sameList && !usesAll && noStrayFlags && Boolean(darkBlock) &&
+      /default:\s*true/.test(darkBlock[1]) &&
+      /prefersdark:\s*true/.test(darkBlock[1]);
   })());
     return names.length === installed.length + 2 &&
       installed.every((name) => names.includes(name)) &&
       names.includes('washguard') && names.includes('washguard-dark') &&
-      themesSrc.includes("export const DEFAULT_LIGHT_THEME = 'cupcake'") &&
-      themesSrc.includes('export const DEFAULT_DARK_THEME = \'dim\'') &&
+      themesSrc.includes("export const DEFAULT_LIGHT_THEME = 'washguard'") &&
+      themesSrc.includes('export const DEFAULT_DARK_THEME = \'washguard-dark\'') &&
       shellSrc.includes('<ThemePicker />') &&
       read('src/lib/store.tsx').includes("localStorage.setItem('washguard.theme.name'") &&
       html.includes("localStorage.getItem('washguard.theme.name')");
@@ -659,9 +659,9 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     const { dom, w } = makeDom('/app/tableau-de-bord', base());
     const errs = await mount(acode, w);
     const click = (el) => el.dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true, view: w }));
-    check('thème cupcake appliqué dès le montage (aucune préférence enregistrée)',
-      w.document.documentElement.getAttribute('data-theme') === 'cupcake' &&
-      !w.document.documentElement.classList.contains('dark'),
+    check('Signature sombre appliquée dès le montage (aucune préférence enregistrée)',
+      w.document.documentElement.getAttribute('data-theme') === 'washguard-dark' &&
+      w.document.documentElement.classList.contains('dark'),
       String(w.document.documentElement.getAttribute('data-theme')));
     const pickerButton = () => w.document.querySelector('button[aria-label="Choisir un thème"]');
     const rows = () => [...w.document.querySelectorAll('button[data-theme]')];
@@ -707,19 +707,19 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     const { dom, w } = makeDom('/app/tableau-de-bord', base());
     w.localStorage.setItem('washguard.theme.name', 'washguard-dark');
     await mount(acode, w);
-    check('ancienne préférence de thème ignorée au profit de cupcake',
-      w.document.documentElement.getAttribute('data-theme') === 'cupcake',
+    check('ancienne préférence de thème ignorée au profit de la Signature',
+      w.document.documentElement.getAttribute('data-theme') === 'washguard-dark',
       String(w.document.documentElement.getAttribute('data-theme')));
     check('préférence de thème réécrite à la version courante',
-      w.localStorage.getItem('washguard.theme.v') === '2' &&
-      w.localStorage.getItem('washguard.theme.name') === 'cupcake',
+      w.localStorage.getItem('washguard.theme.v') === '3' &&
+      w.localStorage.getItem('washguard.theme.name') === 'washguard-dark',
       String(w.localStorage.getItem('washguard.theme.name')));
     dom.window.close();
   }
   {
     // Préférence versionnée : le choix explicite de l'utilisateur est respecté.
     const { dom, w } = makeDom('/app/tableau-de-bord', base());
-    w.localStorage.setItem('washguard.theme.v', '2');
+    w.localStorage.setItem('washguard.theme.v', '3');
     w.localStorage.setItem('washguard.theme.name', 'nord');
     await mount(acode, w);
     check('préférence de thème versionnée respectée (nord)',
@@ -737,16 +737,15 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     if (toggle()) {
       click(toggle());
       await wait(140);
-      check('bascule rapide : cupcake → dim (pendant sombre pastel)',
-        themeNow() === 'dim' && w.document.documentElement.classList.contains('dark') &&
-        w.localStorage.getItem('washguard.theme.name') === 'dim' &&
-        w.localStorage.getItem('washguard.theme.dark') === 'dim',
+      check('bascule rapide : Signature sombre → Signature clair',
+        themeNow() === 'washguard' && !w.document.documentElement.classList.contains('dark') &&
+        w.localStorage.getItem('washguard.theme.name') === 'washguard',
         String(themeNow()));
       click(toggle());
       await wait(140);
-      check('bascule rapide : retour au thème clair mémorisé (cupcake)',
-        themeNow() === 'cupcake' && !w.document.documentElement.classList.contains('dark') &&
-        w.localStorage.getItem('washguard.theme.light') === 'cupcake',
+      check('bascule rapide : retour à la Signature sombre',
+        themeNow() === 'washguard-dark' && w.document.documentElement.classList.contains('dark') &&
+        w.localStorage.getItem('washguard.theme.dark') === 'washguard-dark',
         String(themeNow()));
       // Un thème sombre choisi dans le menu devient le pendant de la bascule.
       click(w.document.querySelector('button[aria-label="Choisir un thème"]'));
@@ -756,7 +755,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
       await wait(140);
       click(toggle());
       await wait(140);
-      check('bascule rapide : retour au thème clair (cupcake) depuis dracula', themeNow() === 'cupcake', String(themeNow()));
+      check('bascule rapide : retour au thème clair depuis dracula', themeNow() === 'washguard', String(themeNow()));
       click(toggle());
       await wait(140);
       check('bascule rapide : mémorise le dernier thème sombre choisi (dracula)', themeNow() === 'dracula', String(themeNow()));

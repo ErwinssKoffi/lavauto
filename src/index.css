@@ -12,14 +12,15 @@
    `themes: all` : avec `all`, DaisyUI réserve `:where(:root)` au thème `light`
    et `prefers-color-scheme` au thème `dark` en dur (pluginOptionsHandler.js),
    en ignorant les clés `default:` / `prefersdark:` de nos blocs ci-dessous.
-   Le thème par défaut du projet est **cupcake** (DEFAULT_THEME) : il tient donc
-   les deux rôles (`:where(:root)` et `prefers-color-scheme`). Les deux thèmes
-   WashGuard restent disponibles dans le sélecteur, et la bascule rapide
-   soleil/lune y ramène l'utilisateur en un clic.
+   Le thème par défaut est **washguard-dark** (DEFAULT_THEME, Signature
+   Edition) : il tient donc les deux rôles (`:where(:root)` et
+   `prefers-color-scheme`) via `default: true` + `prefersdark: true` dans son
+   bloc. `washguard` est son pendant clair, les 35 autres thèmes restent
+   sélectionnables.
    La liste est vérifiée par `npm run check` (cohérence avec src/lib/themes.ts
    et avec les fichiers de node_modules/daisyui/theme).                      */
 @plugin "daisyui" {
-  themes: cupcake --default --prefersdark, washguard-dark, washguard, abyss, acid, aqua, autumn, black, bumblebee, business, caramellatte, cmyk, coffee, corporate, cyberpunk, dark, dim, dracula, emerald, fantasy, forest, garden, halloween, lemonade, light, lofi, luxury, night, nord, pastel, retro, silk, sunset, synthwave, valentine, winter, wireframe;
+  themes: cupcake, washguard-dark, washguard, abyss, acid, aqua, autumn, black, bumblebee, business, caramellatte, cmyk, coffee, corporate, cyberpunk, dark, dim, dracula, emerald, fantasy, forest, garden, halloween, lemonade, light, lofi, luxury, night, nord, pastel, retro, silk, sunset, synthwave, valentine, winter, wireframe;
 }
 
 @plugin "daisyui/theme" {
@@ -28,31 +29,31 @@
   prefersdark: false;
   color-scheme: light;
 
+  /* Signature Clair : encre bleu nuit sur glace, cyan réservé à l'action. */
   --color-base-100: #ffffff;
-  --color-base-200: #f1f5f9;
-  --color-base-300: #e2e8f0;
-  --color-base-content: #0f172a;
-  --color-primary: #0284c7;
+  --color-base-200: #f4f8fc;
+  --color-base-300: #dde6f2;
+  --color-base-content: #0a1526;
+  --color-primary: #0e7490;
   --color-primary-content: #ffffff;
-  --color-secondary: #0ea5e9;
+  --color-secondary: #0369a1;
   --color-secondary-content: #ffffff;
-  --color-accent: #22d3ee;
-  --color-accent-content: #083344;
-  --color-neutral: #0f172a;
-  --color-neutral-content: #e9f0fb;
-  --color-info: #0284c7;
+  --color-accent: #0891b2;
+  --color-accent-content: #ffffff;
+  --color-neutral: #0a1526;
+  --color-neutral-content: #e6eefb;
+  --color-info: #0369a1;
   --color-info-content: #ffffff;
   --color-success: #15803d;
   --color-success-content: #ffffff;
-  --color-warning: #b45309;
+  --color-warning: #a16207;
   --color-warning-content: #ffffff;
   --color-error: #b91c1c;
   --color-error-content: #ffffff;
 
-  --radius-selector: 0.75rem;
-  --radius-field: 0.75rem;
-  --radius-box: 1rem;
-  /* Densité WashGuard : 0,3 rem × 8 = 2,4 rem pour btn-sm / input-sm / select-sm. */
+  --radius-selector: 0.5rem;
+  --radius-field: 0.625rem;
+  --radius-box: 0.875rem;
   --size-field: 0.3rem;
   --size-selector: 0.25rem;
   --border: 1px;
@@ -62,34 +63,36 @@
 
 @plugin "daisyui/theme" {
   name: "washguard-dark";
-  default: false;
-  prefersdark: false;
+  default: true;
+  prefersdark: true;
   color-scheme: dark;
 
-  --color-base-100: #101b2d;
-  --color-base-200: #16243a;
-  --color-base-300: #22314b;
-  --color-base-content: #e9f0fb;
-  --color-primary: #38bdf8;
-  --color-primary-content: #04121e;
-  --color-secondary: #0ea5e9;
+  /* Signature Nuit : page la plus sombre, carte plus claire, bordure plus claire
+     encore. Une seule échelle de profondeur, identique sur tous les écrans. */
+  --color-base-200: #080f1b;
+  --color-base-100: #0d1929;
+  --color-base-300: #1e3049;
+  --color-base-content: #e6eefb;
+  --color-primary: #22d3ee;
+  --color-primary-content: #04212b;
+  --color-secondary: #38bdf8;
   --color-secondary-content: #04121e;
-  --color-accent: #22d3ee;
+  --color-accent: #7dd3fc;
   --color-accent-content: #04121e;
-  --color-neutral: #16243a;
-  --color-neutral-content: #e9f0fb;
+  --color-neutral: #132238;
+  --color-neutral-content: #dce7f8;
   --color-info: #38bdf8;
   --color-info-content: #04121e;
-  --color-success: #4ade80;
-  --color-success-content: #04121e;
+  --color-success: #34d399;
+  --color-success-content: #04231a;
   --color-warning: #fbbf24;
-  --color-warning-content: #04121e;
+  --color-warning-content: #2a1c02;
   --color-error: #f87171;
-  --color-error-content: #04121e;
+  --color-error-content: #2a0b0b;
 
-  --radius-selector: 0.75rem;
-  --radius-field: 0.75rem;
-  --radius-box: 1rem;
+  --radius-selector: 0.5rem;
+  --radius-field: 0.625rem;
+  --radius-box: 0.875rem;
   --size-field: 0.3rem;
   --size-selector: 0.25rem;
   --border: 1px;
@@ -100,6 +103,14 @@
 @theme {
   --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --animate-fade-in: fadeIn 0.32s ease both;
+
+  /* Élévations Signature : trois niveaux seulement, teintés par `neutral`
+     plutôt que par du noir pur, pour rester cohérent sur tous les thèmes. */
+  --shadow-e1: 0 1px 2px -1px color-mix(in oklab, var(--color-neutral) 55%, transparent);
+  --shadow-e2: 0 14px 30px -18px color-mix(in oklab, var(--color-neutral) 60%, transparent),
+               0 1px 2px -1px color-mix(in oklab, var(--color-neutral) 45%, transparent);
+  --shadow-e3: 0 30px 60px -30px color-mix(in oklab, var(--color-neutral) 75%, transparent),
+               0 2px 6px -2px color-mix(in oklab, var(--color-neutral) 50%, transparent);
 
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(8px); }
@@ -138,12 +149,19 @@
 
 html, body, #root { min-height: 100%; }
 
-/* Fond applicatif légèrement plus profond que `base-100` (surface des cartes).
-   Il est dérivé du thème actif : les 37 thèmes DaisyUI sont donc tous
-   respectés, sans couleur codée en dur. */
+/* Fond applicatif : `base-200`, un cran plus profond que la surface des cartes
+   (`base-100`), plus un halo cyan très bas perché en haut de page. Le halo est
+   dérivé de `primary`, donc il suit le thème actif sans couleur codée en dur. */
 body {
   margin: 0;
-  background: color-mix(in oklab, var(--color-base-100) 94%, #000);
+  background-color: var(--color-base-200);
+  background-image: radial-gradient(
+    120% 70% at 50% -25%,
+    color-mix(in oklab, var(--color-primary) 10%, transparent),
+    transparent 62%
+  );
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   font-feature-settings: 'kern', 'tnum';
