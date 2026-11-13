@@ -32,17 +32,17 @@ export interface AuthResult {
 }
 
 export interface AuthPort {
-  readonly kind: 'supabase' | 'local';
+  readonly kind: 'api' | 'supabase' | 'local';
   getIdentity(): Promise<AuthIdentity | null>;
   onAuthStateChange(handler: (change: AuthChange) => void): AuthSubscription;
   signIn(email: string, password: string, rememberMe?: boolean): Promise<AuthResult>;
   signUp(payload: SignUpPayload): Promise<AuthResult>;
   signOut(): Promise<void>;
-  requestPasswordReset(email: string): Promise<void>;
-  updatePassword(password: string): Promise<void>;
+  requestPasswordReset(email: string): Promise<{ resetUrl?: string } | void>;
+  updatePassword(password: string, token?: string): Promise<void>;
   listUsers(): Promise<{ identity: AuthIdentity; users: CompanyUser[] }>;
   listInvitations(): Promise<Invitation[]>;
-  invite(payload: InvitePayload): Promise<{ id: string; message?: string }>;
+  invite(payload: InvitePayload): Promise<{ id: string; message?: string; inviteUrl?: string }>;
   revokeInvitation(id: string): Promise<void>;
   updateUser(payload: UpdateUserPayload): Promise<void>;
   refreshUsers(): Promise<AppUser[]>;

@@ -4,6 +4,8 @@
 // dérivé de auth.uid() par station_asset_path().
 
 import { supabase } from './supabase';
+import { getDataSource } from '../services/adapters/DataAdapter';
+import { apiFetch } from '../services/api/apiClient';
 import { idempotencyKey, NetworkError, withRetry } from './network';
 import { isStationLogoPath, optimizeStationLogo, validateStationLogo } from './image';
 
@@ -57,6 +59,10 @@ export interface LogoUploadResult {
   bytes: number;
 }
 
+function isApiMode(): boolean {
+  return getDataSource() === 'api';
+}
+
 function logoBucket() {
   if (BUCKET !== 'station-assets') {
     throw new NetworkError('Le bucket privé station-assets est requis pour les logos.');
@@ -87,10 +93,17 @@ function expectObject<T>(value: unknown, label: string): T {
 }
 
 export async function fetchQaBoard(): Promise<QaBoard> {
+  if (isApiMode()) return expectObject<QaBoard>(await apiFetch('/api/qa/board'), 'Board QA');
   return expectObject<QaBoard>(await rpc<unknown>('my_qa_board'), 'Board QA');
 }
 
 export async function fetchWashesPage(limit = 20, offset = 0): Promise<WashPage> {
+  if (isApiMode()) {
+    return expectObject<WashPage>(
+      await apiFetch(`/api/qa/washes-page?limit=${limit}&offset=${offset}`),
+      'Pagination des lavages',
+    );
+  }
   return expectObject<WashPage>(
     await rpc<unknown>('my_washes_page', { p_limit: limit, p_offset: offset }),
     'Pagination des lavages',
@@ -105,15 +118,41 @@ export function claimIdempotency(rpcName: string, key: string): Promise<{ firstC
 export async function uploadStationLogo(file: File): Promise<LogoUploadResult> {
   const validationError = validateStationLogo(file);
   if (validationError) throw new Error(validationError);
-  const bucket = logoBucket();
   const key = idempotencyKey('logo');
+
+  if (isApiMode()) {
+    const optimized = await optimizeStationLogo(file);
+    const extension = optimized.contentType === 'image/webp' ? 'webp'
+      : optimized.contentType === 'image/png' ? 'png' : 'jpg';
+    const claimed = await apiFetch<{ path: string }>('/api/storage/station-logo/claim', {
+      method: 'POST',
+      body: JSON.stringify({ key, filename: `${key}.${extension}` }),
+    });
+    if (!isStationLogoPath(claimed.path)) throw new NetworkError('Chemin de logo renvoyé par le serveur invalide');
+    await withRetry(async () => {
+      const res = await fetch(`/api/storage/station-logo/upload?path=${encodeURIComponent(claimed.path)}`, {
+        method: 'PUT',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': optimized.contentType },
+        body: optimized.body,
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res;
+    }, { label: 'Envoi du logo' });
+    return {
+      path: claimed.path,
+      idempotencyKey: key,
+      optimized: optimized.optimized,
+      bytes: optimized.bytes,
+    };
+  }
+
+  const bucket = logoBucket();
   await claimIdempotency('station_asset_path', key);
 
   const optimized = await optimizeStationLogo(file);
   const extension = optimized.contentType === 'image/webp' ? 'webp'
     : optimized.contentType === 'image/png' ? 'png' : 'jpg';
-  // Un nouveau nom par sélection évite d'écraser un logo existant (ou celui
-  // d'une autre station). La clé reste identique pendant les retries d'upload.
   const path = await rpc<string>('station_asset_path', { p_filename: `${key}.${extension}` });
   if (!isStationLogoPath(path)) throw new NetworkError('Chemin de logo renvoyé par le serveur invalide');
   await withRetry(async () => {
@@ -136,12 +175,22 @@ export async function uploadStationLogo(file: File): Promise<LogoUploadResult> {
 /** Associe uniquement un objet privé existant à une station autorisée. */
 export async function saveStationLogoPath(stationId: string, path: string | null): Promise<void> {
   if (path !== null && !isStationLogoPath(path)) throw new Error('Chemin de logo invalide.');
+  if (isApiMode()) {
+    await apiFetch('/api/storage/station-logo/save', {
+      method: 'POST',
+      body: JSON.stringify({ stationId, path }),
+    });
+    return;
+  }
   await rpc('save_station_logo', { p_station_id: stationId, p_path: path });
 }
 
 /** Les URL temporaires ne sont générées qu'au moment de l'affichage. */
 export async function getStationLogoSignedUrl(path: string): Promise<string> {
   if (!isStationLogoPath(path)) throw new Error('Chemin de logo invalide.');
+  if (isApiMode()) {
+    return `/api/storage/station-logo/file?path=${encodeURIComponent(path)}`;
+  }
   const bucket = logoBucket();
   const signed = await withRetry(async () => {
     const result = await bucket.createSignedUrl(path, LOGO_URL_TTL_SECONDS);

@@ -116,7 +116,7 @@ export default function Commissions() {
     <div>
       <PageHeader title="Commissions" subtitle={`Aperçu brouillon, relevés validés figés et paie tracée (${label}).`}
         actions={<div className="flex gap-2">
-          {dataSource === 'supabase' && authReady && identity &&
+          {dataSource !== 'local' && authReady && identity &&
             <button className="wg-btn wg-btn-ghost" onClick={() => safe(() => refreshFinance())}><FiRefreshCw /> Actualiser</button>}
           <button className="wg-btn wg-btn-primary" onClick={exportCSV}><FiDownload /> Export CSV pour la paie</button>
         </div>} />

@@ -62,7 +62,8 @@ function Stat({ label, value, ok }: { label: string; value: string | number; ok?
 
 export default function Quality() {
   const { state, dataSource, authKind, canWriteSubscription } = useStore();
-  const serverReady = dataSource === 'supabase' && authKind === 'supabase' && Boolean(supabase && state.session?.userId);
+  const serverReady = ((dataSource === 'supabase' && authKind === 'supabase' && Boolean(supabase))
+    || (dataSource === 'api' && authKind === 'api')) && Boolean(state.session?.userId);
   const [board, setBoard] = useState<QaBoard | null>(null);
   const [page, setPage] = useState<WashPage | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
@@ -115,14 +116,14 @@ export default function Quality() {
     <div>
       <PageHeader
         title="Qualité & déploiement"
-        subtitle="Prompt 10 : QA, sécurité, performance, Storage, CI/CD et documentation. Le libellé historique « Prévisions & alertes » ne correspond pas à un module de prévision ou d’alerte additionnel."
-        actions={<Badge tone="accent">Phase 9 livrée</Badge>}
+        subtitle="Contrôles d’intégrité, sécurité, pagination serveur, stockage du logo et diagnostics techniques."
+        actions={<Badge tone="accent">Diagnostic serveur</Badge>}
       />
 
       {!serverReady && (
         <div className="mb-5">
           <Alert kind="info">
-            Les compteurs, la pagination serveur et l’envoi du logo nécessitent <code>VITE_DATA_SOURCE=supabase</code> avec un client configuré. Le mode local conserve les 19 écrans sans accès réseau.
+            Connectez une session serveur pour charger les métriques de diagnostic, la pagination des fiches et le stockage du logo.
           </Alert>
         </div>
       )}
@@ -137,8 +138,8 @@ export default function Quality() {
             <Stat label="Vues analytics" value={board.views} ok={board.views === 2} />
             <Stat label="Permissions" value={board.permissions} ok={board.permissions === 48} />
             <Stat label="Liaisons RBAC" value={board.rolePermissions} ok={board.rolePermissions === 112} />
-            <Stat label="Index P10" value={board.indexes} ok={board.indexes === 5} />
-            <Stat label="RPC P10" value={board.rpcCount} ok={board.rpcCount === 4} />
+            <Stat label="Index SQL" value={board.indexes} ok={board.indexes === 5} />
+            <Stat label="Fonctions RPC" value={board.rpcCount} ok={board.rpcCount === 4} />
             <Stat label="Triggers quota" value={board.quotaTriggers} ok={board.quotaTriggers === 3} />
             <Stat label="Bucket privé" value={board.storageBucket ? 'oui' : 'non'} ok={board.storageBucket} />
             <Stat label="Policies objets" value={board.storagePolicies} ok={board.storagePolicies >= 5} />
@@ -148,7 +149,7 @@ export default function Quality() {
             <Stat label="Table d’idempotence" value={board.idempotencyTable ? 'présente' : 'absente'} ok={board.idempotencyTable} />
           </div>
         ) : (
-          <EmptyState title="Board QA non chargé" description="Les compteurs sont lus depuis my_qa_board() en mode Supabase." />
+          <EmptyState title="Diagnostic serveur non chargé" description="Les compteurs sont lus depuis le backend connecté." />
         )}
       </Card>
 

@@ -49,7 +49,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     id: 'exploitation', label: 'Exploitation', icon: <FiTruck />, entries: [
       { to: '/app/lavages', label: 'Lavages', icon: <FiTruck />, roles: STAFF, permission: ROUTE_PERMISSIONS['/app/lavages'], keywords: ['fiche', 'véhicule', 'file', 'statut', 'prestation'] },
-      { label: 'Postes & affectations', icon: <FiTool />, roles: STAFF, permission: 'washes.assign', upcoming: { step: '05', hint: 'File d’attente, postes et affectations — Prompt 05' } },
+      { label: 'Postes & affectations', icon: <FiTool />, roles: STAFF, permission: 'washes.assign', upcoming: { step: '05', hint: 'File d’attente et suivi des postes de lavage' } },
     ],
   },
   {

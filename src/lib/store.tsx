@@ -17,7 +17,7 @@ import {
   validateCommissionPeriodLocal, withFinanceDefaults,
 } from './financeState';
 import {
-  emptyStockCollections, seedLocalDemoStock, withStockDefaults,
+  emptyStockCollections, withStockDefaults,
   type CostCertificationPayload, type CreatePurchaseOrderPayload,
   type InventoryCountPayload, type ProductPayload, type ReceivePurchasePayload,
   type ServiceConsumptionPayload, type SupplierPayload, type StockSnapshot,
@@ -54,6 +54,7 @@ import {
 } from './crmState';
 import { formatFCFA, uid, todayISO } from './format';
 import { idempotencyKey } from './network';
+import { clearOfflineApiCache } from './pwa';
 import {
   clearPendingWash, readPendingWash, savePendingWash, WashCreationError,
   type PendingWashCreation,
@@ -350,9 +351,9 @@ interface Ctx {
   signUp: (p: SignUpPayload) => Promise<AuthResult>;
   signIn: (email: string, password: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
-  requestPasswordReset: (email: string) => Promise<void>;
-  updatePassword: (password: string) => Promise<void>;
-  inviteUser: (p: InvitePayload) => Promise<{ id: string; message?: string }>;
+  requestPasswordReset: (email: string) => Promise<{ resetUrl?: string } | void>;
+  updatePassword: (password: string, token?: string) => Promise<void>;
+  inviteUser: (p: InvitePayload) => Promise<{ id: string; message?: string; inviteUrl?: string }>;
   revokeInvitation: (id: string) => Promise<void>;
   updateUser: (p: UpdateUserPayload) => Promise<void>;
   refreshUsers: () => Promise<AppUser[]>;
@@ -382,7 +383,7 @@ interface Ctx {
   updateService: (id: string, patch: Partial<Service>) => void | Promise<void>;
   setPrice: (serviceId: string, categoryId: string, price: number) => void | Promise<void>;
   removeService: (id: string) => void | Promise<void>;
-  updateEmployee: (id: string, patch: Partial<AppUser>) => void;
+  updateEmployee: (id: string, patch: Partial<AppUser>) => void | Promise<void>;
   addClient: (p: { name: string; phone: string; plate: string; notes: string }) => void;
   updateClient: (id: string, p: Partial<Client>) => void;
   // exploitation (protégées par le garde 409)
@@ -428,7 +429,7 @@ interface Ctx {
   consumeWash: (washId: string) => void | Promise<void>;
   linkExpenseToOrder: (expenseId: string, orderId: string) => void | Promise<void>;
   certifyCosts: (p: CostCertificationPayload) => void | Promise<void>;
-  updateStockThreshold: (productId: string, reorderLevel: number) => void;
+  updateStockThreshold: (productId: string, reorderLevel: number) => void | Promise<void>;
   adjustProductStock: (productId: string, qtyOnHand: number) => void;
   // Prompt 08 : CRM, fidélité, forfaits, promotions, flottes, file d'attente.
   refreshCrm: () => Promise<void>;
@@ -523,7 +524,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   // Les données métier connectées ne sont ni restaurées ni persistées dans le
   // cache de démonstration : seul un contexte JWT vérifié peut les afficher.
   const [initialDemoRead] = useState(() => readDemoState());
-  const [state, setState] = useState<AppState>(() => getDataSource() === 'supabase' && !TEST_AUTH ? emptyState() : load(initialDemoRead));
+  const [state, setState] = useState<AppState>(() => getDataSource() !== 'local' && !TEST_AUTH ? emptyState() : load(initialDemoRead));
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [authReady, setAuthReady] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -604,7 +605,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setState: (updater) => setState(updater),
     onStateCommitted: (raw) => { demoBaseline.current = raw; setDemoSavedRaw(raw); },
   }), []);
-  const recoveryScope = authPort.kind === 'supabase' && identity?.companyId
+  const isRemoteAuth = authPort.kind === 'supabase' || authPort.kind === 'api';
+  const recoveryScope = isRemoteAuth && identity?.companyId
     ? { userId: identity.userId, companyId: identity.companyId } : null;
   const currentRevocation = recoveryScope && revocationRecovery?.userId === recoveryScope.userId
     && revocationRecovery.companyId === recoveryScope.companyId ? revocationRecovery : null;
@@ -615,7 +617,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     message: `Révocation non confirmée : elle a peut-être été enregistrée. Reprenez uniquement cette même révocation ou vérifiez avec le support ; un refus ultérieur ne prouverait pas que la première tentative a échoué. Invitation : ${currentRevocation.pending.invitationId}. Ce rappel est conservé pour ce compte dans cet onglet ; il peut disparaître si l’onglet ou son stockage est supprimé, ou sur un autre appareil.`,
   } : null;
   useEffect(() => {
-    if (authPort.kind !== 'supabase' || !identity?.userId || !identity.companyId) {
+    if (!isRemoteAuth || !identity?.userId || !identity.companyId) {
       setRevocationRecovery(null); return;
     }
     const userId = identity.userId;
@@ -653,34 +655,20 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   // comme un tarif de la base ; une erreur explicite est affichée à la place.
   const dataSource = getDataSource();
   const adapter = useMemo(() => getDataAdapter(() => stateRef.current), []);
-  // `demoMode` décrit l'état de l'interface et n'est pas un garde de sécurité.
-  // Une configuration mixte ne doit jamais activer ces mutations locales.
+  const isConnectedMode = (dataSource === 'supabase' && authPort.kind === 'supabase')
+    || (dataSource === 'api' && authPort.kind === 'api');
   const isLocalStockDemo = dataSource === 'local' && authPort.kind === 'local';
   const localSetup = authPort.kind === 'local' && (dataSource === 'local' || TEST_AUTH);
-  const serverSetup = dataSource === 'supabase' && authPort.kind === 'supabase' && Boolean(adapter.setupCommands);
+  const serverSetup = isConnectedMode && Boolean(adapter.setupCommands);
   const setupStatus: 'loading' | 'ready' | 'error' = localSetup ? 'ready'
     : !serverSetup ? 'error' : setupLoad.epoch === scopeRef.current.epoch ? setupLoad.status : 'loading';
   const setupError = localSetup ? null : !serverSetup ? 'Configuration mixte : les réglages ne peuvent pas être enregistrés.'
     : setupLoad.epoch === scopeRef.current.epoch ? setupLoad.error : null;
-  // Les RPC exigent une vraie session Supabase Auth. Le harnais JSDOM garde le
-  // port Auth local même en VITE_DATA_SOURCE=supabase : il continue donc à
-  // exercer les règles métier locales (gardes 409, caisse, prix figé).
-  const serverWash = dataSource === 'supabase' && authPort.kind === 'supabase' && Boolean(adapter.washCommands);
-  // P06 : les mêmes RPC sont aussi l'autorité pour caisse, dépenses, canaux,
-  // commissions et rentabilité. Le mode local conserve ses transformateurs purs.
-  const serverFinance = dataSource === 'supabase' && authPort.kind === 'supabase'
-    && Boolean(adapter.financeCommands);
-  // P07 : `my_stock_board()` et les 11 RPC sont l'autorité en mode branché.
-  const serverStock = dataSource === 'supabase' && authPort.kind === 'supabase'
-    && Boolean(adapter.stockCommands);
-  // P08 : `my_crm_board()` et les 17 RPC sont l'autorité en mode branché.
-  const serverCrm = dataSource === 'supabase' && authPort.kind === 'supabase'
-    && Boolean(adapter.crmCommands);
-  // P09 : `my_analytics_board()`, `my_subscription_usage()` et
-  // `my_platform_board()` deviennent l'autorité en mode branché. Les valeurs
-  // locales restent calculées à partir de l'état réellement enregistré.
-  const serverAnalytics = dataSource === 'supabase' && authPort.kind === 'supabase'
-    && Boolean(adapter.analyticsCommands);
+  const serverWash = isConnectedMode && Boolean(adapter.washCommands);
+  const serverFinance = isConnectedMode && Boolean(adapter.financeCommands);
+  const serverStock = isConnectedMode && Boolean(adapter.stockCommands);
+  const serverCrm = isConnectedMode && Boolean(adapter.crmCommands);
+  const serverAnalytics = isConnectedMode && Boolean(adapter.analyticsCommands);
   const [plans, setPlans] = useState<Plan[]>(() => dataSource === 'local' ? getPlans() : []);
   const [plansError, setPlansError] = useState<string | null>(null);
   const [subscriptionLoad, setSubscriptionLoad] = useState<{
@@ -691,7 +679,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [subscriptionRequestsError, setSubscriptionRequestsError] = useState<string | null>(null);
   const subscriptionRequestInFlight = useRef(false);
   const [, setSubscriptionClock] = useState(0);
-  const serverSubscription = dataSource === 'supabase' && authPort.kind === 'supabase' && Boolean(adapter.subscriptionCommands);
+  const serverSubscription = isConnectedMode && Boolean(adapter.subscriptionCommands);
   const localSubscription = authPort.kind === 'local' ? localSubscriptionAccess(state, plans) : null;
   const currentSubscriptionLoad = subscriptionLoad?.epoch === scopeRef.current.epoch
     && subscriptionLoad.userId === identity?.userId && subscriptionLoad.companyId === identity?.companyId ? subscriptionLoad : null;
@@ -757,15 +745,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setPendingExpenseError(error instanceof Error ? error.message : 'Tentative de dépense inaccessible.');
     }
   }, [serverFinance, authReady, identity?.userId, state.station?.id]);
-
-  // Les produits d'exemple ne sont créés que pour la démonstration entièrement
-  // locale, jamais lors de la normalisation d'un tableau de bord serveur vide.
-  useEffect(() => {
-    if (isLocalStockDemo && state.station && state.products.length === 0
-      && accessCanWrite(localSubscription) && localSubscription?.features.stock) {
-      setState((current) => seedLocalDemoStock(current));
-    }
-  }, [isLocalStockDemo, state.station?.id, state.products.length, localSubscription?.canWrite, localSubscription?.features.stock]);
 
   useEffect(() => {
     if (authPort.kind !== 'local' || demoIssueRef.current) return;
@@ -878,7 +857,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       authGenerationRef.current += 1;
       authKeyRef.current = 'signed-out';
       scopeRef.current = { epoch: scopeRef.current.epoch + 1, userId: null, companyId: null, stationId: null };
-      setState((s) => authPort.kind === 'supabase' ? emptyState() : { ...s, session: null });
+      setState((s) => isRemoteAuth ? emptyState() : { ...s, session: null });
       setIdentity(null);
       setInvitations([]);
       setEmployeeReadWarning(null);
@@ -922,7 +901,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const changedScope = !sameUser || previousScope.stationId !== selected;
     // Des permissions peuvent être retirées sans changer de station. Ne pas
     // conserver une projection chargée sous les anciennes autorisations.
-    const invalidate = changedScope || (authPort.kind === 'supabase' && sameUser && key !== authKeyRef.current);
+    const invalidate = changedScope || (isRemoteAuth && sameUser && key !== authKeyRef.current);
     if (invalidate) {
       scopeRef.current = { epoch: previousScope.epoch + 1, userId: value.userId, companyId: value.companyId, stationId: selected };
       setAssignableUsers([]);
@@ -935,7 +914,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (selected) rememberStation(value.userId, value.companyId, selected);
     const generation = ++authGenerationRef.current;
     authKeyRef.current = key;
-    if (authPort.kind === 'supabase' && !sameUser) setAuthReady(false);
+    if (isRemoteAuth && !sameUser) setAuthReady(false);
     const nextSession = sessionFromIdentity(value, selected);
     const projection = mapIdentityToAppState(value, [], selected);
     setIdentity(value);
@@ -970,7 +949,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       try {
         const { users } = await authPort.listUsers();
         if (authGenerationRef.current !== generation) return;
-        if (authPort.kind === 'supabase' && usersCurrent()) {
+        if (isRemoteAuth && usersCurrent()) {
           // Une sélection effectuée pendant la lecture est conservée.
           const projected = mapIdentityToAppState(value, users, scopeRef.current.stationId);
           setState((s) => authGenerationRef.current === generation && usersCurrent() && s.session?.userId === value.userId
@@ -985,7 +964,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       } catch {
         if (authGenerationRef.current === generation && current()) {
           setAuthError('Lecture du profil ou des permissions impossible.');
-          if (authPort.kind === 'supabase') {
+          if (isRemoteAuth) {
             setEmployeeReadWarning((warning) => warning ?? 'Les comptes ou les invitations n’ont pas pu être relus. Actualisez-les avant toute action.');
           }
         }
@@ -993,10 +972,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         if (authGenerationRef.current === generation) setAuthReady(true);
       }
     })();
-  }, [authPort, beginRequest, sessionFromIdentity, reasonMessage]);
+  }, [authPort, isRemoteAuth, beginRequest, sessionFromIdentity, reasonMessage]);
 
   const selectStation = useCallback((stationId: string) => {
-    if (authPort.kind !== 'supabase' || !authReady || !identity
+    if (!isRemoteAuth || !authReady || !identity
       || identity.userId !== scopeRef.current.userId || !identity.stations.some((s) => s.id === stationId)) {
       throw new ApiError('station_inaccessible', 'Cette station n’est pas accessible à votre session.');
     }
@@ -1638,10 +1617,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const assertSelectedStation = useCallback((stationId: string) => {
     if (!stationId || stationId !== stateRef.current.station?.id
-      || (authPort.kind === 'supabase' && stationId !== scopeRef.current.stationId)) {
+      || (isRemoteAuth && stationId !== scopeRef.current.stationId)) {
       throw new ApiError('station_changed', 'Cette opération ne concerne pas la station sélectionnée.');
     }
-  }, [authPort.kind]);
+  }, [isRemoteAuth]);
 
   // ── Prompt 08 : 17 actions, sync locales ou RPC serveur ────────────────────
   const saveCustomerProfile = useCallback((p: CustomerProfilePayload) => {
@@ -1750,7 +1729,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       authKeyRef.current = 'signed-out';
       scopeRef.current = { epoch: scopeRef.current.epoch + 1, userId: null, companyId: null, stationId: null };
       setAuthReady(true);
-      setState((s) => authPort.kind === 'supabase' ? emptyState() : { ...s, session: null });
+      setState((s) => isRemoteAuth ? emptyState() : { ...s, session: null });
       setAssignableUsers([]); setStationMetrics(null); setStationMetricsError(null);
       setAnalyticsBoard(emptyAnalyticsBoard()); setSubscriptionUsage(emptySubscriptionUsage()); setPlatformBoard(emptyPlatformBoard());
       setIdentity(null);
@@ -1766,25 +1745,24 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setToasts([]);
     }
     await authPort.signOut();
-  }, [authPort]);
+    await clearOfflineApiCache();
+  }, [authPort, isRemoteAuth]);
 
   const requestPasswordReset = useCallback((email: string) =>
     authPort.requestPasswordReset(email), [authPort]);
 
-  const updatePassword = useCallback(async (password: string) => {
-    await authPort.updatePassword(password);
+  const updatePassword = useCallback(async (password: string, token?: string) => {
+    await authPort.updatePassword(password, token);
     setAuthRecovery(false);
   }, [authPort]);
 
   const refreshEmployeeData = useCallback(async (): Promise<void> => {
     const generation = authGenerationRef.current;
-    // En démo, l'adaptateur a déjà planifié une mise à jour React du compte :
-    // relire immédiatement stateRef pourrait restaurer une ancienne version.
     // Certains rôles (par exemple un gérant en Standard) ne peuvent pas lire
     // les quotas : ne pas prétendre les relire ni bloquer la gestion courante
     // uniquement pour cette permission absente. Si la lecture était autorisée,
     // elle est obligatoire et doit rester la plus récente.
-    const results = await Promise.allSettled(authPort.kind === 'supabase'
+    const results = await Promise.allSettled(isRemoteAuth
       ? [refreshUsers(), refreshInvitations(), refreshSubscriptionAccess(),
         ...(canReadSubscriptionUsage ? [refreshSubscriptionUsage(quotaMonthStartISO(), true)] : [])]
       : [refreshInvitations()]);
@@ -1795,7 +1773,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       throw new ApiError('employee_read_failed', 'Actualisation incomplète : réessayez avant toute action.');
     }
     setEmployeeReadWarning(null);
-  }, [authPort.kind, refreshUsers, refreshInvitations, refreshSubscriptionAccess, refreshSubscriptionUsage, canReadSubscriptionUsage]);
+  }, [isRemoteAuth, refreshUsers, refreshInvitations, refreshSubscriptionAccess, refreshSubscriptionUsage, canReadSubscriptionUsage]);
 
   const assertNoUnconfirmedAccountOperation = useCallback(() => {
     const pendingInvite = unconfirmedInvitationRef.current;
@@ -1815,7 +1793,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const assertNoPendingRevocation = useCallback(() => {
     assertNoUnconfirmedAccountOperation();
-    if (authPort.kind !== 'supabase' || !identity?.userId || !identity.companyId) return;
+    if (!isRemoteAuth || !identity?.userId || !identity.companyId) return;
     const userId = identity.userId;
     const companyId = identity.companyId;
     let pending: PendingRevocation | null;
@@ -1829,21 +1807,21 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setRevocationRecovery({ userId, companyId, pending, error: null });
       throw new ApiError('revoke_pending', 'Vérifiez la révocation précédente avant toute autre action sur les comptes.');
     }
-  }, [authPort.kind, identity?.userId, identity?.companyId, assertNoUnconfirmedAccountOperation]);
+  }, [isRemoteAuth, identity?.userId, identity?.companyId, assertNoUnconfirmedAccountOperation]);
 
   const inviteUser = useCallback(async (p: InvitePayload) => {
     assertNoPendingRevocation();
     const generation = authGenerationRef.current;
     const userId = identity?.userId;
     const companyId = identity?.companyId;
-    const lockKey = authPort.kind === 'supabase' && userId && companyId ? `${userId}:${companyId}` : null;
+    const lockKey = isRemoteAuth && userId && companyId ? `${userId}:${companyId}` : null;
     if (lockKey) invitationsInFlight.current.add(lockKey);
     try {
-      let result: { id: string; message?: string };
+      let result: { id: string; message?: string; inviteUrl?: string };
       try { result = await authPort.invite(p); }
       catch (error) {
         if (userId && companyId && scopeRef.current.userId === userId && scopeRef.current.companyId === companyId
-          && authPort.kind === 'supabase' && error instanceof ApiError
+          && isRemoteAuth && error instanceof ApiError
           && ['invite_unconfirmed', 'reservation_unconfirmed'].includes(error.code)) {
           const email = p.email.trim().toLowerCase();
           unconfirmedInvitationRef.current = { userId, companyId };
@@ -1854,8 +1832,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (generation !== authGenerationRef.current) return result;
       try { await refreshEmployeeData(); }
       catch {
-        // Le service a confirmé l'invitation : une relecture échouée ne permet
-        // pas de la présenter comme annulée, ni d'encourager un second envoi.
         if (generation === authGenerationRef.current) {
           const warning = 'Invitation enregistrée, mais données non relues. Actualisez-les avant toute autre action.';
           setEmployeeReadWarning(warning);
@@ -1868,7 +1844,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     } finally {
       if (lockKey) invitationsInFlight.current.delete(lockKey);
     }
-  }, [authPort, identity?.userId, identity?.companyId, assertNoPendingRevocation, refreshEmployeeData, notify]);
+  }, [authPort, isRemoteAuth, identity?.userId, identity?.companyId, assertNoPendingRevocation, refreshEmployeeData, notify]);
 
   const revokeInvitation = useCallback(async (id: string) => {
     assertNoUnconfirmedAccountOperation();
@@ -1881,7 +1857,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         setRevocationRecovery({ userId, companyId, pending, error });
       }
     };
-    if (authPort.kind === 'supabase') {
+    if (isRemoteAuth) {
       const userId = identity?.userId;
       const companyId = identity?.companyId;
       if (!userId || !companyId) throw new ApiError('revoke_scope', 'Compte et entreprise vérifiés requis pour révoquer une invitation.');
@@ -1896,8 +1872,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         }
         wasPending = Boolean(previous);
         attempt = previous ?? { version: 1, userId, companyId, invitationId: id, startedAt: new Date().toISOString() };
-        // Le marqueur précède l'envoi : même un rechargement pendant la RPC
-        // laisse la première opération à vérifier dans cet onglet.
         if (!previous) savePendingRevocation(attempt);
         showRecovery(attempt, null, userId, companyId);
       } catch (error) {
@@ -1911,9 +1885,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     try {
       try { await authPort.revokeInvitation(id); }
       catch (error) {
-        // Seul un refus certain de la toute première tentative permet de
-        // retirer le marqueur. Un refus d'un rejeu ne prouve rien sur l'envoi
-        // initial, et une exception inconnue reste conservatrice.
         if (attempt && !wasPending && error instanceof ApiError && error.code !== 'revoke_unconfirmed') {
           try {
             clearPendingRevocation(attempt);
@@ -1949,20 +1920,20 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     } finally {
       if (lockKey) revocationsInFlight.current.delete(lockKey);
     }
-  }, [authPort, identity?.userId, identity?.companyId, assertNoUnconfirmedAccountOperation, refreshEmployeeData, notify]);
+  }, [authPort, isRemoteAuth, identity?.userId, identity?.companyId, assertNoUnconfirmedAccountOperation, refreshEmployeeData, notify]);
 
   const updateUser = useCallback(async (p: UpdateUserPayload) => {
     assertNoPendingRevocation();
     const generation = authGenerationRef.current;
     const userId = identity?.userId;
     const companyId = identity?.companyId;
-    const lockKey = authPort.kind === 'supabase' && userId && companyId ? `${userId}:${companyId}` : null;
+    const lockKey = isRemoteAuth && userId && companyId ? `${userId}:${companyId}` : null;
     if (lockKey) accountUpdatesInFlight.current.add(lockKey);
     try {
       await authPort.updateUser(p);
     } catch (error) {
       if (userId && companyId && scopeRef.current.userId === userId && scopeRef.current.companyId === companyId
-        && authPort.kind === 'supabase' && (!(error instanceof ApiError) || error.code === 'update_unconfirmed')) {
+        && isRemoteAuth && (!(error instanceof ApiError) || error.code === 'update_unconfirmed')) {
         unconfirmedAccountUpdateRef.current = { userId, companyId };
         setUnconfirmedAccountUpdate({ userId: p.userId,
           message: `Modification de compte non confirmée : elle a peut-être été enregistrée. Les états affichés peuvent être périmés. Ne répétez pas l’action et faites vérifier le compte ${p.userId} avec le support. Ce rappel disparaît au rechargement ou à la déconnexion : notez l’identifiant et les changements demandés.` });
@@ -2009,7 +1980,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (patch.monthlyTarget !== undefined) validateMoney(patch.monthlyTarget);
     if (patch.commissionRate !== undefined) validatePercentage(patch.commissionRate);
     if (serverSetup) {
-      if (Object.keys(patch).some((key) => !['name', 'address', 'city', 'phone', 'hours', 'paymentMethods', 'commissionRate', 'monthlyTarget'].includes(key))) {
+      const allowedKeys = dataSource === 'api'
+        ? ['name', 'address', 'city', 'phone', 'hours', 'paymentMethods', 'commissionRate', 'monthlyTarget', 'cashRequiresOpen', 'maxCashierDiscount']
+        : ['name', 'address', 'city', 'phone', 'hours', 'paymentMethods', 'commissionRate', 'monthlyTarget'];
+      if (Object.keys(patch).some((key) => !allowedKeys.includes(key))) {
         throw new ApiError('invalid_field', 'Ce réglage n’est pas disponible sur le serveur.');
       }
       return setupRpc((c, station) => c.saveStation(station, patch), (snapshot) => setupPatchMatches(snapshot.station, patch));
@@ -2114,15 +2088,20 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return mutate((s) => ({ ...s, services: s.services.filter((v) => v.id !== id) }));
   }, [mutate, serverSetup, localSetup, setupRpc]);
 
-  const updateEmployee = useCallback((id: string, patch: Partial<AppUser>) => {
-    // Le taux individuel affiché en démo n'est pas relié aux contrats serveur.
-    // Ne jamais le modifier seulement dans la projection d'une session connectée.
+  const updateEmployee = useCallback((id: string, patch: Partial<AppUser>): void | Promise<void> => {
+    if (dataSource === 'api' && authPort.kind === 'api') {
+      if (patch.commissionRateOverride !== undefined) {
+        if (patch.commissionRateOverride !== null) validatePercentage(patch.commissionRateOverride);
+        return updateUser({ userId: id, commissionRateOverride: patch.commissionRateOverride });
+      }
+      throw new ApiError('invalid_field', 'Champ employé non modifiable ici.');
+    }
     if (!isLocalStockDemo) throw new ApiError('server_unavailable', 'Réglage individuel indisponible en mode connecté.');
     return mutate((s) => {
       const next = { ...s, users: s.users.map((u) => u.id === id ? { ...u, ...patch } : u) };
       return { ...next, auditLogs: logAction(next, 'Employé modifié', `${id} : ${Object.keys(patch).join(', ')}`) };
     });
-  }, [mutate, isLocalStockDemo]);
+  }, [mutate, isLocalStockDemo, dataSource, authPort.kind, updateUser]);
 
   const addClient = useCallback((p: { name: string; phone: string; plate: string; notes: string }) => mutate((s) => {
     if (!s.station || !p.name.trim()) return s;
@@ -2289,7 +2268,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         cancelledReason: null, payments: [], history: [], qualityResult: null, qualityNotes: null,
       } as Wash));
     }
-    if (authPort.kind === 'supabase') {
+    if (isRemoteAuth) {
       throw new ApiError('server_unavailable', 'Création serveur indisponible : aucune fiche locale n’a été enregistrée.');
     }
 
@@ -2914,14 +2893,29 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     notify('success', 'Coûts certifiés : résultat net publié.');
   }, [assertActivated, assertStockWriteMode, serverStock, stockRpc, notify]);
 
-  const updateStockThreshold = useCallback((productId: string, reorderLevel: number) => {
+  const updateStockThreshold = useCallback((productId: string, reorderLevel: number): void | Promise<void> => {
     validateQuantity(reorderLevel, true);
+    if (dataSource === 'api' && serverStock) {
+      assertActivated();
+      assertStockWriteMode();
+      const product = stateRef.current.products.find((p) => p.id === productId);
+      if (!product) throw new ApiError('not_found', 'Produit introuvable.');
+      return stockRpc((c) => c.saveProduct({
+        stationId: product.stationId,
+        id: product.id,
+        name: product.name,
+        sku: product.sku,
+        category: product.category,
+        unit: product.unit,
+        reorderLevel,
+      })).then(() => undefined);
+    }
     if (!isLocalStockDemo) {
       throw new ApiError('local_demo_only', 'La modification locale des seuils est réservée au mode démo local.');
     }
     setState((cur) => updateProductThresholdLocal(cur, productId, reorderLevel));
-    notify('success', 'Seuil critique mis à jour dans la démonstration locale.');
-  }, [isLocalStockDemo, notify]);
+    notify('success', 'Seuil critique mis à jour.');
+  }, [dataSource, serverStock, isLocalStockDemo, assertActivated, assertStockWriteMode, stockRpc, notify]);
 
   const adjustProductStock = useCallback((productId: string, qtyOnHand: number) => {
     validateQuantity(qtyOnHand, true);
@@ -2929,7 +2923,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       throw new ApiError('local_demo_only', 'La simulation de stock est réservée au mode démo local.');
     }
     setState((cur) => adjustProductStockQtyLocal(cur, productId, qtyOnHand));
-    notify('info', 'Simulation locale : niveau de stock ajusté dans ce navigateur.');
+    notify('info', 'Niveau de stock ajusté.');
   }, [isLocalStockDemo, notify]);
 
   // ── P09 : formules, limites, abonnements, suspension ─────────────────────
@@ -3142,7 +3136,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (authPort.kind === 'local' && demoIssueRef.current) {
       throw new ApiError('demo_storage_unavailable', demoIssueRef.current);
     }
-    if (authPort.kind === 'supabase' && viewEpoch !== scopeRef.current.epoch) {
+    if (isRemoteAuth && viewEpoch !== scopeRef.current.epoch) {
       throw new ApiError('station_changed', 'La station ou la session a changé : vérifiez l’opération initiale avant de poursuivre.');
     }
     return fn(...args);
@@ -3205,7 +3199,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   });
 
   const value: Ctx = {
-    state, toasts, notify: (kind, message) => { if (authPort.kind !== 'supabase' || viewEpoch === scopeRef.current.epoch) notify(kind, message); }, dismissToast, theme, toggleTheme, plans, dataSource, isLocalStockDemo, demoStorageIssue, demoStoragePending, isServerStock: serverStock, plansError,
+    state, toasts, notify: (kind, message) => { if (!isRemoteAuth || viewEpoch === scopeRef.current.epoch) notify(kind, message); }, dismissToast, theme, toggleTheme, plans, dataSource, isLocalStockDemo, demoStorageIssue, demoStoragePending, isServerStock: serverStock, plansError,
     subscriptionAccess, subscriptionStatus, subscriptionError, canWriteSubscription, refreshSubscriptionAccess,
     subscriptionRequests, subscriptionRequestsError, refreshSubscriptionRequests, decideSubscriptionRequest,
     onboarding, missing,

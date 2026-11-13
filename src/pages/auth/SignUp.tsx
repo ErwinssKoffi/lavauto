@@ -54,7 +54,7 @@ export default function SignUp() {
 
   return (
     <AuthLayout>
-      <Badge tone="accent">{authKind === 'local' ? 'Espace de démonstration local' : 'Inscription par e-mail'}</Badge>
+      <Badge tone="accent">{authKind === 'local' ? 'Espace local' : 'Inscription par e-mail'}</Badge>
       <h1 className="mt-4 text-3xl font-extrabold tracking-tight">Créer mon espace</h1>
       <p className="mt-2 text-sm text-slate-500">Comparez les formules, puis créez votre entreprise et votre compte.</p>
 
@@ -118,7 +118,7 @@ export default function SignUp() {
             {authKind === 'local' ? (
               <p>L’espace est créé uniquement dans ce navigateur. Aucun e-mail n’est envoyé ni vérifié ; aucun lien de récupération n’est disponible. Un espace existant ne sera pas remplacé.</p>
             ) : (
-              <p>Supabase Auth crée l’entreprise, sa station, le profil propriétaire et l’abonnement d’essai. Une confirmation par e-mail peut être requise avant la première connexion. Aucun tarif de lavage n’est prérempli.</p>
+              <p>Le serveur crée l’entreprise, sa station, le profil propriétaire et l’abonnement d’essai. Une confirmation par e-mail peut être requise selon la configuration. Aucun tarif de lavage n’est prérempli.</p>
             )}
           </div>
         </div>
@@ -131,7 +131,7 @@ export default function SignUp() {
       <p className="mt-5 text-center text-sm text-slate-500">
         Déjà inscrit ? <Link to="/connexion" className="font-bold text-sky-600 hover:underline">Se connecter</Link>
       </p>
-      <div className="mt-5 flex items-center justify-center gap-2 text-[11px] text-slate-400"><FiCheckCircle /> <FiLock /> {authKind === 'local' ? 'Démonstration non sécurisée · session en mémoire' : 'Aucune connexion Google / Facebook'}</div>
+      <div className="mt-5 flex items-center justify-center gap-2 text-[11px] text-slate-400"><FiCheckCircle /> <FiLock /> {authKind === 'local' ? 'Stockage navigateur · session locale' : 'Authentification serveur sécurisée'}</div>
     </AuthLayout>
   );
 }

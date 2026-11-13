@@ -46,7 +46,7 @@ export default function Cash() {
     <div>
       <PageHeader title="Caisse" subtitle="Fond théorique, mouvements signés, clôtures immuables et rapprochement par canal : espèces ≠ Mobile Money."
         actions={<div className="flex gap-2">
-          {dataSource === 'supabase' && authReady && identity &&
+          {dataSource !== 'local' && authReady && identity &&
             <button className="wg-btn wg-btn-ghost" onClick={() => safe(() => refreshFinance())}><FiRefreshCw /> Actualiser</button>}
           {open
             ? <button className="wg-btn wg-btn-danger" disabled={!canOperate} onClick={() => { setCounted(theoretical); setCloseMode(true); }}><FiLock /> Clôturer avec comptage</button>
@@ -68,7 +68,7 @@ export default function Cash() {
           <StatCard label="État" value="Caisse ouverte" hint={`Depuis le ${formatDateTime(open.openedAt)}`} icon={<FiCheckCircle />} accent="bg-emerald-500/10 text-emerald-400" />
           <StatCard label="Fond de caisse" value={formatFCFA(open.openingFloat)} hint={`Ouverte par ${open.openedBy}`} icon={<FiDollarSign />} />
           <StatCard label="Théorique en caisse" value={formatFCFA(theoretical)} hint="Fond + encaissements − décaissements" icon={<FiDollarSign />} accent="bg-sky-500/10 text-sky-400" />
-          <StatCard label="Mouvements" value={String(movements.filter((m) => m.cashSessionId === open.id).length)} hint="Journal P06 signé" icon={<FiDollarSign />} accent="bg-amber-500/10 text-amber-400" />
+          <StatCard label="Mouvements" value={String(movements.filter((m) => m.cashSessionId === open.id).length)} hint="Journal des mouvements signé" icon={<FiDollarSign />} accent="bg-amber-500/10 text-amber-400" />
         </div>
       ) : (
         <Card className="mb-5"><EmptyState icon={<FiDollarSign />} title="Aucune caisse ouverte" description="Ouvrez une caisse avec un fond pour autoriser les encaissements en espèces. Les autres moyens de paiement restent enregistrables." action={activated ? <button className="wg-btn wg-btn-primary" disabled={!canOperate} onClick={() => setOpenMode(true)}><FiPlus /> Ouvrir la caisse</button> : undefined} /></Card>
@@ -134,7 +134,7 @@ export default function Cash() {
           </div>
         </div>
         <p className="wg-muted mb-4 text-xs">Chaque canal est rapproché séparément. Un relevé validé est figé : aucun recalcul, aucune modification.
-          {dataSource === 'supabase' && ' Avant validation, l’aperçu est une estimation sur les fiches chargées (200 au maximum). Le serveur recalcule le montant attendu ; saisissez votre comptage réel.'}
+          {dataSource !== 'local' && ' Avant validation, l’aperçu est une estimation sur les fiches chargées (200 au maximum). Le serveur recalcule le montant attendu ; saisissez votre comptage réel.'}
         </p>
         {methods.length === 0 ? <p className="wg-muted text-xs">Aucun moyen de paiement configuré.</p> : (
           <div className="grid gap-3 lg:grid-cols-2">
@@ -147,7 +147,7 @@ export default function Cash() {
               // Un comptage est une saisie de l'opérateur, pas une copie d'une
               // estimation potentiellement limitée à 200 fiches côté serveur.
               const value = countedByMethod[m.id] ?? frozenRecord?.counted
-                ?? (dataSource === 'supabase' ? '' : Math.max(0, expected));
+                ?? (dataSource !== 'local' ? '' : Math.max(0, expected));
               const invalid = value === '' || !Number.isSafeInteger(value) || value < 0;
               const name = m.label || PAY_METHOD_LABELS[m.uiMethod];
               return (
@@ -156,7 +156,7 @@ export default function Cash() {
                     <span className="text-sm font-bold">{name}</span>
                     <Badge tone={frozen ? 'success' : 'warn'}>{frozen ? 'Figé' : 'À rapprocher'}</Badge>
                   </div>
-                  <p className="wg-muted text-xs">{!frozen && dataSource === 'supabase' ? 'Estimation sur les fiches chargées' : 'Attendu sur la période'} : {formatFCFA(expected)} · {m.affectsCash ? 'impacte la caisse espèces' : 'hors caisse espèces'}</p>
+                  <p className="wg-muted text-xs">{!frozen && dataSource !== 'local' ? 'Estimation sur les fiches chargées' : 'Attendu sur la période'} : {formatFCFA(expected)} · {m.affectsCash ? 'impacte la caisse espèces' : 'hors caisse espèces'}</p>
                   <div className="mt-3 flex gap-2">
                     <Input label={`Compté ${name} (FCFA)`} type="number" min="0" step="1" value={value} disabled={frozen || !canOperate}
                       hint={!frozen ? 'Saisissez un montant entier positif ou nul.' : undefined}

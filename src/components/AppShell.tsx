@@ -13,7 +13,7 @@ import { findEntry, groupsForRole } from './navigation';
 import { ROLE_LABELS, type Role } from '../types';
 import { usePermissions } from '../lib/usePermissions';
 import StockAlertBanner from './StockAlertBanner';
-import { DemoNotice } from './DemoNotice';
+import { PWAInstallButton } from './PwaControls';
 
 const SIDEBAR_KEY = 'washguard.sidebar.collapsed';
 
@@ -152,7 +152,6 @@ export default function AppShell() {
               </div>
             )}
           </div>
-          {!collapsed && state.demoMode && <p className="wg-muted mt-2 text-[10px] leading-snug">Mode démonstration frontend : données conservées dans ce navigateur.</p>}
         </div>
         <button
           type="button"
@@ -209,7 +208,7 @@ export default function AppShell() {
               <FiSearch size={16} />
               <span className="wg-kbd hidden xl:inline-flex">Ctrl K</span>
             </button>
-            {state.demoMode && <span className="hidden sm:inline-flex"><Badge tone="accent">Démo frontend</Badge></span>}
+            <PWAInstallButton compact />
             <button type="button" onClick={toggleTheme} className="wg-btn wg-btn-ghost !px-2.5" aria-label="Changer de thème" title="Thème clair / sombre">
               {theme === 'dark' ? <FiSun size={16} /> : <FiMoon size={16} />}
             </button>
@@ -307,14 +306,13 @@ export default function AppShell() {
         </header>
 
         <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
-          {dataSource === 'local' && authKind === 'local' && <DemoNotice className="mb-5 rounded-xl" />}
           {can('inventory.view') && <StockAlertBanner key={`${state.session?.userId}:${state.session?.stationId}`} />}
           {role !== 'super_admin' && subscriptionStatus === 'loading' && <div role="status" className="wg-card mb-5 px-4 py-3 text-xs">Vérification de l’abonnement ; les écritures ordinaires sont momentanément bloquées.</div>}
           {role !== 'super_admin' && subscriptionStatus !== 'loading' && !canWriteSubscription && <div role="status" className="wg-card mb-5 flex flex-wrap items-center justify-between gap-3 !border-amber-500/40 px-4 py-3 text-xs">
             <span><strong>{subscriptionAccess ? 'Abonnement en lecture seule.' : 'Abonnement non confirmé.'}</strong>{' '}
               {subscriptionAccess ? 'Les données restent consultables ; les écritures ordinaires sont bloquées jusqu’à validation. Après expiration, un retrait WhatsApp peut être demandé sous réserve des droits.' : `Les écritures ordinaires sont bloquées. ${subscriptionError ?? ''}`}</span>
             <span className="flex gap-3">{can('subscription.manage') && <NavLink to="/app/abonnement" className="wg-link">Voir l’abonnement →</NavLink>}
-              {dataSource === 'supabase' && authKind === 'supabase' && <button className="wg-link" onClick={() => { void refreshSubscriptionAccess().catch(() => undefined); }}>Relire</button>}</span>
+              {((dataSource === 'supabase' && authKind === 'supabase') || (dataSource === 'api' && authKind === 'api')) && <button className="wg-link" onClick={() => { void refreshSubscriptionAccess().catch(() => undefined); }}>Relire</button>}</span>
           </div>}
           {!state.station?.activated && role !== 'super_admin' && location.pathname !== '/app/mise-en-route' && (
             <div className="wg-card mb-5 flex flex-wrap items-center justify-between gap-3 !border-amber-500/30 px-4 py-3">

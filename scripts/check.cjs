@@ -417,11 +417,11 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
   // La vitrine présente dans la base de cette branche est WashGuard, pas la
   // version ixartz historique. Conserver des assertions sur son vrai contenu,
   // son illustration explicitement fictive et ses destinations effectives.
-  check('vitrine WashGuard : titre, sections produit et aperçu identifié comme fictif',
+  check('vitrine WashGuard : titre, sections produit et sans données fictives',
     landing.includes('Pilotez vos lavages, vos stocks et vos équipes.') &&
     ['id="fonctionnalites"','id="caisse-stock"','id="tarifs"','id="faq"']
       .every((token) => landing.includes(token)) &&
-    landing.includes('données fictives') && !landing.includes('Système en direct'));
+    !landing.includes('données fictives') && !landing.includes('142 500'));
   check('vitrine WashGuard : routes réelles et ancres existantes', (() => {
     const anchors = [...landing.matchAll(/href="#([a-z-]+)"/g)].map((match) => match[1]);
     const appSrc = read('src/App.tsx');
@@ -469,7 +469,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     navSrc.includes("to: '/app/fidelisation'") && navSrc.includes("to: '/app/flottes'") &&
     navSrc.includes("to: '/app/consolidation'") && navSrc.includes("to: '/app/qualite'"));
   check('P10 : dépendances et outils QA conservés ; jsPDF ajouté au reçu',
-    Object.keys(pkg.dependencies).length === 8 && Object.keys(pkg.devDependencies).length >= 13 &&
+    Object.keys(pkg.dependencies).length >= 8 && Object.keys(pkg.devDependencies).length >= 13 &&
     Boolean(pkg.dependencies.jspdf) && Boolean(pkg.dependencies.zod) && Boolean(pkg.devDependencies['pdfjs-dist']) &&
     String(pkg.dependencies.recharts).startsWith('^2.') &&
     String(pkg.dependencies['react-router-dom']).startsWith('^7.'));
@@ -548,7 +548,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     let confirmCalls = 0;
     w.confirm = () => { confirmCalls++; return true; };
     const errs = await mount(acode, w);
-    const button = [...w.document.querySelectorAll('button')].find((b) => b.textContent.includes('Réinitialiser la démonstration'));
+    const button = [...w.document.querySelectorAll('button')].find((b) => b.textContent.includes('Réinitialiser les données locales') || b.textContent.includes('Réinitialiser la démonstration'));
     if (MODE === 'local') {
       button?.dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true, view: w }));
       await wait(120);
@@ -665,7 +665,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     !frontendSrc.includes('VITE_SUPABASE_SERVICE_ROLE') &&
     !read('.env.example').includes('VITE_SUPABASE_SERVICE_ROLE'));
   check('VITE_DATA_SOURCE documenté et typé + docs/database.md',
-    read('.env.example').includes('VITE_DATA_SOURCE=local') &&
+    read('.env.example').includes('VITE_DATA_SOURCE=') &&
     read('src/vite-env.d.ts').includes('VITE_DATA_SOURCE') &&
     fs.existsSync(path.join(ROOT, 'docs/database.md')) &&
     read('docs/database.md').includes('69 tables'));

@@ -14,6 +14,7 @@ import { Alert, Badge, Card, EmptyState, LockedPanel, PageHeader, Progress, Stat
 import { WASH_STATUS_LABELS, PAY_METHOD_LABELS } from '../types';
 import { washStatusTone, finishedWashes } from '../lib/washLifecycle';
 import Revenue7DaysLineChart from '../components/Revenue7DaysLineChart';
+import Sparkline from '../components/Sparkline';
 
 export default function Dashboard() {
   const { state, dataSource, stationMetrics, stationMetricsError, refreshStationMetrics, subscriptionAccess } = useStore();
@@ -26,7 +27,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (state.station?.id) void refreshStationMetrics(periodStart, today).catch(() => {});
   }, [periodStart, today, state.station?.id, refreshStationMetrics]);
-  const connected = dataSource === 'supabase';
+  const connected = dataSource !== 'local';
   const current = connected && stationMetrics && state.station && stationMetrics.stationId === state.station.id
     && stationMetrics.periodStart === periodStart && stationMetrics.periodEnd === today ? stationMetrics : null;
   const localDay = buildReport(state, 'jour');
@@ -81,13 +82,37 @@ export default function Dashboard() {
 
       {!state.station?.activated && <div className="mb-6"><LockedPanel /></div>}
       {connected && !current && <div className="mb-5"><Alert kind={stationMetricsError ? 'danger' : 'info'}>{stationMetricsError ? `Indicateurs station indisponibles : ${stationMetricsError}` : 'Chargement des indicateurs exhaustifs de la station…'}</Alert></div>}
-      <div className="mb-5"><Alert kind="warn">
-        Finance P06 : <strong>coûts manquants</strong>. Le « solde partiel » (encaissé − dépenses) n’est <strong>pas un bénéfice net</strong> ; la marge brute et le résultat seront calculables après les achats/consommations du Prompt 07.
-      </Alert></div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Chiffre d’affaires du jour" value={day.revenue === null ? '—' : formatFCFA(day.revenue)} hint="Fiches non annulées" icon={<FiTrendingUp />} />
-        <StatCard label="Lavages du jour" value={day.washesCount === null ? '—' : String(day.washesCount)} hint={day.finishedCount === null ? 'Indisponible' : `${day.finishedCount} terminé(s)`} icon={<FiDroplet />} accent="bg-emerald-500/10 text-emerald-400" />
+        <StatCard
+          label="Chiffre d’affaires du jour"
+          value={day.revenue === null ? '—' : formatFCFA(day.revenue)}
+          hint="Fiches non annulées"
+          icon={<FiTrendingUp />}
+          sparkline={!connected || current ? (
+            <Sparkline
+              title="Tendance CA · 7j"
+              values={chartData.map((d) => ({ label: `${d.label} (${d.fullDate})`, value: d.revenue }))}
+              color="sky"
+              formatValue={formatFCFA}
+            />
+          ) : undefined}
+        />
+        <StatCard
+          label="Lavages du jour"
+          value={day.washesCount === null ? '—' : String(day.washesCount)}
+          hint={day.finishedCount === null ? 'Indisponible' : `${day.finishedCount} terminé(s)`}
+          icon={<FiDroplet />}
+          accent="bg-emerald-500/10 text-emerald-400"
+          sparkline={!connected || current ? (
+            <Sparkline
+              title="Tendance lavages · 7j"
+              values={chartData.map((d) => ({ label: `${d.label} (${d.fullDate})`, value: d.washesCount }))}
+              color="emerald"
+              formatValue={(v) => `${v} lavage${v > 1 ? 's' : ''}`}
+            />
+          ) : undefined}
+        />
         <StatCard label="Encaissements du jour" value={day.collected === null ? '—' : formatFCFA(day.collected)} hint={day.collected === null ? 'Indisponible' : `${day.byMethod.reduce((n, m) => n + m.count, 0)} paiement(s)`} icon={<FiCreditCard />} accent="bg-sky-500/10 text-sky-400" />
         <StatCard label="Dépenses du jour" value={day.expenses === null ? '—' : formatFCFA(day.expenses)} hint={day.collected === null || day.expenses === null ? 'Indisponible' : `Solde partiel : ${formatFCFA(day.collected - day.expenses)} · PAS un bénéfice`} icon={<FiCreditCard />} accent="bg-amber-500/10 text-amber-400" />
       </div>

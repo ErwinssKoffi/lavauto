@@ -48,7 +48,7 @@ export default function Platform() {
   const safe = useSafeAction();
   const [decision, setDecision] = useState<{ request: SubscriptionRequest; approve: boolean } | null>(null);
   const [decisionBusy, setDecisionBusy] = useState(false);
-  const connected = dataSource === 'supabase' && authKind === 'supabase';
+  const connected = (dataSource === 'supabase' && authKind === 'supabase') || (dataSource === 'api' && authKind === 'api');
   const [selectedPlanId, setSelectedPlanId] = useState(platformBoard.plans[0]?.id ?? 'essai');
   const [planDraft, setPlanDraft] = useState({
     planId: platformBoard.plans[0]?.id ?? 'essai',

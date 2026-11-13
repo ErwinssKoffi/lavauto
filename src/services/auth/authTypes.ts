@@ -52,6 +52,7 @@ export interface CompanyUser {
   active: boolean;
   createdAt: string;
   stationIds: string[];
+  commissionRateOverride?: number | null;
 }
 
 export interface Invitation {
@@ -79,6 +80,7 @@ export interface UpdateUserPayload {
   role?: Role;
   active?: boolean;
   stationIds?: string[];
+  commissionRateOverride?: number | null;
 }
 
 export interface SignUpPayload {
@@ -263,7 +265,7 @@ export function mapIdentityToAppState(
     phone: u.phone,
     role: u.role,
     active: u.active,
-    commissionRateOverride: null,
+    commissionRateOverride: u.commissionRateOverride ?? null,
     createdAt: u.createdAt,
     stationIds: u.stationIds,
   }));

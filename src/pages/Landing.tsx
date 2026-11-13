@@ -8,7 +8,6 @@ import {
 } from 'react-icons/fi';
 import { useStore } from '../lib/store';
 import { formatFCFA } from '../lib/format';
-import { DemoNotice } from '../components/DemoNotice';
 import { PlanDetails } from '../components/PlanDetails';
 
 interface FaqItem {
@@ -27,7 +26,7 @@ const FAQS: FaqItem[] = [
   },
   {
     q: 'Comment fonctionne le système d’alertes de stock ?',
-    a: 'Les niveaux et les seuils disponibles sont affichés dans le module stock et signalés dans l’interface. Les simulations et l’édition locale des seuils sont réservées à la démonstration locale ; en mode connecté, les données sont relues depuis le serveur.',
+    a: 'Définissez un seuil critique par consommable dans Paramètres ou Stocks & achats. Dès que le stock disponible atteint ou passe sous ce seuil, une alerte apparaît dans le tableau de bord et la cloche en temps réel.',
   },
   {
     q: 'Les prix des prestations peuvent-ils être modifiés par les caissiers ?',
@@ -44,12 +43,11 @@ const FAQS: FaqItem[] = [
 ];
 
 export default function Landing() {
-  const { plans, plansError, dataSource, authKind } = useStore();
+  const { plans, plansError } = useStore();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'lavages' | 'caisse' | 'stock' | 'commissions'>('caisse');
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 antialiased selection:bg-sky-500 selection:text-white">
-      {dataSource === 'local' && authKind === 'local' && <DemoNotice />}
       {/* ── Top Announcement Banner ────────────────────────────────────────── */}
       <div className="border-b border-sky-500/20 bg-gradient-to-r from-sky-950 via-slate-900 to-indigo-950 px-4 py-2 text-center text-xs font-medium text-sky-200">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-500/20 px-2.5 py-0.5 font-bold text-sky-300">
@@ -155,141 +153,70 @@ export default function Landing() {
             </div>
           </div>
 
-          {/* ── Hero Live Preview Widget (Interactive Dashboard Teaser) ────── */}
+          {/* ── Hero Operational Showcase (No fictitious figures) ──────────── */}
           <div className="relative mt-14 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/90 shadow-2xl shadow-black/80 backdrop-blur-xl">
-            {/* Window Topbar */}
-            <div className="flex items-center justify-between border-b border-slate-800 bg-slate-950/60 px-4 py-3">
-              <div className="flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full bg-red-500/80" />
-                <span className="h-3 w-3 rounded-full bg-amber-500/80" />
-                <span className="h-3 w-3 rounded-full bg-emerald-500/80" />
-                <span className="ml-2 font-mono text-xs text-slate-400">
-                  Aperçu d’une station — données fictives
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-xs font-medium text-emerald-400">
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-                </span>
-                Illustration
-              </div>
-            </div>
-
-            {/* Dashboard Mockup Content */}
-            <div className="p-5 sm:p-7">
-              {/* Top Metrics Row */}
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
-                  <p className="text-xs font-semibold text-slate-400 uppercase">Chiffre d’affaires du jour</p>
-                  <p className="mt-1.5 text-2xl font-black text-white">142 500 FCFA</p>
-                  <p className="mt-1 text-xs text-emerald-400">↑ +18% vs moyenne 7 jours</p>
-                </div>
-                <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
-                  <p className="text-xs font-semibold text-slate-400 uppercase">Lavages aujourd’hui</p>
-                  <p className="mt-1.5 text-2xl font-black text-white">38 véhicules</p>
-                  <p className="mt-1 text-xs text-slate-400">32 livrés · 4 en cours · 2 en attente</p>
-                </div>
-                <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
-                  <p className="text-xs font-semibold text-slate-400 uppercase">Contrôle de Caisse</p>
-                  <p className="mt-1.5 text-2xl font-black text-emerald-400">0 FCFA d'écart</p>
-                  <p className="mt-1 text-xs text-slate-400">Comptage espèces (exemple fictif)</p>
-                </div>
-                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold text-amber-300 uppercase">Alerte Stock Critique</p>
-                    <FiAlertTriangle className="text-amber-400" size={16} />
-                  </div>
-                  <p className="mt-1.5 text-xl font-bold text-amber-200">2 produits bas</p>
-                  <p className="mt-1 text-xs text-amber-300/80">Savon (4L / min 10L) · Cire (1L)</p>
+            <div className="grid items-stretch lg:grid-cols-5">
+              <div className="relative min-h-[260px] overflow-hidden lg:col-span-2">
+                <img
+                  src="/images/lav-auto.jpeg"
+                  alt="Station de lavage automobile équipée"
+                  className="h-full w-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent lg:bg-gradient-to-r lg:from-transparent lg:to-slate-900" />
+                <div className="absolute bottom-4 left-4 right-4 rounded-xl border border-white/10 bg-slate-950/80 p-3.5 backdrop-blur">
+                  <p className="text-[11px] font-bold tracking-wider text-sky-400 uppercase">Architecture Station</p>
+                  <p className="mt-1 text-xs text-slate-200">
+                    Chaque opération est horodatée, attribuée à un employé et vérifiée côté serveur avant enregistrement.
+                  </p>
                 </div>
               </div>
 
-              {/* Live Bays & Real-time Operations Showcase */}
-              <div className="mt-6 grid gap-6 lg:grid-cols-3">
-                <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4 lg:col-span-2">
-                  <div className="mb-3 flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-white">Postes de lavage en activité</h3>
-                    <span className="text-xs text-sky-400">Exemple fictif</span>
+              <div className="p-6 sm:p-8 lg:col-span-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-4">
+                  <div>
+                    <h2 className="text-base font-bold text-white">Chaîne de contrôle de bout en bout</h2>
+                    <p className="mt-0.5 text-xs text-slate-400">Aucune donnée préremplie — votre station démarre à blanc sur vos propres tarifs.</p>
                   </div>
-                  <div className="space-y-2.5">
-                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-800/80 bg-slate-900/60 p-3 text-xs">
-                      <div className="flex items-center gap-3">
-                        <span className="rounded bg-sky-500/20 px-2 py-1 font-mono font-bold text-sky-300">
-                          LAV-2026-042
-                        </span>
-                        <div>
-                          <p className="font-bold text-white">Toyota Land Cruiser (4x4) · 1289 JJ 01</p>
-                          <p className="text-slate-400">Lavage complet + Lustrage cire · Laveur : Ibrahim K.</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="font-semibold text-white">7 000 FCFA</span>
-                        <span className="rounded-full bg-blue-500/20 px-2.5 py-0.5 font-bold text-blue-300">
-                          En cours (85%)
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-800/80 bg-slate-900/60 p-3 text-xs">
-                      <div className="flex items-center gap-3">
-                        <span className="rounded bg-emerald-500/20 px-2 py-1 font-mono font-bold text-emerald-300">
-                          LAV-2026-041
-                        </span>
-                        <div>
-                          <p className="font-bold text-white">Mercedes Classe C (Berline) · 8845 HG 01</p>
-                          <p className="text-slate-400">Extérieur + Nettoyage jantes · Laveur : Moussa T.</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="font-semibold text-white">4 000 FCFA</span>
-                        <span className="rounded-full bg-emerald-500/20 px-2.5 py-0.5 font-bold text-emerald-300">
-                          Prêt · Contrôle validé
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                  <span className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300">
+                    Devise FCFA (XOF)
+                  </span>
                 </div>
 
-                {/* Stock Alert Real-time card */}
-                <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
-                  <div className="mb-3 flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-white">État des consommables</h3>
-                    <FiBox className="text-slate-400" />
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                    <div className="flex items-center gap-2 text-xs font-bold text-sky-300">
+                      <FiTruck size={15} /> 1. Mise en route contrôlée
+                    </div>
+                    <p className="mt-2 text-xs leading-relaxed text-slate-400">
+                      Catégories de véhicules, catalogue, grille tarifaire complète et moyens de paiement validés avant ouverture.
+                    </p>
                   </div>
-                  <div className="space-y-3 text-xs">
-                    <div>
-                      <div className="flex justify-between font-medium">
-                        <span className="text-amber-300">Shampoing moussant carrosserie</span>
-                        <span className="font-bold text-amber-400">4 Litres (Seuil : 10L)</span>
-                      </div>
-                      <div className="mt-1 h-1.5 w-full rounded-full bg-slate-800">
-                        <div className="h-1.5 rounded-full bg-amber-400" style={{ width: '40%' }} />
-                      </div>
+
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                    <div className="flex items-center gap-2 text-xs font-bold text-emerald-300">
+                      <FiLock size={15} /> 2. Caisse & canaux séparés
                     </div>
-                    <div>
-                      <div className="flex justify-between font-medium">
-                        <span className="text-red-400">Cire lustrante protectrice</span>
-                        <span className="font-bold text-red-400">1 Litre (Seuil : 5L)</span>
-                      </div>
-                      <div className="mt-1 h-1.5 w-full rounded-full bg-slate-800">
-                        <div className="h-1.5 rounded-full bg-red-400" style={{ width: '20%' }} />
-                      </div>
+                    <p className="mt-2 text-xs leading-relaxed text-slate-400">
+                      Espèces rattachées à la session ouverte ; Wave, Orange Money et MTN MoMo rapprochés indépendamment.
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                    <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
+                      <FiBox size={15} /> 3. Stocks & coût moyen (PUMP)
                     </div>
-                    <div>
-                      <div className="flex justify-between font-medium">
-                        <span className="text-slate-300">Dégraissant jantes actif</span>
-                        <span className="font-bold text-emerald-400">18 Litres (Seuil : 8L)</span>
-                      </div>
-                      <div className="mt-1 h-1.5 w-full rounded-full bg-slate-800">
-                        <div className="h-1.5 rounded-full bg-emerald-400" style={{ width: '85%' }} />
-                      </div>
+                    <p className="mt-2 text-xs leading-relaxed text-slate-400">
+                      Commandes fournisseurs, réceptions, normes de consommation par lavage, inventaires et alertes de seuil.
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                    <div className="flex items-center gap-2 text-xs font-bold text-indigo-300">
+                      <FiUsers size={15} /> 4. Équipe, RBAC & reçus PDF
                     </div>
-                    <div className="pt-2 text-center">
-                      <span className="inline-block rounded-lg bg-sky-500/20 px-3 py-1 font-semibold text-sky-300">
-                        Alerte affichée dans l’interface
-                      </span>
-                    </div>
+                    <p className="mt-2 text-xs leading-relaxed text-slate-400">
+                      Invitations par rôle, affectations multi-stations, barème de commissions et reçu imprimable ou PDF.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -420,13 +347,13 @@ export default function Landing() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h2 className="text-xs font-bold tracking-widest text-sky-400 uppercase">
-              Expérience Interactive
+              Fonctionnement Métier
             </h2>
             <p className="mt-3 text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-              Découvrez la simplicité d'utilisation au quotidien
+              Des règles claires sur chaque poste de la station
             </p>
             <p className="mx-auto mt-4 max-w-2xl text-slate-400">
-              Cliquez sur les onglets pour découvrir des exemples illustratifs avec des données fictives.
+              Explorez les contrôles automatisés appliqués sur vos données d’exploitation réelles.
             </p>
           </div>
 
@@ -497,23 +424,27 @@ export default function Landing() {
                     </Link>
                   </div>
                 </div>
-                <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-5 font-mono text-xs">
+                <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-5 text-xs">
                   <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                    <span className="font-bold text-slate-300">Session de caisse #CS-092</span>
-                    <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300">CONFORME</span>
+                    <span className="font-bold text-slate-200">Règles de clôture serveur</span>
+                    <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300">IMMUABLE</span>
                   </div>
-                  <div className="mt-3 space-y-2 text-slate-300">
-                    <div className="flex justify-between"><span>Fond initial (08h00) :</span><span className="font-bold text-white">25 000 FCFA</span></div>
-                    <div className="flex justify-between"><span>+ Encaissements Espèces :</span><span className="font-bold text-emerald-400">+ 85 000 FCFA</span></div>
-                    <div className="flex justify-between"><span>- Sorties dépenses autorisées :</span><span className="font-bold text-red-400">- 10 000 FCFA</span></div>
-                    <div className="border-t border-slate-800 pt-2 flex justify-between font-bold text-sky-300">
-                      <span>Solde théorique attendu :</span><span>100 000 FCFA</span>
+                  <div className="mt-3 space-y-2.5 text-slate-300">
+                    <div className="flex justify-between rounded-lg bg-slate-950/60 px-3 py-2">
+                      <span>1. Fond d’ouverture</span>
+                      <span className="font-semibold text-white">Déclaré à la prise de poste</span>
                     </div>
-                    <div className="flex justify-between font-bold text-white">
-                      <span>Montant physique compté :</span><span>100 000 FCFA</span>
+                    <div className="flex justify-between rounded-lg bg-slate-950/60 px-3 py-2">
+                      <span>2. Mouvements espèces</span>
+                      <span className="font-semibold text-emerald-400">+ Encaissements − Dépenses</span>
                     </div>
-                    <div className="rounded-lg bg-emerald-500/10 p-2.5 text-center font-bold text-emerald-400">
-                      Écart de clôture : 0 FCFA (Équilibré)
+                    <div className="flex justify-between rounded-lg bg-slate-950/60 px-3 py-2">
+                      <span>3. Comptage physique</span>
+                      <span className="font-semibold text-sky-300">Saisi par le caissier</span>
+                    </div>
+                    <div className="flex justify-between rounded-lg bg-slate-950/60 px-3 py-2">
+                      <span>4. Relevé de clôture</span>
+                      <span className="font-semibold text-white">Écart archivé sans réécriture</span>
                     </div>
                   </div>
                 </div>
@@ -530,7 +461,7 @@ export default function Landing() {
                     Repérez les produits sous leur seuil
                   </h3>
                   <p className="mt-3 text-sm leading-relaxed text-slate-300">
-                    Le bandeau signale les produits sous leur seuil à partir des données disponibles. En mode connecté, les données proviennent du serveur ; les simulations et l’édition locale des seuils sont réservées à la démonstration locale.
+                    Configurez vos consommables, leurs seuils critiques et leurs fiches techniques par prestation. Chaque réception met à jour le coût moyen pondéré (PUMP) et chaque sortie est tracée.
                   </p>
                   <ul className="mt-4 space-y-2.5 text-xs text-slate-300">
                     <li className="flex items-center gap-2">
@@ -539,7 +470,7 @@ export default function Landing() {
                     </li>
                     <li className="flex items-center gap-2">
                       <FiCheck className="text-amber-400" />
-                      <span>Seuil d’alerte affiché par produit (litres, bidons, unités)</span>
+                      <span>Seuil d’alerte configurable par produit (litres, bidons, unités)</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <FiCheck className="text-amber-400" />
@@ -554,32 +485,23 @@ export default function Landing() {
                 </div>
                 <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-5 text-xs">
                   <div className="mb-4 flex items-center justify-between border-b border-slate-800 pb-3">
-                    <span className="font-bold text-white">Niveaux de stock critiques</span>
+                    <span className="font-bold text-white">Cycle complet des achats & stocks</span>
                     <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-300">
-                      2 alertes actives
+                      TRAÇABILITÉ PUMP
                     </span>
                   </div>
-                  <div className="space-y-4">
-                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
-                      <div className="flex items-center justify-between font-bold text-amber-200">
-                        <span>Shampoing moussant carrosserie</span>
-                        <span>4 Litres restants</span>
-                      </div>
-                      <p className="mt-1 text-[11px] text-amber-300/80">Seuil critique : 10 Litres · Action : Commander 25L</p>
-                      <div className="mt-2 h-1.5 w-full rounded-full bg-slate-800">
-                        <div className="h-1.5 rounded-full bg-amber-400" style={{ width: '40%' }} />
-                      </div>
+                  <div className="space-y-2.5 text-slate-300">
+                    <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-3">
+                      <p className="font-bold text-white">Commande fournisseur → Réception partielle ou totale</p>
+                      <p className="mt-1 text-[11px] text-slate-400">Une commande ne crédite le stock qu’à la réception physique validée.</p>
                     </div>
-
-                    <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3">
-                      <div className="flex items-center justify-between font-bold text-red-200">
-                        <span>Cire lustrante protectrice</span>
-                        <span>1 Litre restant</span>
-                      </div>
-                      <p className="mt-1 text-[11px] text-red-300/80">Seuil critique : 5 Litres · Action : Rupture imminente</p>
-                      <div className="mt-2 h-1.5 w-full rounded-full bg-slate-800">
-                        <div className="h-1.5 rounded-full bg-red-400" style={{ width: '20%' }} />
-                      </div>
+                    <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-3">
+                      <p className="font-bold text-white">Alertes de seuil en direct</p>
+                      <p className="mt-1 text-[11px] text-slate-400">Détection immédiate des consommables en rupture ou sous le seuil critique.</p>
+                    </div>
+                    <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-3">
+                      <p className="font-bold text-white">Certification périodique des coûts</p>
+                      <p className="mt-1 text-[11px] text-slate-400">Rapprochement des factures d’achat et des consommations valorisées.</p>
                     </div>
                   </div>
                 </div>
@@ -593,23 +515,23 @@ export default function Landing() {
                     <FiDroplet size={14} /> Fluidité opérationnelle
                   </span>
                   <h3 className="mt-4 text-2xl font-bold text-white">
-                    File d'attente et suivi du contrôle qualité
+                    File d’attente et suivi du contrôle qualité
                   </h3>
                   <p className="mt-3 text-sm leading-relaxed text-slate-300">
-                    Chaque fiche regroupe les prestations choisies, les affectations et, si nécessaire, un poste. Le contrôle qualité précède la livraison.
+                    Chaque fiche regroupe les prestations choisies, les affectations et, si nécessaire, un poste. Le contrôle qualité précède la livraison et les tarifs restent figés à la création.
                   </p>
                   <ul className="mt-4 space-y-2.5 text-xs text-slate-300">
                     <li className="flex items-center gap-2">
                       <FiCheck className="text-sky-400" />
-                      <span>Grille tarifaire par catégorie : Moto, Berline, SUV, 4x4, Minibus</span>
+                      <span>Grille tarifaire configurable par catégorie de véhicule</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <FiCheck className="text-sky-400" />
-                      <span>Affectation nominative des laveurs pour chaque tâche</span>
+                      <span>Affectation nominative des laveurs pour chaque fiche</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <FiCheck className="text-sky-400" />
-                      <span>Validation du contrôle qualité avant restitution</span>
+                      <span>Validation du contrôle qualité et reçu PDF avant restitution</span>
                     </li>
                   </ul>
                   <div className="mt-6">
@@ -620,24 +542,25 @@ export default function Landing() {
                 </div>
                 <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-5 text-xs">
                   <div className="flex items-center justify-between border-b border-slate-800 pb-3 font-bold text-white">
-                    <span>Exemple de fiche #LAV-2026-042</span>
-                    <span className="text-sky-400">Poste 1 (Extérieur)</span>
+                    <span>Statuts d’une fiche de lavage</span>
+                    <span className="text-sky-400">Tarifs figés serveur</span>
                   </div>
-                  <div className="mt-3 space-y-2">
-                    <div className="flex justify-between text-slate-300">
-                      <span>Véhicule :</span><span className="font-bold text-white">Hyundai Tucson · 4512 KM 01</span>
+                  <div className="mt-3 space-y-2.5 text-slate-300">
+                    <div className="flex justify-between rounded-lg bg-slate-950/60 px-3 py-2">
+                      <span>En attente / Affecté</span>
+                      <span className="text-slate-400">Prise en charge & équipe</span>
                     </div>
-                    <div className="flex justify-between text-slate-300">
-                      <span>Prestation :</span><span>Lavage Complet + Moteur</span>
+                    <div className="flex justify-between rounded-lg bg-slate-950/60 px-3 py-2">
+                      <span>En cours</span>
+                      <span className="text-sky-300">Exécution sur poste</span>
                     </div>
-                    <div className="flex justify-between text-slate-300">
-                      <span>Laveur affecté :</span><span className="font-semibold text-sky-300">Koffi Serge</span>
+                    <div className="flex justify-between rounded-lg bg-slate-950/60 px-3 py-2">
+                      <span>Contrôle qualité → Prêt</span>
+                      <span className="text-emerald-400">Inspection avant remise</span>
                     </div>
-                    <div className="flex justify-between text-slate-300">
-                      <span>Moyen de paiement :</span><span className="font-semibold text-emerald-400">Wave (Trans. #WAV-9812)</span>
-                    </div>
-                    <div className="border-t border-slate-800 pt-2 flex justify-between font-bold text-white">
-                      <span>Total réglé :</span><span className="text-emerald-400">6 000 FCFA</span>
+                    <div className="flex justify-between rounded-lg bg-slate-950/60 px-3 py-2">
+                      <span>Livré · Reçu FCFA</span>
+                      <span className="font-semibold text-white">Impression & export PDF</span>
                     </div>
                   </div>
                 </div>
@@ -654,12 +577,12 @@ export default function Landing() {
                     Commissions calculées et relevés de période
                   </h3>
                   <p className="mt-3 text-sm leading-relaxed text-slate-300">
-                    Consultez un aperçu des commissions et préparez des relevés périodiques. En mode connecté, les relevés utilisent les données de barème du serveur ; les réglages locaux ne les modifient pas.
+                    Définissez le barème de la station et, si besoin, un taux individuel par employé. Les relevés validés figent les montants dus pour préparer la paie sans ambiguïté.
                   </p>
                   <ul className="mt-4 space-y-2.5 text-xs text-slate-300">
                     <li className="flex items-center gap-2">
                       <FiCheck className="text-indigo-400" />
-                      <span>Barème de station ou contrat employé côté serveur</span>
+                      <span>Barème de station et taux individuel par employé</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <FiCheck className="text-indigo-400" />
@@ -672,36 +595,27 @@ export default function Landing() {
                   </ul>
                   <div className="mt-6">
                     <Link to="/connexion" className="inline-flex items-center gap-2 text-sm font-bold text-sky-400 hover:text-sky-300">
-                      Tester le calcul des commissions <FiArrowRight />
+                      Accéder aux commissions <FiArrowRight />
                     </Link>
                   </div>
                 </div>
                 <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-5 text-xs">
                   <div className="flex items-center justify-between border-b border-slate-800 pb-3 font-bold text-white">
-                    <span>Relevé Hebdomadaire · Laveurs</span>
-                    <span className="text-emerald-400">Période validée</span>
+                    <span>Validation des relevés</span>
+                    <span className="text-emerald-400">Export CSV paie</span>
                   </div>
-                  <div className="mt-3 divide-y divide-slate-800">
-                    <div className="py-2 flex justify-between items-center">
-                      <div>
-                        <p className="font-bold text-white">Moussa Traoré</p>
-                        <p className="text-[11px] text-slate-400">42 lavages · Base : 168 000 FCFA (20%)</p>
-                      </div>
-                      <span className="font-bold text-emerald-400">33 600 FCFA</span>
+                  <div className="mt-3 space-y-2.5 text-slate-300">
+                    <div className="rounded-lg bg-slate-950/60 p-3">
+                      <p className="font-bold text-white">1. Aperçu en direct sur lavages terminés</p>
+                      <p className="mt-1 text-[11px] text-slate-400">Les fiches annulées ou en cours sont automatiquement exclues.</p>
                     </div>
-                    <div className="py-2 flex justify-between items-center">
-                      <div>
-                        <p className="font-bold text-white">Ibrahim Koné</p>
-                        <p className="text-[11px] text-slate-400">38 lavages · Base : 152 000 FCFA (20%)</p>
-                      </div>
-                      <span className="font-bold text-emerald-400">30 400 FCFA</span>
+                    <div className="rounded-lg bg-slate-950/60 p-3">
+                      <p className="font-bold text-white">2. Création & validation de période</p>
+                      <p className="mt-1 text-[11px] text-slate-400">Le relevé validé fige la base, le taux appliqué et le montant dû.</p>
                     </div>
-                    <div className="py-2 flex justify-between items-center">
-                      <div>
-                        <p className="font-bold text-white">Serge Kouadio</p>
-                        <p className="text-[11px] text-slate-400">29 lavages · Base : 116 000 FCFA (20%)</p>
-                      </div>
-                      <span className="font-bold text-emerald-400">23 200 FCFA</span>
+                    <div className="rounded-lg bg-slate-950/60 p-3">
+                      <p className="font-bold text-white">3. Traçabilité des règlements</p>
+                      <p className="mt-1 text-[11px] text-slate-400">Chaque paie enregistrée conserve sa référence et son horodatage.</p>
                     </div>
                   </div>
                 </div>

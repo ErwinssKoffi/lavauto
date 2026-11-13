@@ -246,11 +246,12 @@ function LogoForm() {
 }
 
 function CashRulesForm() {
-  const { state, updateStation, notify, isLocalStockDemo } = useStore();
+  const { state, dataSource, updateStation, notify, isLocalStockDemo } = useStore();
   const st = state.station;
   const [requires, setRequires] = useState(st?.cashRequiresOpen ?? true);
   const [max, setMax] = useState(st?.maxCashierDiscount ?? 0);
-  if (!isLocalStockDemo) return <Alert kind="warn">En mode connecté, une caisse ouverte est requise pour les espèces. Le plafond de remise du caissier n’est pas encore contrôlé par le serveur et n’est pas configurable ici.</Alert>;
+  const canConfigure = isLocalStockDemo || dataSource === 'api';
+  if (!canConfigure) return <Alert kind="warn">En mode Supabase, une caisse ouverte est requise pour les espèces. Le plafond de remise du caissier n’est pas configurable ici.</Alert>;
   return (
     <div>
       <p className="wg-muted mb-4 text-sm">Facultatif : des règles par défaut sont déjà appliquées. Elles restent modifiables dans Paramètres.</p>

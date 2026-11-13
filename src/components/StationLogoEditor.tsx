@@ -13,8 +13,10 @@ export function StationLogoEditor() {
   const station = state.station;
   const session = state.session;
   const userId = session?.userId;
-  const serverReady = dataSource === 'supabase' && authKind === 'supabase'
-    && isSupabaseConfigured && Boolean(station?.id && userId)
+  const serverReady = (
+    (dataSource === 'api' && authKind === 'api') ||
+    (dataSource === 'supabase' && authKind === 'supabase' && isSupabaseConfigured)
+  ) && Boolean(station?.id && userId)
     && station?.id === session?.stationId && station?.companyId === session?.companyId;
   const logoPath = station?.logoPath ?? null;
   const scope = `${userId ?? ''}:${station?.companyId ?? ''}:${station?.id ?? ''}`;
@@ -105,7 +107,7 @@ export function StationLogoEditor() {
         PNG, JPEG ou WebP, 5 Mo maximum. Le fichier est optimisé si possible et conservé dans un stockage privé.
       </p>
       {!serverReady && (
-        <div className="mt-3"><Alert kind="info">Le téléversement du logo nécessite une session Supabase et le stockage privé configuré. Il est indisponible en mode local.</Alert></div>
+        <div className="mt-3"><Alert kind="info">Téléversement du logo indisponible en mode local : connectez une session serveur active.</Alert></div>
       )}
       {serverReady && logoPath && (
         <div className="mt-3" aria-live="polite">

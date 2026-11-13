@@ -62,7 +62,7 @@ export default function Fidelisation() {
   return (
     <div>
       <PageHeader title="Fidélisation & forfaits" subtitle="Cartes de fidélité, forfaits prépayés, promotions et préférences de communication."
-        actions={dataSource === 'supabase' ? (
+        actions={dataSource !== 'local' ? (
           <button className="wg-btn wg-btn-ghost" onClick={() => { void refreshCrm().catch(() => {}); }}><FiRefreshCw /> Actualiser</button>
         ) : undefined} />
 

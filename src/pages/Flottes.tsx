@@ -48,7 +48,7 @@ export default function Flottes() {
   return (
     <div>
       <PageHeader title="Flottes & contrats" subtitle="Contrats, véhicules rattachés, créances ouvertes et préférence de canal."
-        actions={dataSource === 'supabase' ? (
+        actions={dataSource !== 'local' ? (
           <button className="wg-btn wg-btn-ghost" onClick={() => { void refreshCrm().catch(() => {}); }}><FiRefreshCw /> Actualiser</button>
         ) : undefined} />
 

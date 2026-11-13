@@ -5,12 +5,12 @@ import AuthLayout from './AuthLayout';
 import { Alert, Badge } from '../../components/ui';
 import { useStore } from '../../lib/store';
 
-/** Demande RÉELLE de lien Supabase Auth ; aucun e-mail de test n'est envoyé. */
 export default function ForgotPassword() {
   const { requestPasswordReset, authKind } = useStore();
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [sent, setSent] = useState(false);
+  const [resetUrl, setResetUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
@@ -18,7 +18,8 @@ export default function ForgotPassword() {
     setError('');
     setBusy(true);
     try {
-      await requestPasswordReset(email);
+      const res = await requestPasswordReset(email);
+      setResetUrl(res?.resetUrl ?? null);
       setSent(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Demande impossible.');
@@ -29,16 +30,21 @@ export default function ForgotPassword() {
 
   return (
     <AuthLayout>
-      <Badge tone="accent"><FiMail /> {authKind === 'local' ? 'Démonstration locale' : 'Réinitialisation par e-mail'}</Badge>
+      <Badge tone="accent"><FiMail /> {authKind === 'local' ? 'Stockage local' : 'Réinitialisation de mot de passe'}</Badge>
       <h1 className="mt-4 text-3xl font-extrabold tracking-tight">Mot de passe oublié ?</h1>
-      <p className="mt-2 text-sm text-slate-500">{authKind === 'local' ? 'La récupération par e-mail n’est pas disponible dans ce mode.' : 'Saisissez l’adresse e-mail de votre compte WashGuard.'}</p>
+      <p className="mt-2 text-sm text-slate-500">{authKind === 'local' ? 'La récupération par e-mail n’est pas disponible sans serveur connecté.' : 'Saisissez l’adresse e-mail de votre compte WashGuard.'}</p>
 
       {authKind === 'local' ? (
-        <div className="mt-7"><Alert kind="warn">Aucun e-mail n’est envoyé en démonstration. Conservez une copie des données locales avant toute tentative de récupération ; ne videz pas le navigateur.</Alert></div>
+        <div className="mt-7"><Alert kind="warn">Aucun e-mail de récupération n’est envoyé sans serveur connecté.</Alert></div>
       ) : sent ? (
         <div className="mt-7 space-y-4">
-          <Alert kind="success">Si cette adresse correspond à un compte, un lien de réinitialisation vient d’être envoyé. Vérifiez aussi les courriers indésirables.</Alert>
-          <Link to="/connexion" className="wg-btn wg-btn-primary w-full !py-3">Retour à la connexion <FiArrowRight /></Link>
+          <Alert kind="success">Si cette adresse correspond à un compte actif, un lien sécurisé à usage unique a été généré.</Alert>
+          {resetUrl && (
+            <a href={resetUrl} className="wg-btn wg-btn-primary w-full !py-3">
+              Ouvrir le lien de réinitialisation <FiArrowRight />
+            </a>
+          )}
+          <Link to="/connexion" className="wg-btn wg-btn-ghost w-full !py-3">Retour à la connexion <FiArrowRight /></Link>
         </div>
       ) : (
         <form onSubmit={(e) => { void submit(e); }} className="mt-7 space-y-4">
@@ -58,7 +64,7 @@ export default function ForgotPassword() {
 
       <div className="mt-5 rounded-xl border border-sky-100 bg-sky-50 p-3.5 text-xs leading-relaxed text-slate-600">
         <div className="flex items-start gap-2"><FiInfo className="mt-0.5 shrink-0 text-sky-600" />
-          <p>{authKind === 'local' ? 'Utilisez le compte et le mot de passe de démonstration déjà créés dans ce navigateur.' : 'Si le service e-mail est configuré, Supabase Auth peut envoyer un lien de définition d’un nouveau mot de passe.'}</p>
+          <p>{authKind === 'local' ? 'Connectez un serveur backend pour activer la réinitialisation par jeton.' : 'Le lien expire automatiquement après utilisation ou à son échéance.'}</p>
         </div>
       </div>
       <p className="mt-6 text-center text-sm text-slate-500">

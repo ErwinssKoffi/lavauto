@@ -41,7 +41,7 @@ export default function Reports() {
   const from = dateISO(start);
   const to = dateISO(end);
   const server = state.profitability;
-  const connected = dataSource === 'supabase';
+  const connected = dataSource !== 'local';
   // Aucune substitution par une file limitée ou par une ancienne période.
   const rawProfitability: ProfitabilityReport | null = connected
     ? (server && server.periodStart === from && server.periodEnd === to ? server : null)
@@ -128,7 +128,7 @@ export default function Reports() {
     <div>
       <PageHeader title="Rapports" subtitle={`Station ${state.station?.name ?? '—'} · jour / semaine / mois : CA, encaissé, créances, coûts et solde partiel (${label}).`}
         actions={<div className="flex gap-2">
-          {dataSource === 'supabase' && <button className="wg-btn wg-btn-ghost" onClick={reload}><FiRefreshCw /> Actualiser</button>}
+          {dataSource !== 'local' && <button className="wg-btn wg-btn-ghost" onClick={reload}><FiRefreshCw /> Actualiser</button>}
           <button className="wg-btn wg-btn-ghost" disabled={!canCertify} title={!hasStock ? 'Module stock non inclus' : !canWriteSubscription ? 'Abonnement en lecture seule' : undefined} onClick={() => setCertOpen(true)}><FiFileText /> {connected ? 'Certification entreprise' : 'Certifier les coûts'}</button>
           <button className="wg-btn wg-btn-primary" onClick={exportCSV}><FiDownload /> Exporter en CSV</button>
         </div>} />

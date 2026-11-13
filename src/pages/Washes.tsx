@@ -377,7 +377,7 @@ function WashDetail({ washId, methods, onClose, onStatus, onAssign, onQuality, o
   const stationId = state.station?.id ?? '';
   const userId = identity?.userId ?? '';
   const readPayment = (): { pending: PendingPayment | null; error: string | null } => {
-    if (dataSource !== 'supabase' || !userId || !stationId) return { pending: null, error: null };
+    if (dataSource === 'local' || !userId || !stationId) return { pending: null, error: null };
     try { return { pending: readPendingPayment(userId, stationId, washId), error: null }; }
     catch (error) { return { pending: null, error: error instanceof Error ? error.message : 'Tentative illisible.' }; }
   };

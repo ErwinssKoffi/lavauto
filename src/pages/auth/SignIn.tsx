@@ -13,7 +13,7 @@ export default function SignIn() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const notice = authKind !== 'supabase' ? null : params.get('confirmed') === '1'
+  const notice = authKind === 'local' ? null : params.get('confirmed') === '1'
     ? 'Adresse e-mail confirmée. Vous pouvez maintenant vous connecter.'
     : params.get('reset') === '1'
       ? 'Mot de passe mis à jour. Connectez-vous avec votre nouveau mot de passe.'
@@ -39,8 +39,8 @@ export default function SignIn() {
 
   return (
     <AuthLayout>
-      <Badge tone="accent"><FiLock /> {authKind === 'local' ? 'Connexion de démonstration' : 'Connexion par e-mail'}</Badge>
-      <h1 className="mt-4 text-3xl font-extrabold tracking-tight">Bonjour 👋</h1>
+      <Badge tone="accent"><FiLock /> {authKind === 'local' ? 'Connexion locale' : 'Connexion par e-mail'}</Badge>
+      <h1 className="mt-4 text-3xl font-extrabold tracking-tight">Bonjour</h1>
       <p className="mt-2 text-sm text-slate-500">Connectez-vous pour retrouver votre station.</p>
 
       {notice && <div className="mt-4"><Alert kind="success">{notice}</Alert></div>}
@@ -82,9 +82,9 @@ export default function SignIn() {
         <div className="flex items-start gap-2">
           <FiInfo className="mt-0.5 shrink-0 text-sky-600" />
           {authKind === 'local' ? (
-            <p><strong>Mot de passe oublié ?</strong> Aucun e-mail ni lien de récupération n’est disponible dans cette démonstration. Ne réinitialisez pas le navigateur sans avoir sauvegardé ses données.</p>
+            <p><strong>Mot de passe oublié ?</strong> Aucun e-mail ni lien de récupération n’est disponible en mode stockage navigateur.</p>
           ) : (
-            <p><strong>Mot de passe oublié ?</strong> Utilisez « Mot de passe oublié » pour demander un lien de réinitialisation Supabase Auth. L’envoi dépend de la configuration e-mail du service.</p>
+            <p><strong>Mot de passe oublié ?</strong> Utilisez « Mot de passe oublié » pour demander un lien de réinitialisation sécurisé.</p>
           )}
         </div>
       </div>

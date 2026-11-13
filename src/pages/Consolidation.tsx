@@ -39,7 +39,7 @@ export default function Consolidation() {
   const ce = compareEnabled ? compareEnd : null;
 
   useEffect(() => {
-    if (dataSource === 'supabase' && (!authReady || !identity)) return;
+    if (dataSource !== 'local' && (!authReady || !identity)) return;
     void refreshAnalytics(start, end, cs, ce).catch(() => {
       /* l'erreur est exposée par analyticsError dans le store */
     });
@@ -63,7 +63,7 @@ export default function Consolidation() {
       <PageHeader
         title="Consolidation multi-stations"
         subtitle="Graphiques Recharts, comparaison de périodes avec les mêmes définitions métier et classement par chiffre d’affaires."
-        actions={<Badge tone="accent"><FiBarChart2 /> Analytics P09</Badge>}
+        actions={<Badge tone="accent"><FiBarChart2 /> Consolidation</Badge>}
       />
 
       <div className="mb-5"><Alert kind="info">

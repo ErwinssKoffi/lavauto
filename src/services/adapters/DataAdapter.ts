@@ -23,21 +23,20 @@ import type {
 } from '../../lib/analytics';
 import type { SubscriptionAccess, SubscriptionRequest } from '../../lib/subscription';
 import { LocalDataAdapter } from './LocalDataAdapter';
+import { ApiDataAdapter } from './ApiDataAdapter';
 import { SupabaseDataAdapter, type SupabaseReader } from './SupabaseDataAdapter';
 
 // ─── Contrat de données (Prompts 03 + 05) ───────────────────────────────────
 // Prompt 03 : lectures seules (plans, bootstrap, catalogue).
 // Prompt 05 : le cœur lavages ajoute la lecture du tableau de bord et un port
 // d'écritures RPC. Les commandes passent TOUTES par des fonctions
-// SECURITY DEFINER qui déduisent le tenant du JWT ; le frontend n'envoie
-// jamais d'identifiant d'entreprise. `washCommands` est null en mode local :
-// le store continue d'appliquer ses mutations synchrones sur l'état navigateur.
+// SECURITY DEFINER ou des routes API serveur qui déduisent le tenant de la session ;
+// le frontend n'envoie jamais d'identifiant d'entreprise.
 //
 // Sécurité : aucun identifiant d'entreprise n'est jamais accepté en paramètre.
-// Le serveur le déduit de `auth.uid()` via sa fonction de contexte, et la RLS
-// filtre les lignes. Le frontend lit uniquement ce que la RLS rend visible.
+// Le serveur le déduit de la session authentifiée.
 
-export type DataSource = 'local' | 'supabase';
+export type DataSource = 'local' | 'api' | 'supabase';
 
 export interface CompanySummary {
   id: string;
@@ -104,7 +103,7 @@ export interface StationSetupSnapshot {
 }
 export type CompanySetupPatch = Partial<Pick<Company, 'name' | 'city' | 'phone'>>;
 export type StationSetupPatch = Partial<Pick<Station,
-  'name' | 'address' | 'city' | 'phone' | 'hours' | 'paymentMethods' | 'commissionRate' | 'monthlyTarget'>>;
+  'name' | 'address' | 'city' | 'phone' | 'hours' | 'paymentMethods' | 'cashRequiresOpen' | 'maxCashierDiscount' | 'commissionRate' | 'monthlyTarget'>>;
 
 /** Commandes réservées aux RPC vérifiant les permissions et la station côté serveur. */
 export interface SetupCommands {
@@ -307,8 +306,9 @@ export interface DataAdapter {
 export function resolveDataSource(raw: string | undefined | null): DataSource {
   const value = (raw ?? '').trim().toLowerCase();
   if (value === '' || value === 'local') return 'local';
+  if (value === 'api') return 'api';
   if (value === 'supabase') return 'supabase';
-  throw new Error(`VITE_DATA_SOURCE invalide : « ${raw} ». Utilisez local ou supabase.`);
+  throw new Error(`VITE_DATA_SOURCE invalide : « ${raw} ». Utilisez local, api ou supabase.`);
 }
 
 /** `import.meta.env` n'existe que dans Vite ; garde-fou pour les tests Node. */
@@ -324,12 +324,12 @@ export function getDataSource(): DataSource {
 }
 
 /**
- * Sélection de l'adaptateur. `local` est le défaut : rollback immédiat et
- * démonstration inchangée. `supabase` exige un client configuré avec la clé
- * PUBLISHABLE, jamais la clé service_role.
+ * Sélection de l'adaptateur : `api` en production par défaut, `supabase` si configuré,
+ * ou `local` uniquement pour les tests isolés.
  */
 export function getDataAdapter(getState: () => AppState): DataAdapter {
   const source = getDataSource();
+  if (source === 'api') return new ApiDataAdapter();
   if (source === 'local') return new LocalDataAdapter(getState);
   if (!isSupabaseConfigured || !supabase) {
     throw new Error(

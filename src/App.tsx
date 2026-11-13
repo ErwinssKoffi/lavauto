@@ -9,6 +9,7 @@ import { permissionForRoles } from './lib/permissionCatalog';
 import { permissionFeature } from './lib/subscription';
 import { LoadingState } from './components/feedback';
 import { ROLE_LABELS, type Role } from './types';
+import { OfflineIndicator } from './components/PwaControls';
 
 import Landing from './pages/Landing';
 import SignIn from './pages/auth/SignIn';
@@ -142,6 +143,7 @@ export default function App() {
   return (
     <SessionGate>
       <ToastHost />
+      <OfflineIndicator />
       <React.Suspense fallback={<LoadingState label="Chargement de l’écran…" />}>
       <Routes>
         <Route path="/" element={<LandingRoute />} />

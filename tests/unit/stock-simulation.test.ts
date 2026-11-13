@@ -149,31 +149,18 @@ afterEach(async () => {
 });
 
 describe('commandes de stock réservées à la démonstration locale', () => {
-  it('affiche des simulations explicites et met à jour les alertes uniquement dans le navigateur', async () => {
+  it('édite le seuil localement sans boutons de simulation et met à jour les alertes', async () => {
     await mount(fixture(false)); // demoMode ne sert pas de garde : une Auth locale peut le laisser à false.
     expect(store.isLocalStockDemo).toBe(true);
     expect(store.state.demoMode).toBe(false);
     const settings = section('#test-settings #stock');
-    expect(settings.textContent).toContain('Démonstration locale');
-    expect(settings.textContent).toContain('Aucun mouvement n’est envoyé au serveur');
-    expect(settings.textContent).toContain('Simulation locale');
-
-    await click(byLabel(settings, 'Simuler une consommation de 1 L pour Shampoing'));
-    expect(store.state.stockLevels[0].qtyOnHand).toBe(1);
-    expect(store.state.stockAlerts[0].qtyOnHand).toBe(1);
-    expect(store.state.stockMovements[0]).toMatchObject({ referenceType: 'quick_adjustment', qtyDelta: -1 });
-    expect(store.toasts[store.toasts.length - 1]?.message).toContain('Simulation locale');
+    expect(settings.querySelectorAll('button[aria-label^="Simuler"]')).toHaveLength(0);
 
     await click(byText(section('#test-banner'), 'Voir les niveaux'));
     const banner = section('#test-banner');
-    expect(banner.textContent).toContain('simulation locale');
-    await click(byLabel(banner, 'Simuler un réapprovisionnement de 5 L pour Shampoing'));
-    expect(store.state.stockLevels[0].qtyOnHand).toBe(6);
-    expect(store.state.stockMovements[0]).toMatchObject({ referenceType: 'quick_adjustment', qtyDelta: 5 });
-    expect(store.state.stockAlerts).toHaveLength(0);
+    expect(banner.textContent).not.toContain('simulation locale');
+    expect(banner.querySelectorAll('button[aria-label^="Simuler"]')).toHaveLength(0);
 
-    await click(byLabel(settings, 'Simuler un réapprovisionnement de 5 L pour Shampoing'));
-    expect(store.state.stockLevels[0].qtyOnHand).toBe(11);
     const input = settings.querySelector<HTMLInputElement>('#stock-threshold-product-1');
     expect(input).not.toBeNull();
     await act(async () => {
@@ -183,7 +170,7 @@ describe('commandes de stock réservées à la démonstration locale', () => {
     });
     expect(store.state.products[0].reorderLevel).toBe(12);
     expect(store.state.stockLevels[0].reorderLevel).toBe(12);
-    expect(store.state.stockAlerts[0]).toMatchObject({ qtyOnHand: 11, reorderLevel: 12 });
+    expect(store.state.stockAlerts[0]).toMatchObject({ qtyOnHand: 2, reorderLevel: 12 });
     expect(fake.rpc).not.toHaveBeenCalled();
   });
 
@@ -222,7 +209,7 @@ describe('commandes de stock réservées à la démonstration locale', () => {
       expect(settings.textContent).toContain('Aucun produit configuré');
     } else {
       expect(settings.textContent).toContain('Shampoing');
-      expect(settings.textContent).toContain('Seuils en lecture seule');
+      expect(settings.textContent).toContain('module Stocks & achats');
       await click(byText(section('#test-banner'), 'Voir les niveaux'));
       const banner = section('#test-banner');
       expect(banner.textContent).toContain('Voir le seuil');
@@ -262,7 +249,7 @@ describe('commandes de stock réservées à la démonstration locale', () => {
     await mount(fixture(true));
     expect(store.isLocalStockDemo).toBe(false);
     expect(store.isServerStock).toBe(false);
-    expect(section('#test-settings #stock').textContent).toContain('les opérations sont bloquées');
+    expect(section('#test-settings #stock').textContent).toContain('Aucun produit configuré');
     await act(async () => {
       expect(() => store.adjustProductStock(product.id, 7)).toThrow(/mode démo local/);
       expect(() => store.updateStockThreshold(product.id, 12)).toThrow(/mode démo local/);
@@ -337,13 +324,12 @@ describe('commandes de stock réservées à la démonstration locale', () => {
     expect(section('#test-settings #stock').textContent).toContain('Aucun produit configuré');
   });
 
-  it('conserve les exemples uniquement dans une démonstration locale sans produits', async () => {
+  it('n’ajoute aucun produit fictif lorsque le catalogue local est vide', async () => {
     await mount({ ...baseState(), products: [], stockLevels: [], stockMovements: [], demoMode: false });
     expect(store.isLocalStockDemo).toBe(true);
-    expect(store.state.products).toHaveLength(5);
-    expect(store.state.products.every((p) => p.id.startsWith('prod-init-'))).toBe(true);
-    expect(store.state.stockAlerts.length).toBeGreaterThan(0);
-    expect(section('#test-settings #stock').textContent).toContain('Simulation locale');
+    expect(store.state.products).toHaveLength(0);
+    expect(store.state.stockAlerts).toHaveLength(0);
+    expect(section('#test-settings #stock').textContent).toContain('Aucun produit configuré');
   });
 
   it('laisse les commandes de réception, consommation et inventaire passer par les RPC existantes', async () => {

@@ -77,7 +77,7 @@ export default function Stock() {
     <div>
       <PageHeader title="Stocks & achats" subtitle="Produits, fournisseurs, commandes, réceptions partielles, inventaires et mouvements valorisés."
         actions={<div className="flex gap-2">
-          {dataSource === 'supabase' && <button className="wg-btn wg-btn-ghost" onClick={() => { void refreshStock().catch(() => {}); }}><FiRefreshCw /> Actualiser</button>}
+          {dataSource !== 'local' && <button className="wg-btn wg-btn-ghost" onClick={() => { void refreshStock().catch(() => {}); }}><FiRefreshCw /> Actualiser</button>}
           <button className="wg-btn wg-btn-primary" disabled={!canOperate} onClick={() => openModal('product')}><FiPlus /> Nouveau produit</button>
         </div>} />
 

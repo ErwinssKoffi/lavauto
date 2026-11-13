@@ -15,7 +15,7 @@ export default function Subscription() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const periodStart = quotaMonthStartISO();
-  const connected = dataSource === 'supabase' && authKind === 'supabase';
+  const connected = (dataSource === 'supabase' && authKind === 'supabase') || (dataSource === 'api' && authKind === 'api');
   useEffect(() => {
     if (connected && (!authReady || !identity)) return;
     void refreshSubscriptionUsage(periodStart).catch(() => { /* l'absence de relevé reste visible */ });

@@ -97,18 +97,32 @@ export function Badge({ children, tone = 'neutral' }: { children: React.ReactNod
   return <span className={`wg-badge ${cls}`}>{children}</span>;
 }
 
-export function StatCard({ label, value, hint, icon, accent }: { label: string; value: string; hint?: string; icon?: React.ReactNode; accent?: string }) {
+export function StatCard({ label, value, hint, icon, accent, sparkline }: {
+  label: string;
+  value: string;
+  hint?: string;
+  icon?: React.ReactNode;
+  accent?: string;
+  sparkline?: React.ReactNode;
+}) {
   return (
-    <Card className="flex items-start justify-between gap-3">
-      <div className="min-w-0">
-        <p className="wg-muted text-xs font-semibold uppercase tracking-wide">{label}</p>
-        <p className="mt-2 truncate text-xl font-bold tracking-tight sm:text-2xl">{value}</p>
-        {hint && <p className="wg-muted mt-1 truncate text-xs">{hint}</p>}
+    <Card className="flex h-full flex-col justify-between gap-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="wg-muted text-xs font-semibold uppercase tracking-wide">{label}</p>
+          <p className="mt-2 truncate text-xl font-bold tracking-tight sm:text-2xl">{value}</p>
+          {hint && <p className="wg-muted mt-1 truncate text-xs">{hint}</p>}
+        </div>
+        {icon && (
+          <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl text-lg ${accent ?? 'bg-sky-500/10 text-sky-400'}`}>
+            {icon}
+          </span>
+        )}
       </div>
-      {icon && (
-        <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl text-lg ${accent ?? 'bg-sky-500/10 text-sky-400'}`}>
-          {icon}
-        </span>
+      {sparkline && (
+        <div className="border-t pt-2.5" style={{ borderColor: 'var(--wg-border)' }}>
+          {sparkline}
+        </div>
       )}
     </Card>
   );

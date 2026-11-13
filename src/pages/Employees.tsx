@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FiKey, FiMail, FiPlus, FiSettings, FiTrash2, FiUserCheck, FiUserX, FiX } from 'react-icons/fi';
+import { FiCheck, FiCopy, FiKey, FiMail, FiPlus, FiSettings, FiTrash2, FiUserCheck, FiUserX, FiX } from 'react-icons/fi';
 import { useStore } from '../lib/store';
 import { usePermissions } from '../lib/usePermissions';
 import { formatDate, formatFCFA } from '../lib/format';
@@ -10,7 +10,7 @@ const INVITABLE: Role[] = ['gerant', 'caissier', 'laveur'];
 
 export default function Employees() {
   const {
-    state, identity, invitations, authKind, isLocalStockDemo, canWriteSubscription, notify,
+    state, identity, invitations, authKind, dataSource, isLocalStockDemo, canWriteSubscription, notify,
     employeeReadWarning, unconfirmedInvitation, unconfirmedAccountUpdate, unconfirmedRevocation, revocationRecoveryLoading, revocationRecoveryError, refreshEmployeeData,
     inviteUser, updateUser, updateEmployee, requestPasswordReset, revokeInvitation,
   } = useStore();
@@ -19,8 +19,11 @@ export default function Employees() {
   const stations = identity?.stations ?? [];
   const defaultStation = stations[0]?.id ?? state.station?.id ?? '';
   const [open, setOpen] = useState(false);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [resetTarget, setResetTarget] = useState<string | null>(null);
+  const [resetLink, setResetLink] = useState<string | null>(null);
+  const [copiedUrl, setCopiedUrl] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [f, setF] = useState<{ name: string; email: string; phone: string; role: Role; stationIds: string[] }>({
@@ -48,19 +51,34 @@ export default function Employees() {
   const selected = (event: React.ChangeEvent<HTMLSelectElement>): string[] =>
     Array.from(event.target.selectedOptions).map((option) => option.value);
 
+  const copyLink = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedUrl(true);
+      setTimeout(() => setCopiedUrl(false), 2000);
+    } catch {
+      notify('info', 'Copiez manuellement le lien affiché.');
+    }
+  };
+
   const submitInvite = async () => {
     if (!canEditEmployees || busy) return;
     if (!f.name.trim() || !f.email.trim()) return notify('error', 'Remplissez le nom et l’adresse e-mail.');
     if (f.stationIds.length === 0) return notify('error', 'Affectez au moins une station.');
     setBusy(true);
     try {
-      await inviteUser({
+      const res = await inviteUser({
         fullName: f.name, email: f.email, phone: f.phone,
         role: f.role, stationIds: f.stationIds,
       });
-      setOpen(false);
       setF({ name: '', email: '', phone: '', role: 'caissier',
         stationIds: defaultStation ? [defaultStation] : [] });
+      if (res?.inviteUrl) {
+        setInviteLink(res.inviteUrl);
+        setCopiedUrl(false);
+      } else {
+        setOpen(false);
+      }
     } catch (err) {
       notify('error', err instanceof Error ? err.message : 'Invitation impossible.');
     } finally { setBusy(false); }
@@ -99,9 +117,15 @@ export default function Employees() {
     if (!resetUser || !canEditEmployees || busy) return;
     setBusy(true);
     try {
-      await requestPasswordReset(resetUser.email);
-      setResetTarget(null);
-      notify('success', 'Lien de réinitialisation envoyé si ce compte existe.');
+      const res = await requestPasswordReset(resetUser.email);
+      if (res?.resetUrl) {
+        setResetLink(res.resetUrl);
+        setCopiedUrl(false);
+        notify('success', 'Lien de réinitialisation généré.');
+      } else {
+        setResetTarget(null);
+        notify('success', 'Lien de réinitialisation envoyé si ce compte existe.');
+      }
     } catch (err) {
       notify('error', err instanceof Error ? err.message : 'Réinitialisation impossible.');
     } finally { setBusy(false); }
@@ -131,8 +155,8 @@ export default function Employees() {
 
   return (
     <div>
-      <PageHeader title="Employés" subtitle="Comptes et rôles, affectations multi-stations, invitations, activation / désactivation et liens de réinitialisation Supabase Auth."
-        actions={canInvite ? <button className="wg-btn wg-btn-primary" disabled={!canEditEmployees || busy} onClick={() => setOpen(true)}><FiPlus /> Inviter un employé</button> : null} />
+      <PageHeader title="Employés" subtitle="Comptes et rôles, affectations multi-stations, invitations, activation / désactivation et liens de réinitialisation."
+        actions={canInvite ? <button className="wg-btn wg-btn-primary" disabled={!canEditEmployees || busy} onClick={() => { setInviteLink(null); setOpen(true); }}><FiPlus /> Inviter un employé</button> : null} />
 
       {revocationRecoveryLoading && <div role="status" className="mb-5"><Alert kind="info">Vérification des révocations précédentes dans cet onglet…</Alert></div>}
       {revocationRecoveryError && <div role="alert" className="mb-5"><Alert kind="warn">
@@ -157,8 +181,8 @@ export default function Employees() {
             || !invitations.some((invitation) => invitation.id === unconfirmedRevocation.id)}
           onClick={() => setRevokeTarget(unconfirmedRevocation.id)}>Reprendre la même révocation</button>
       </Alert></div>}
-      <div className="mb-5"><Alert kind="info">Aucun mot de passe n’est stocké dans WashGuard. Un nouvel employé reçoit une invitation et définit son mot de passe via Supabase Auth ; un mot de passe oublié se réinitialise avec un lien e-mail signé, jamais avec un mot de passe provisoire.</Alert></div>
-      {authKind === 'local' && <div className="mb-5"><Alert kind="warn">Mode démonstration locale : aucun e-mail n’est envoyé. Le lien de réinitialisation réel est disponible avec la source Supabase.</Alert></div>}
+      <div className="mb-5"><Alert kind="info">Chaque nouvel employé reçoit une invitation et définit son propre mot de passe ; un mot de passe oublié se réinitialise uniquement via un lien sécurisé à usage unique.</Alert></div>
+      {authKind === 'local' && <div className="mb-5"><Alert kind="warn">Mode stockage navigateur : aucun e-mail n’est envoyé sans serveur connecté.</Alert></div>}
 
       <Card className="!p-0 overflow-hidden">
         <div className="wg-scroll-x">
@@ -181,16 +205,23 @@ export default function Employees() {
                     <td className="wg-td">{formatDate(u.createdAt)}</td>
                     <td className="wg-td">{washes.length} lavage(s) · {formatFCFA(washes.reduce((sum, w) => sum + w.total, 0))}</td>
                     <td className="wg-td">
-                      {isLocalStockDemo ? <>
-                        <input type="number" min="0" max="100" placeholder="Barème station" className="wg-input !w-28 !py-1 text-xs"
-                          disabled={!canEditEmployees || busy} value={u.commissionRateOverride ?? ''} onChange={(e) => { const rate = e.target.value === '' ? null : Number(e.target.value); void safe(() => updateEmployee(u.id, { commissionRateOverride: rate })); }} />
+                      {isLocalStockDemo || (dataSource === 'api' && canManage) ? <>
+                        <input key={`${u.id}:${u.commissionRateOverride ?? ''}`} type="number" min="0" max="100" placeholder="Barème station" className="wg-input !w-28 !py-1 text-xs"
+                          disabled={!canEditEmployees || busy} defaultValue={u.commissionRateOverride ?? ''}
+                          onBlur={(e) => {
+                            const rate = e.target.value === '' ? null : Number(e.target.value);
+                            if (rate !== (u.commissionRateOverride ?? null)) {
+                              void safe(() => updateEmployee(u.id, { commissionRateOverride: rate }));
+                            }
+                          }}
+                          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }} />
                         <p className="wg-muted mt-1 text-[10px]">Vide = barème de la station</p>
-                      </> : <p className="wg-muted text-xs">Réglage individuel indisponible ici en mode connecté.</p>}
+                      </> : <p className="wg-muted text-xs">Barème individuel : {u.commissionRateOverride !== undefined && u.commissionRateOverride !== null ? `${u.commissionRateOverride} %` : 'barème station'}</p>}
                     </td>
                     <td className="wg-td"><Badge tone={u.active ? 'success' : 'danger'}>{u.active ? 'Actif' : 'Désactivé'}</Badge></td>
                     <td className="wg-td">
                       <div className="flex gap-1.5">
-                        {canReset && <button className="wg-btn wg-btn-ghost !px-2 !py-1 text-[11px]" disabled={!canEditEmployees || busy} title="Envoyer un lien de réinitialisation" onClick={() => setResetTarget(u.id)}><FiKey /></button>}
+                        {canReset && <button className="wg-btn wg-btn-ghost !px-2 !py-1 text-[11px]" disabled={!canEditEmployees || busy} title="Envoyer un lien de réinitialisation" onClick={() => { setResetLink(null); setResetTarget(u.id); }}><FiKey /></button>}
                         {canManage && u.role !== 'proprietaire' && <button className="wg-btn wg-btn-ghost !px-2 !py-1 text-[11px]" disabled={!canEditEmployees || busy} title="Rôle, état et stations" onClick={() => openEdit(u.id)}><FiSettings /></button>}
                         {canDisable && u.role !== 'proprietaire' && (
                           <button className="wg-btn wg-btn-ghost !px-2 !py-1 text-[11px]" disabled={!canEditEmployees || busy} title={u.active ? 'Désactiver' : 'Activer'}
@@ -233,36 +264,53 @@ export default function Employees() {
         </Card>
       )}
 
-      <Modal open={open} onClose={() => { if (!busy) setOpen(false); }} title="Inviter un employé">
-        <fieldset disabled={!canEditEmployees || busy} className="min-w-0 space-y-3">
-          <Input label="Nom complet *" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Input label="Adresse e-mail *" type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
-            <Input label="Téléphone" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} />
+      <Modal open={open} onClose={() => { if (!busy) { setOpen(false); setInviteLink(null); } }} title="Inviter un employé">
+        {inviteLink ? (
+          <div className="space-y-4">
+            <Alert kind="success">Invitation enregistrée. Partagez ce lien sécurisé avec l’employé pour qu’il active son compte et choisisse son mot de passe :</Alert>
+            <div className="rounded-xl border p-3 text-xs break-all" style={{ borderColor: 'var(--wg-border)', background: 'var(--wg-surface-2)' }}>{inviteLink}</div>
+            <div className="flex justify-end gap-2">
+              <button type="button" className="wg-btn wg-btn-ghost" onClick={() => { void copyLink(inviteLink); }}>
+                {copiedUrl ? <FiCheck /> : <FiCopy />} {copiedUrl ? 'Lien copié' : 'Copier le lien'}
+              </button>
+              <button type="button" className="wg-btn wg-btn-primary" onClick={() => { setOpen(false); setInviteLink(null); }}>Fermer</button>
+            </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Select label="Rôle" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value as Role })}>
-              {INVITABLE.map((role) => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}
-            </Select>
-            <Select label="Stations * (sélection multiple)" multiple size={Math.min(4, Math.max(2, stations.length))}
-              value={f.stationIds} onChange={(e) => setF({ ...f, stationIds: selected(e) })}>
-              {stations.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </Select>
-          </div>
-          <p className="wg-muted text-xs">Le collaborateur reçoit un lien pour définir son propre mot de passe. Aucun mot de passe provisoire n’est créé.</p>
-        </fieldset>
-        <div className="mt-5 flex justify-end gap-2">
-          <button className="wg-btn wg-btn-ghost" disabled={busy} onClick={() => setOpen(false)}><FiX /> Annuler</button>
-          <button className="wg-btn wg-btn-primary" disabled={busy || !canEditEmployees} onClick={() => { void submitInvite(); }}><FiPlus /> {busy ? 'Invitation en cours…' : 'Envoyer l’invitation'}</button>
-        </div>
+        ) : (
+          <>
+            <fieldset disabled={!canEditEmployees || busy} className="min-w-0 space-y-3">
+              <Input label="Nom complet *" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Input label="Adresse e-mail *" type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
+                <Input label="Téléphone" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Select label="Rôle" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value as Role })}>
+                  {INVITABLE.map((role) => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}
+                </Select>
+                <Select label="Stations * (sélection multiple)" multiple size={Math.min(4, Math.max(2, stations.length))}
+                  value={f.stationIds} onChange={(e) => setF({ ...f, stationIds: selected(e) })}>
+                  {stations.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </Select>
+              </div>
+              <p className="wg-muted text-xs">Le collaborateur reçoit un lien pour définir son propre mot de passe.</p>
+            </fieldset>
+            <div className="mt-5 flex justify-end gap-2">
+              <button className="wg-btn wg-btn-ghost" disabled={busy} onClick={() => setOpen(false)}><FiX /> Annuler</button>
+              <button className="wg-btn wg-btn-primary" disabled={busy || !canEditEmployees} onClick={() => { void submitInvite(); }}><FiPlus /> {busy ? 'Invitation en cours…' : 'Envoyer l’invitation'}</button>
+            </div>
+          </>
+        )}
       </Modal>
 
       <Modal open={Boolean(revoking)} onClose={() => { if (!busy) setRevokeTarget(null); }} title="Révoquer l’invitation">
         <p className="text-sm">Révoquer l’invitation de <strong>{revoking?.email}</strong> désactive aussi son accès à l’application.</p>
         {authKind === 'supabase' ? (
-          <p className="wg-muted mt-3 text-xs">Le compte, le lien et les sessions Supabase Auth ne sont pas supprimés. Réactiver le compte peut lui rendre l’accès. Une invitation ancienne sans compte lié nécessite une vérification par le support.</p>
+          <p className="wg-muted mt-3 text-xs">Le compte, le lien et les sessions Supabase Auth ne sont pas supprimés. Réactiver le compte peut lui rendre l’accès.</p>
+        ) : authKind === 'api' ? (
+          <p className="wg-muted mt-3 text-xs">Les jetons d’invitation associés sont invalidés et l’accès du compte est désactivé sur le serveur.</p>
         ) : (
-          <p className="wg-muted mt-3 text-xs">En démonstration, aucun e-mail ni compte Auth réel n’est créé.</p>
+          <p className="wg-muted mt-3 text-xs">Mode stockage navigateur : l’invitation locale est marquée révoquée.</p>
         )}
         {!canWriteSubscription && <p className="mt-3 text-xs text-amber-500">Abonnement en lecture seule : révocation indisponible.</p>}
         {unconfirmedRevocation?.id === revokeTarget && <div className="mt-3"><Alert kind="warn">{unconfirmedRevocation.message}</Alert></div>}
@@ -295,13 +343,28 @@ export default function Employees() {
         </div>
       </Modal>
 
-      <Modal open={Boolean(resetUser)} onClose={() => { if (!busy) setResetTarget(null); }} title="Lien de réinitialisation">
-        <p className="wg-muted mb-4 text-sm">Un lien signé sera envoyé à <strong>{resetUser?.email}</strong>. Vous ne verrez jamais le nouveau mot de passe.</p>
-        {!canWriteSubscription && <Alert kind="warn">En lecture seule, l’envoi depuis cet écran est suspendu. Chaque utilisateur peut toujours récupérer son propre accès depuis la page de connexion.</Alert>}
-        <div className="mt-5 flex justify-end gap-2">
-          <button className="wg-btn wg-btn-ghost" disabled={busy} onClick={() => setResetTarget(null)}>Annuler</button>
-          <button className="wg-btn wg-btn-primary" disabled={busy || !canEditEmployees} onClick={() => { void submitReset(); }}><FiMail /> {busy ? 'Envoi en cours…' : 'Envoyer le lien'}</button>
-        </div>
+      <Modal open={Boolean(resetUser)} onClose={() => { if (!busy) { setResetTarget(null); setResetLink(null); } }} title="Lien de réinitialisation">
+        {resetLink ? (
+          <div className="space-y-4">
+            <Alert kind="success">Lien de réinitialisation à usage unique pour <strong>{resetUser?.email}</strong> :</Alert>
+            <div className="rounded-xl border p-3 text-xs break-all" style={{ borderColor: 'var(--wg-border)', background: 'var(--wg-surface-2)' }}>{resetLink}</div>
+            <div className="flex justify-end gap-2">
+              <button type="button" className="wg-btn wg-btn-ghost" onClick={() => { void copyLink(resetLink); }}>
+                {copiedUrl ? <FiCheck /> : <FiCopy />} {copiedUrl ? 'Lien copié' : 'Copier le lien'}
+              </button>
+              <button type="button" className="wg-btn wg-btn-primary" onClick={() => { setResetTarget(null); setResetLink(null); }}>Fermer</button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <p className="wg-muted mb-4 text-sm">Un lien signé sera généré pour <strong>{resetUser?.email}</strong>. Vous ne verrez jamais le nouveau mot de passe.</p>
+            {!canWriteSubscription && <Alert kind="warn">En lecture seule, l’envoi depuis cet écran est suspendu. Chaque utilisateur peut toujours récupérer son propre accès depuis la page de connexion.</Alert>}
+            <div className="mt-5 flex justify-end gap-2">
+              <button className="wg-btn wg-btn-ghost" disabled={busy} onClick={() => setResetTarget(null)}>Annuler</button>
+              <button className="wg-btn wg-btn-primary" disabled={busy || !canEditEmployees} onClick={() => { void submitReset(); }}><FiMail /> {busy ? 'Génération…' : 'Générer / envoyer le lien'}</button>
+            </div>
+          </>
+        )}
       </Modal>
     </div>
   );

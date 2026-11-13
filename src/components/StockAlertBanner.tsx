@@ -1,14 +1,12 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  FiAlertTriangle, FiChevronDown, FiChevronUp, FiPlus, FiSettings, FiX,
+  FiAlertTriangle, FiChevronDown, FiChevronUp, FiSettings, FiX,
 } from 'react-icons/fi';
 import { useStore } from '../lib/store';
-import { useSafeAction } from './ui';
 
 export default function StockAlertBanner() {
-  const { state, adjustProductStock, isLocalStockDemo, canWriteSubscription } = useStore();
-  const safe = useSafeAction();
+  const { state, dataSource, isLocalStockDemo } = useStore();
   const [expanded, setExpanded] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
@@ -140,20 +138,14 @@ export default function StockAlertBanner() {
                       to="/app/parametres#stock"
                       className="wg-link flex items-center gap-1 text-[11px]"
                     >
-                      <FiSettings size={12} /> {isLocalStockDemo ? 'Modifier seuil' : 'Voir le seuil'}
+                      <FiSettings size={12} /> {dataSource === 'api' || isLocalStockDemo ? 'Modifier le seuil' : 'Voir le seuil'}
                     </Link>
-                    {isLocalStockDemo && (
-                      <button
-                        type="button"
-                        onClick={() => { void safe(() => adjustProductStock(item.productId, item.qtyOnHand + 5)); }}
-                        disabled={!canWriteSubscription}
-                        className="flex items-center gap-1 rounded bg-sky-500/20 px-2 py-0.5 font-semibold text-sky-300 hover:bg-sky-500/30"
-                        title="Simuler un réapprovisionnement dans ce navigateur"
-                        aria-label={`Simuler un réapprovisionnement de 5 ${unit} pour ${item.name}`}
-                      >
-                        <FiPlus size={11} aria-hidden="true" /> 5 {unit} (simulation locale)
-                      </button>
-                    )}
+                    <Link
+                      to="/app/stock"
+                      className="wg-link text-[11px] font-semibold"
+                    >
+                      Enregistrer un achat / mouvement →
+                    </Link>
                   </div>
                 </div>
               );

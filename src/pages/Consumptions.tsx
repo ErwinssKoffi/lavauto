@@ -26,7 +26,7 @@ export default function Consumptions() {
     <div>
       <PageHeader title="Consommations" subtitle="Normes produit × prestation, consommation théorique valorisée une seule fois par lavage et coût de revient certifiable."
         actions={<div className="flex gap-2">
-          {dataSource === 'supabase' && <button className="wg-btn wg-btn-ghost" onClick={() => { void refreshStock().catch(() => {}); }}><FiRefreshCw /> Actualiser</button>}
+          {dataSource !== 'local' && <button className="wg-btn wg-btn-ghost" onClick={() => { void refreshStock().catch(() => {}); }}><FiRefreshCw /> Actualiser</button>}
           <button className="wg-btn wg-btn-primary" disabled={!canOperate || state.stockServices.length === 0 || state.products.length === 0} onClick={() => setOpen(true)}><FiPlus /> Nouvelle norme</button>
         </div>} />
 
