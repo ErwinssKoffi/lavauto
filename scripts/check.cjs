@@ -100,8 +100,25 @@ if (MODE === 'supabase') {
     });
   };
 }
+// Vite fournit `virtual:pwa-register` via vite-plugin-pwa ; esbuild ne connaît
+// pas ce module virtuel. Sans cet alias, le bundle de `src/main.tsx` échoue et
+// tout le harnais DOM tombe alors que le code applicatif est sain.
+const PWA_REGISTER_STUB = 'export function registerSW() { return function updateSW() {}; }';
+const viteVirtualModules = {
+  name: 'wg-vite-virtual-modules',
+  setup(build) {
+    build.onResolve({ filter: /^virtual:pwa-register$/ }, () => ({
+      path: 'pwa-register', namespace: 'wg-virtual',
+    }));
+    build.onLoad({ filter: /.*/, namespace: 'wg-virtual' }, () => ({
+      contents: PWA_REGISTER_STUB, loader: 'js',
+    }));
+  },
+};
+
 const buildWith = (stdin, define=DEFINE) => esbuild.build({ stdin, bundle:true, write:false, platform:'node', format:'cjs', target:'node22',
-  loader:{'.css':'empty'}, define, jsx:'automatic', absWorkingDir:ROOT, logLevel:'silent' });
+  loader:{'.css':'empty'}, define, jsx:'automatic', absWorkingDir:ROOT, logLevel:'silent',
+  plugins:[viteVirtualModules] });
 const build = (stdin) => buildWith(stdin);
 
 let pass = 0, fail = 0;

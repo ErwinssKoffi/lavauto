@@ -21,6 +21,17 @@
 | `VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` | absents | **GitHub Secrets** |
 | `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` | `.env.local` ignoré | **GitHub Variables** (ou Secrets) |
 
+### Serveur Node `api` — variables d'environnement
+
+Le mode `VITE_DATA_SOURCE=api` démarre `server.ts` (Express + PGlite). Deux variables conditionnent sa sûreté :
+
+| Variable | Rôle | Valeur attendue |
+| --- | --- | --- |
+| `WASHGUARD_PGDATA` | Répertoire du cluster PGlite (défaut `./.washguard/pgdata`, ignoré par Git) | Chemin **persistant**. Un répertoire absent ou incomplet provoque un repli mémoire : `/api/health` répond alors `503` avec `database.mode = "memory"` et le démarrage affiche un avertissement explicite. |
+| `WASHGUARD_DEMO_RESET` | Renvoie le lien de réinitialisation dans la réponse HTTP de `/api/auth/forgot-password` (aucun e-mail n'est envoyé par ce serveur) | `1` **uniquement** en sandbox ou en test local. **Vide en production et en préproduction** : sinon un appelant anonyme peut réinitialiser le mot de passe d'un tiers et prendre le contrôle du compte. |
+
+`/api/health` expose `database` et `demoReset` : une sonde de déploiement doit exiger `ok: true`, c'est-à-dire `database.mode === "disk"`.
+
 Aucune clé `service_role`, aucun secret Supabase, aucun `sb_secret` et aucun mot de passe ne doit être exposé au navigateur ni versionné. Les valeurs `VITE_DATA_SOURCE`, `VITE_SUPABASE_STORAGE_BUCKET` et `VITE_WG_TEST_AUTH` sont fixées directement dans `.github/workflows/deploy.yml` ; elles ne sont pas des secrets.
 
 ### Secrets et variables à créer dans GitHub

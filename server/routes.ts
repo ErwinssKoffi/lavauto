@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import express, { type Request, type Response } from 'express';
-import { getDb } from './db';
+import { getDb, getDatabaseStatus } from './db';
 import {
   attachIdentity,
   clearSessionCookie,
@@ -145,6 +145,16 @@ import {
   type WashQualityResult,
   type WashStatus,
 } from '../src/types';
+
+/**
+ * Le renvoi du lien de réinitialisation dans la réponse HTTP est une commodité
+ * de DÉMONSTRATION (aucun e-mail n'est envoyé par ce serveur). Il est désactivé
+ * par défaut et interdit en production : sans lui, un appelant anonyme ne peut
+ * plus réinitialiser le mot de passe d'un tiers et prendre le contrôle du compte.
+ */
+function demoResetEnabled(): boolean {
+  return process.env.WASHGUARD_DEMO_RESET === '1' && process.env.NODE_ENV !== 'production';
+}
 
 // ─── Per-company async serialization mutex ───────────────────────────────────
 const companyLocks = new Map<string, Promise<unknown>>();
@@ -775,8 +785,18 @@ export function createApiRouter(): express.Router {
   router.use(attachIdentity);
 
   router.get('/health', wrap(async (_req, res) => {
+    // Initialise la base (et donc l'état réel) avant d'exposer le diagnostic.
     await getDb();
-    res.json({ ok: true, service: 'washguard-api', time: new Date().toISOString() });
+    const status = getDatabaseStatus();
+    // Un repli mémoire non signalé ferait perdre les données au redémarrage :
+    // l'état est donc exposé, et le code HTTP le reflète pour les sondes.
+    res.status(status.mode === 'memory' ? 503 : 200).json({
+      ok: status.mode !== 'memory',
+      service: 'washguard-api',
+      time: new Date().toISOString(),
+      database: status,
+      demoReset: demoResetEnabled(),
+    });
   }));
 
   router.get('/plans', wrap(async (_req, res) => {
@@ -918,8 +938,17 @@ export function createApiRouter(): express.Router {
       return;
     }
     const rawToken = await createActionToken(user.id, 'reset_password', 24);
+    // Le jeton n'est renvoyé au client QUE si la démonstration locale le permet
+    // explicitement (`WASHGUARD_DEMO_RESET=1`) et jamais en production. Sinon,
+    // n'importe quel appelant non authentifié pourrait réinitialiser le mot de
+    // passe d'autrui et prendre le contrôle du compte.
+    if (!demoResetEnabled()) {
+      res.json({ ok: true });
+      return;
+    }
     res.json({
       ok: true,
+      demoMode: true,
       resetUrl: `/reinitialiser-mot-de-passe?token=${encodeURIComponent(rawToken)}`,
     });
   }));
@@ -961,7 +990,18 @@ export function createApiRouter(): express.Router {
     }
 
     await db.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hashPassword(password), userId]);
-    res.json({ ok: true });
+    // Un changement de mot de passe doit invalider les sessions déjà ouvertes,
+    // y compris celle de l'attaquant qui aurait volé un cookie. Les jetons de
+    // réinitialisation encore valides sont consommés dans la même foulée.
+    await db.query('DELETE FROM sessions WHERE user_id = $1', [userId]);
+    await db.query(
+      'UPDATE action_tokens SET used_at = COALESCE(used_at, NOW()) WHERE user_id = $1 AND kind = $2',
+      [userId, 'reset_password'],
+    );
+    // La session courante (si le changement vient d'un compte connecté) est
+    // fermée aussi : le frontend re-authentifie proprement.
+    clearSessionCookie(res);
+    res.json({ ok: true, sessionsRevoked: true });
   }));
 
   // ─── Employees & Invitations ───────────────────────────────────────────────

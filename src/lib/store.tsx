@@ -351,7 +351,7 @@ interface Ctx {
   signUp: (p: SignUpPayload) => Promise<AuthResult>;
   signIn: (email: string, password: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
-  requestPasswordReset: (email: string) => Promise<{ resetUrl?: string } | void>;
+  requestPasswordReset: (email: string) => Promise<{ resetUrl?: string; demoMode?: boolean } | void>;
   updatePassword: (password: string, token?: string) => Promise<void>;
   inviteUser: (p: InvitePayload) => Promise<{ id: string; message?: string; inviteUrl?: string }>;
   revokeInvitation: (id: string) => Promise<void>;

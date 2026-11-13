@@ -11,6 +11,7 @@ export default function ForgotPassword() {
   const [error, setError] = useState('');
   const [sent, setSent] = useState(false);
   const [resetUrl, setResetUrl] = useState<string | null>(null);
+  const [demoMode, setDemoMode] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
@@ -19,7 +20,10 @@ export default function ForgotPassword() {
     setBusy(true);
     try {
       const res = await requestPasswordReset(email);
+      // Un lien n'est affiché que si le serveur l'a réellement renvoyé (mode
+      // démonstration explicite). En production, seul l'envoi par e-mail compte.
       setResetUrl(res?.resetUrl ?? null);
+      setDemoMode(Boolean(res?.demoMode && res?.resetUrl));
       setSent(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Demande impossible.');
@@ -38,11 +42,21 @@ export default function ForgotPassword() {
         <div className="mt-7"><Alert kind="warn">Aucun e-mail de récupération n’est envoyé sans serveur connecté.</Alert></div>
       ) : sent ? (
         <div className="mt-7 space-y-4">
-          <Alert kind="success">Si cette adresse correspond à un compte actif, un lien sécurisé à usage unique a été généré.</Alert>
+          <Alert kind="success">Si cette adresse correspond à un compte actif, un lien sécurisé à usage unique a été envoyé par e-mail.</Alert>
           {resetUrl && (
-            <a href={resetUrl} className="wg-btn wg-btn-primary w-full !py-3">
-              Ouvrir le lien de réinitialisation <FiArrowRight />
-            </a>
+            <div className="space-y-2 rounded-xl border border-amber-500/50 bg-amber-50 p-3">
+              <p className="text-xs font-bold text-amber-950">
+                Mode démonstration : aucun e-mail n’est envoyé par ce serveur. Le lien ci-dessous est affiché pour vos tests uniquement.
+              </p>
+              <a href={resetUrl} className="wg-btn wg-btn-primary w-full !py-3">
+                Ouvrir le lien de réinitialisation <FiArrowRight />
+              </a>
+            </div>
+          )}
+          {!demoMode && (
+            <p className="text-xs text-slate-500">
+              Vérifiez votre boîte de réception. Le lien expire au bout de 24 heures et ne peut servir qu’une fois.
+            </p>
           )}
           <Link to="/connexion" className="wg-btn wg-btn-ghost w-full !py-3">Retour à la connexion <FiArrowRight /></Link>
         </div>
