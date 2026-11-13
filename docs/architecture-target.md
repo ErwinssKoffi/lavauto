@@ -182,7 +182,7 @@ Erreurs : un type `AppError` (extension de l'actuel `ApiError`) normalisé `{ co
 - **État serveur** : TanStack Query (clés `[company, station, domain, params]`), invalidation après mutation, optimistic UI uniquement sur les actions réversibles.
 - **État UI** : contexte léger (thème, sidebar, filtres persistants), pas de données métier dupliquées.
 - **Performance** : pagination côté serveur sur lavages / paiements / mouvements, index `(company_id, station_id, created_at)`, lazy-loading des modules, agrégations de dashboard en vues matérialisées ou fonctions SQL, images via Supabase Storage avec transformations.
-- **Accessibilité / responsive** : navigation clavier, focus visible, `aria-*`, tables responsives (déjà présentes via `.wg-scroll-x`), sidebar repliable, cibles tactiles adaptées au terrain.
+- **Accessibilité / responsive** : navigation clavier, focus visible, `aria-*`, tables responsives (`.table` DaisyUI dans un conteneur `overflow-x-auto`), sidebar repliable, cibles tactiles adaptées au terrain.
 - **Connectivité** : les stations peuvent avoir un réseau instable. Décision à trancher à l'étape 05 : file d'attente hors ligne avec idempotence, **ou** exigence de connexion explicite. Ne pas promettre un mode hors ligne sans le tester.
 
 ---

@@ -4,7 +4,7 @@ import { Card } from './ui';
 
 /** Placeholder de chargement (squelette), sans donnée factice. */
 export function Skeleton({ className = '' }: { className?: string }) {
-  return <div aria-hidden="true" className={`wg-skeleton ${className}`} />;
+  return <div aria-hidden="true" className={`skeleton ${className}`} />;
 }
 
 /** État de chargement réel : utilisé par la garde de session. */
@@ -12,8 +12,8 @@ export function LoadingState({ label = 'Chargement…', className = '' }: { labe
   return (
     <div className={`grid min-h-screen place-items-center ${className}`} role="status" aria-live="polite">
       <div className="flex flex-col items-center gap-3">
-        <span className="wg-gradient h-10 w-10 animate-pulse rounded-xl" aria-hidden="true" />
-        <p className="wg-muted text-xs">{label}</p>
+        <span className="h-10 w-10 animate-pulse rounded-xl bg-linear-to-br from-primary via-primary to-secondary" aria-hidden="true" />
+        <p className="text-xs text-base-content/60">{label}</p>
       </div>
     </div>
   );
@@ -32,13 +32,13 @@ export function ErrorState({
   return (
     <div role="alert" className="mx-auto max-w-lg">
       <Card className="text-center">
-        <div className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-xl bg-amber-500/15 text-amber-500">
+        <div className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-xl bg-warning/15 text-warning">
           <FiAlertTriangle aria-hidden="true" />
         </div>
         <h2 className="text-base font-bold">{title}</h2>
-        <p className="wg-muted mt-2 text-sm leading-relaxed">{description}</p>
+        <p className="mt-2 text-sm leading-relaxed text-base-content/60">{description}</p>
         {onRetry && (
-          <button type="button" className="wg-btn wg-btn-primary mt-5" onClick={onRetry}>
+          <button type="button" className="btn btn-sm btn-primary mt-5" onClick={onRetry}>
             <FiRefreshCw aria-hidden="true" /> Réessayer
           </button>
         )}

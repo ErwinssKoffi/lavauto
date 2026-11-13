@@ -101,9 +101,9 @@ export function StationLogoEditor() {
   }
 
   return (
-    <section aria-label="Logo de la station" className="mt-5 border-t pt-4" style={{ borderColor: 'var(--wg-border)' }}>
+    <section aria-label="Logo de la station" className="mt-5 border-t pt-4">
       <h3 className="text-sm font-bold">Logo de la station</h3>
-      <p id={`${inputId}-hint`} className="wg-muted mt-1 text-xs leading-relaxed">
+      <p id={`${inputId}-hint`} className="text-base-content/60 mt-1 text-xs leading-relaxed">
         PNG, JPEG ou WebP, 5 Mo maximum. Le fichier est optimisé si possible et conservé dans un stockage privé.
       </p>
       {!serverReady && (
@@ -111,39 +111,39 @@ export function StationLogoEditor() {
       )}
       {serverReady && logoPath && (
         <div className="mt-3" aria-live="polite">
-          {preview.url && <img src={preview.url} alt="Logo actuel de la station" onError={preview.imageFailed} className="h-20 w-20 rounded-xl border bg-white object-contain p-1" style={{ borderColor: 'var(--wg-border)' }} />}
-          {preview.loading && <p className="wg-muted text-xs">Chargement de l’aperçu sécurisé…</p>}
+          {preview.url && <img src={preview.url} alt="Logo actuel de la station" onError={preview.imageFailed} className="h-20 w-20 rounded-xl border bg-base-100 object-contain p-1" />}
+          {preview.loading && <p className="text-base-content/60 text-xs">Chargement de l’aperçu sécurisé…</p>}
           {preview.error && (
-            <div className="flex flex-wrap items-center gap-2 text-xs text-amber-400">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-warning">
               <span>Impossible d’afficher le logo. Vérifiez votre connexion et vos droits.</span>
-              <button type="button" className="wg-link inline-flex items-center gap-1" onClick={preview.retry}><FiRefreshCw /> Réessayer l’aperçu</button>
+              <button type="button" className="link link-primary inline-flex items-center gap-1" onClick={preview.retry}><FiRefreshCw /> Réessayer l’aperçu</button>
             </div>
           )}
         </div>
       )}
-      <label htmlFor={inputId} className="wg-label mt-4 block">Choisir un fichier logo</label>
+      <label htmlFor={inputId} className="label mt-4 block">Choisir un fichier logo</label>
       <input
         id={inputId}
         ref={inputRef}
         type="file"
         accept={LOGO_ACCEPT}
         aria-describedby={`${inputId}-hint`}
-        className="block w-full text-xs text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-sky-500/15 file:px-3 file:py-2 file:font-semibold file:text-sky-300 disabled:opacity-50"
+        className="block w-full text-xs text-base-content/70 file:mr-3 file:rounded-lg file:border-0 file:bg-primary/15 file:px-3 file:py-2 file:font-semibold file:text-primary disabled:opacity-50"
         disabled={!serverReady || !canWriteSubscription || Boolean(busy)}
         onChange={selectFile}
       />
-      {error && <p role="alert" className="mt-2 text-xs text-red-400">{error}</p>}
+      {error && <p role="alert" className="mt-2 text-xs text-error">{error}</p>}
       <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" className="wg-btn wg-btn-primary" disabled={!serverReady || !canWriteSubscription || !file || Boolean(busy)} onClick={() => { void upload(); }}>
+        <button type="button" className="btn btn-sm btn-primary" disabled={!serverReady || !canWriteSubscription || !file || Boolean(busy)} onClick={() => { void upload(); }}>
           <FiUpload /> {busy === 'upload' ? 'Enregistrement…' : 'Enregistrer le logo'}
         </button>
         {logoPath && serverReady && (
-          <button type="button" className="wg-btn wg-btn-ghost" disabled={!canWriteSubscription || Boolean(busy)} onClick={() => { void remove(); }}>
+          <button type="button" className="btn btn-sm" disabled={!canWriteSubscription || Boolean(busy)} onClick={() => { void remove(); }}>
             <FiTrash2 /> {busy === 'remove' ? 'Retrait…' : 'Retirer le logo'}
           </button>
         )}
       </div>
-      {logoPath && serverReady && <p className="wg-muted mt-2 text-xs">Le remplacement ou le retrait dissocie l’ancien logo, mais ne supprime pas son fichier du stockage privé.</p>}
+      {logoPath && serverReady && <p className="text-base-content/60 mt-2 text-xs">Le remplacement ou le retrait dissocie l’ancien logo, mais ne supprime pas son fichier du stockage privé.</p>}
     </section>
   );
 }

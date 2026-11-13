@@ -14,7 +14,7 @@ export function DemoNotice({ className = '' }: { className?: string }) {
     catch { setError('Copie impossible : vérifiez les autorisations de stockage et de téléchargement du navigateur.'); }
   };
   return (
-    <aside aria-label="Avertissement de démonstration" className={`border border-amber-500/50 bg-amber-100 px-4 py-3 text-sm text-amber-950 ${className}`}>
+    <aside aria-label="Avertissement de démonstration" className={`border border-warning/50 bg-warning/15 px-4 py-3 text-sm text-warning-content ${className}`}>
       <div className="mx-auto flex max-w-7xl items-start gap-3">
         <FiAlertTriangle className="mt-0.5 shrink-0" aria-hidden="true" />
         <div>

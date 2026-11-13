@@ -15,6 +15,7 @@ import { usePermissions } from '../lib/usePermissions';
 import StockAlertBanner from './StockAlertBanner';
 import { AccountSecurity } from './AccountSecurity';
 import { PWAInstallButton } from './PwaControls';
+import { ThemePicker } from './ThemeSwitcher';
 
 const SIDEBAR_KEY = 'washguard.sidebar.collapsed';
 
@@ -65,15 +66,15 @@ export default function AppShell() {
   }, []);
 
   const sidebar = (
-    <div className="flex h-full flex-col" style={{ background: 'var(--wg-surface)' }}>
-      <div className="flex h-16 shrink-0 items-center justify-between border-b px-4" style={{ borderColor: 'var(--wg-border)' }}>
+    <div className="flex h-full flex-col bg-base-100">
+      <div className="flex h-16 shrink-0 items-center justify-between border-b border-base-300 px-4">
         <NavLink to="/" aria-label="Accueil WashGuard" className={collapsed ? 'mx-auto' : ''}>
           <Logo compact={collapsed} />
         </NavLink>
-        <button type="button" className="wg-muted lg:hidden" onClick={() => setMobileOpen(false)} aria-label="Fermer le menu"><FiX size={20} /></button>
+        <button type="button" className="text-base-content/60 lg:hidden" onClick={() => setMobileOpen(false)} aria-label="Fermer le menu"><FiX size={20} /></button>
       </div>
 
-      <div className="wg-scroll-thin flex-1 overflow-y-auto px-2 py-4">
+      <div className="flex-1 overflow-y-auto px-2 py-4 [scrollbar-width:thin]">
         {groups.map((group) => {
           const isClosed = closedGroups.includes(group.id);
           return (
@@ -81,7 +82,7 @@ export default function AppShell() {
               <button
                 type="button"
                 onClick={() => toggleGroup(group.id)}
-                className="wg-group-label"
+                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.13em] text-base-content/60 transition hover:bg-primary/10 hover:text-base-content"
                 aria-expanded={!isClosed}
                 aria-controls={`nav-group-${group.id}`}
                 title={collapsed ? group.label : undefined}
@@ -101,7 +102,7 @@ export default function AppShell() {
                       return (
                         <span
                           key={entry.label}
-                          className="wg-nav-item wg-nav-item-soon"
+                          className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-[13px] font-medium leading-snug text-base-content/60 opacity-60 cursor-not-allowed"
                           aria-disabled="true"
                           title={entry.upcoming?.hint}
                         >
@@ -122,14 +123,14 @@ export default function AppShell() {
                         onClick={() => setMobileOpen(false)}
                         aria-label={collapsed ? entry.label : undefined}
                         title={collapsed ? entry.label : undefined}
-                        className={({ isActive }) => `wg-nav-item ${isActive ? 'wg-nav-item-active' : ''}`}
+                        className={({ isActive }) => `flex w-full items-center gap-3 rounded-xl px-3 py-2 text-[13px] font-medium leading-snug no-underline transition hover:bg-primary/10 hover:text-base-content ${isActive ? 'bg-primary font-semibold text-primary-content shadow-lg shadow-primary/20' : 'text-base-content/60'}`}
                       >
                         <span className="text-base" aria-hidden="true">{entry.icon}</span>
                         {!collapsed && (
                           <>
                             <span className="flex-1">{entry.label}</span>
                             {entry.to === '/app/mise-en-route' && !state.station?.activated && missing.length > 0 && (
-                              <span className="rounded-full bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-400">{missing.length}</span>
+                              <span className="rounded-full bg-warning/20 px-1.5 py-0.5 text-[10px] font-bold text-warning">{missing.length}</span>
                             )}
                           </>
                         )}
@@ -143,14 +144,14 @@ export default function AppShell() {
         })}
       </div>
 
-      <div className="shrink-0 border-t p-2" style={{ borderColor: 'var(--wg-border)' }}>
-        <div className="rounded-xl p-2" style={{ background: 'var(--wg-surface-2)' }}>
+      <div className="shrink-0 border-t border-base-300 p-2">
+        <div className="rounded-xl bg-base-200 p-2">
           <div className="flex items-center gap-2">
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg wg-gradient text-white" aria-hidden="true"><FiActivity size={15} /></span>
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-linear-to-br from-primary via-primary to-secondary text-primary-content" aria-hidden="true"><FiActivity size={15} /></span>
             {!collapsed && (
               <div className="min-w-0">
                 <p className="truncate text-xs font-bold">{stationName}</p>
-                <p className="wg-muted truncate text-[11px]">{state.station?.activated ? 'Station active' : 'Mise en route en cours'}</p>
+                <p className="truncate text-[11px] text-base-content/60">{state.station?.activated ? 'Station active' : 'Mise en route en cours'}</p>
               </div>
             )}
           </div>
@@ -158,7 +159,7 @@ export default function AppShell() {
         <button
           type="button"
           onClick={toggleCollapse}
-          className="wg-btn wg-btn-ghost mt-2 hidden w-full !justify-center !py-1.5 lg:inline-flex"
+          className="btn btn-sm mt-2 hidden w-full justify-center! lg:inline-flex"
           aria-label={collapsed ? 'Déplier la navigation' : 'Replier la navigation'}
           title={collapsed ? 'Déplier la navigation' : 'Replier la navigation'}
         >
@@ -173,70 +174,70 @@ export default function AppShell() {
     <div className="min-h-screen">
       {/* Sidebar desktop — largeur repliable, persistée */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 hidden border-r transition-[width] duration-200 lg:block ${collapsed ? 'lg:w-[76px]' : 'lg:w-64'}`}
-        style={{ borderColor: 'var(--wg-border)' }}
+        className={`fixed inset-y-0 left-0 z-40 hidden border-r border-base-300 transition-[width] duration-200 lg:block ${collapsed ? 'lg:w-[76px]' : 'lg:w-64'}`}
       >
         {sidebar}
       </aside>
       {/* Sidebar mobile — drawer */}
       {mobileOpen && (
         <div className="fixed inset-0 z-[70] lg:hidden">
-          <div className="wg-overlay absolute inset-0" onClick={() => setMobileOpen(false)} />
-          <aside className="absolute inset-y-0 left-0 w-[270px] border-r shadow-2xl" style={{ borderColor: 'var(--wg-border)' }}>{sidebar}</aside>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+          <aside className="absolute inset-y-0 left-0 w-[270px] border-r border-base-300 shadow-2xl">{sidebar}</aside>
         </div>
       )}
 
       <div className={`transition-[padding] duration-200 ${collapsed ? 'lg:pl-[76px]' : 'lg:pl-64'}`}>
         {/* Topbar */}
-        <header className="wg-topbar sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b px-4 backdrop-blur-xl sm:px-6" style={{ borderColor: 'var(--wg-border)' }}>
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-base-300 bg-base-100/90 px-4 backdrop-blur-xl sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
-            <button type="button" className="wg-muted lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Ouvrir le menu"><FiMenu size={20} /></button>
+            <button type="button" className="text-base-content/60 lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Ouvrir le menu"><FiMenu size={20} /></button>
             <div className="min-w-0">
               <Breadcrumbs items={crumbs} />
               <p className="truncate text-sm font-bold sm:hidden">{current}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {identity && identity.stations.length > 1 && state.session?.stationId && (
               <label className="flex min-w-0 items-center gap-2 text-xs">
-                <span className="wg-muted hidden xl:inline">Station</span>
-                <select aria-label="Station active" className="wg-input !w-auto max-w-[10rem] !py-1.5 sm:max-w-[14rem]"
+                <span className="hidden text-base-content/60 xl:inline">Station</span>
+                <select aria-label="Station active" className="select select-sm w-auto! max-w-[10rem] sm:max-w-[14rem]"
                   value={state.session.stationId} onChange={(event) => selectStation(event.target.value)}>
                   {identity.stations.map((station) => <option key={station.id} value={station.id}>{station.name}</option>)}
                 </select>
               </label>
             )}
-            <button type="button" onClick={() => setPaletteOpen(true)} className="wg-btn wg-btn-ghost !px-2.5" aria-label="Rechercher un écran" title="Recherche rapide (Ctrl + K)">
+            <button type="button" onClick={() => setPaletteOpen(true)} className="btn btn-sm" aria-label="Rechercher un écran" title="Recherche rapide (Ctrl + K)">
               <FiSearch size={16} />
-              <span className="wg-kbd hidden xl:inline-flex">Ctrl K</span>
+              <kbd className="hidden xl:inline-flex">Ctrl K</kbd>
             </button>
             <PWAInstallButton compact />
-            <button type="button" onClick={toggleTheme} className="wg-btn wg-btn-ghost !px-2.5" aria-label="Changer de thème" title="Thème clair / sombre">
+            <button type="button" onClick={toggleTheme} className="btn btn-sm px-2.5!" aria-label="Basculer clair / sombre" title="Basculer entre le thème clair et le thème sombre">
               {theme === 'dark' ? <FiSun size={16} /> : <FiMoon size={16} />}
             </button>
-            <a href="/#faq" className="wg-btn wg-btn-ghost !px-2.5" title="Questions fréquentes" aria-label="Questions fréquentes"><FiHelpCircle size={16} /></a>
+            <ThemePicker />
+            <a href="/#faq" className="btn btn-sm px-2.5!" title="Questions fréquentes" aria-label="Questions fréquentes"><FiHelpCircle size={16} /></a>
 
             {/* Cloche d'alertes stock en temps réel */}
             {can('inventory.view') && <div className="relative">
               <button
                 type="button"
                 onClick={() => setAlertsOpen((v) => !v)}
-                className={`wg-btn wg-btn-ghost relative !px-2.5 ${state.stockAlerts.length > 0 ? '!text-amber-400' : ''}`}
+                className={`btn btn-sm px-2.5! relative ${state.stockAlerts.length > 0 ? 'text-warning!' : ''}`}
                 aria-label="Alertes stock"
                 title={state.stockAlerts.length > 0 ? `${state.stockAlerts.length} produit(s) sous le seuil critique` : 'Stock normal'}
               >
                 <FiBell size={16} />
                 {state.stockAlerts.length > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-black text-white animate-pulse">
+                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-error text-[9px] font-black text-error-content animate-pulse">
                     {state.stockAlerts.length}
                   </span>
                 )}
               </button>
               {alertsOpen && (
-                <div className="wg-card wg-elev-2 absolute right-0 top-12 z-50 w-72 sm:w-80 p-3">
-                  <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: 'var(--wg-border)' }}>
-                    <div className="flex items-center gap-1.5 font-bold text-xs text-white">
-                      <FiBell className="text-amber-400" />
+                <div className="card absolute right-0 top-12 z-50 w-72 bg-base-100 p-3 shadow-xl sm:w-80">
+                  <div className="flex items-center justify-between border-b border-base-300 pb-2">
+                    <div className="flex items-center gap-1.5 font-bold text-xs text-base-content">
+                      <FiBell className="text-warning" />
                       <span>Alertes Stock en direct</span>
                     </div>
                     <Badge tone={state.stockAlerts.length > 0 ? 'warn' : 'success'}>
@@ -245,32 +246,32 @@ export default function AppShell() {
                   </div>
                   <div className="my-2 max-h-60 overflow-y-auto space-y-2 text-xs">
                     {state.stockAlerts.length === 0 ? (
-                      <p className="wg-muted py-3 text-center text-xs">Tous les produits sont au-dessus de leur seuil d'alerte.</p>
+                      <p className="py-3 text-center text-xs text-base-content/60">Tous les produits sont au-dessus de leur seuil d'alerte.</p>
                     ) : (
                       state.stockAlerts.map((a) => (
-                        <div key={a.productId} className="rounded-lg p-2" style={{ background: 'var(--wg-surface-2)' }}>
+                        <div key={a.productId} className="rounded-lg bg-base-200 p-2">
                           <div className="flex items-center justify-between font-bold">
                             <span className="truncate">{a.name}</span>
-                            <span className={a.severity === 'rupture' ? 'text-red-400' : 'text-amber-400'}>
+                            <span className={a.severity === 'rupture' ? 'text-error' : 'text-warning'}>
                               {a.severity === 'rupture' ? 'RUPTURE' : `${a.qtyOnHand} restant(s)`}
                             </span>
                           </div>
-                          <p className="wg-muted mt-0.5 text-[11px]">Seuil critique : {a.reorderLevel}</p>
+                          <p className="mt-0.5 text-[11px] text-base-content/60">Seuil critique : {a.reorderLevel}</p>
                         </div>
                       ))
                     )}
                   </div>
-                  <div className="border-t pt-2 flex justify-between text-xs" style={{ borderColor: 'var(--wg-border)' }}>
+                  <div className="flex justify-between border-t border-base-300 pt-2 text-xs">
                     <button
                       type="button"
-                      className="wg-link text-[11px]"
+                      className="link link-primary text-[11px]"
                       onClick={() => { setAlertsOpen(false); navigate('/app/parametres#stock'); }}
                     >
                       Voir les seuils
                     </button>
                     <button
                       type="button"
-                      className="wg-link font-bold text-[11px]"
+                      className="link link-primary text-[11px] font-bold"
                       onClick={() => { setAlertsOpen(false); navigate('/app/stock'); }}
                     >
                       Gérer le stock →
@@ -281,27 +282,27 @@ export default function AppShell() {
             </div>}
 
             <div className="relative">
-              <button type="button" onClick={() => setMenuOpen((value) => !value)} className="flex items-center gap-2 rounded-xl px-2 py-1.5 hover:bg-sky-500/10" aria-expanded={menuOpen} aria-label="Menu du compte">
-                <span className="grid h-8 w-8 place-items-center rounded-lg text-xs font-bold text-white wg-gradient">
+              <button type="button" onClick={() => setMenuOpen((value) => !value)} className="flex items-center gap-2 rounded-xl px-2 py-1.5 hover:bg-primary/10" aria-expanded={menuOpen} aria-label="Menu du compte">
+                <span className="grid h-8 w-8 place-items-center rounded-lg text-xs font-bold text-primary-content bg-linear-to-br from-primary via-primary to-secondary">
                   {(state.session?.name ?? '?').split(' ').map((word) => word[0]).slice(0, 2).join('').toUpperCase()}
                 </span>
                 <div className="hidden text-left sm:block">
                   <p className="text-xs font-bold leading-tight">{state.session?.name}</p>
-                  <p className="wg-muted text-[10px] leading-tight">{ROLE_LABELS[role]}</p>
+                  <p className="text-[10px] leading-tight text-base-content/60">{ROLE_LABELS[role]}</p>
                 </div>
               </button>
               {menuOpen && (
-                <div className="wg-card wg-elev-2 absolute right-0 top-12 z-50 w-56 p-2">
+                <div className="card absolute right-0 top-12 z-50 w-56 bg-base-100 p-2 shadow-xl">
                   <div className="px-3 py-2">
                     <p className="text-xs font-bold">{state.session?.name}</p>
-                    <p className="wg-muted truncate text-[11px]">{state.session?.email}</p>
+                    <p className="truncate text-[11px] text-base-content/60">{state.session?.email}</p>
                   </div>
-                  <div className="my-1 border-t" style={{ borderColor: 'var(--wg-border)' }} />
-                  <button type="button" className="wg-btn wg-btn-ghost w-full !justify-start" onClick={() => { setMenuOpen(false); setSecurityOpen(true); }}><FiShield size={15} /> Sécurité du compte</button>
+                  <div className="my-1 border-t border-base-300" />
+                  <button type="button" className="btn btn-sm w-full justify-start!" onClick={() => { setMenuOpen(false); setSecurityOpen(true); }}><FiShield size={15} /> Sécurité du compte</button>
                   {(role === 'proprietaire' || role === 'gerant') && (
-                    <button type="button" className="wg-btn wg-btn-ghost w-full !justify-start" onClick={() => { setMenuOpen(false); navigate('/app/parametres'); }}><FiSliders size={15} /> Paramètres</button>
+                    <button type="button" className="btn btn-sm w-full justify-start!" onClick={() => { setMenuOpen(false); navigate('/app/parametres'); }}><FiSliders size={15} /> Paramètres</button>
                   )}
-                  <button type="button" className="wg-btn wg-btn-danger mt-1 w-full !justify-start" onClick={() => { void signOut().then(() => navigate('/')); }}><FiLogOut size={15} /> Se déconnecter</button>
+                  <button type="button" className="btn btn-sm btn-error btn-outline mt-1 w-full justify-start!" onClick={() => { void signOut().then(() => navigate('/')); }}><FiLogOut size={15} /> Se déconnecter</button>
                 </div>
               )}
             </div>
@@ -310,33 +311,33 @@ export default function AppShell() {
 
         <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
           {can('inventory.view') && <StockAlertBanner key={`${state.session?.userId}:${state.session?.stationId}`} />}
-          {role !== 'super_admin' && subscriptionStatus === 'loading' && <div role="status" className="wg-card mb-5 px-4 py-3 text-xs">Vérification de l’abonnement ; les écritures ordinaires sont momentanément bloquées.</div>}
-          {role !== 'super_admin' && subscriptionStatus !== 'loading' && !canWriteSubscription && <div role="status" className="wg-card mb-5 flex flex-wrap items-center justify-between gap-3 !border-amber-500/40 px-4 py-3 text-xs">
+          {role !== 'super_admin' && subscriptionStatus === 'loading' && <div role="status" className="card mb-5 bg-base-100 px-4 py-3 text-xs shadow-xl">Vérification de l’abonnement ; les écritures ordinaires sont momentanément bloquées.</div>}
+          {role !== 'super_admin' && subscriptionStatus !== 'loading' && !canWriteSubscription && <div role="status" className="card mb-5 flex flex-row flex-wrap items-center justify-between gap-3 bg-base-100 px-4 py-3 text-xs shadow-xl border-warning/40!">
             <span><strong>{subscriptionAccess ? 'Abonnement en lecture seule.' : 'Abonnement non confirmé.'}</strong>{' '}
               {subscriptionAccess ? 'Les données restent consultables ; les écritures ordinaires sont bloquées jusqu’à validation. Après expiration, un retrait WhatsApp peut être demandé sous réserve des droits.' : `Les écritures ordinaires sont bloquées. ${subscriptionError ?? ''}`}</span>
-            <span className="flex gap-3">{can('subscription.manage') && <NavLink to="/app/abonnement" className="wg-link">Voir l’abonnement →</NavLink>}
-              {((dataSource === 'supabase' && authKind === 'supabase') || (dataSource === 'api' && authKind === 'api')) && <button className="wg-link" onClick={() => { void refreshSubscriptionAccess().catch(() => undefined); }}>Relire</button>}</span>
+            <span className="flex gap-3">{can('subscription.manage') && <NavLink to="/app/abonnement" className="link link-primary">Voir l’abonnement →</NavLink>}
+              {((dataSource === 'supabase' && authKind === 'supabase') || (dataSource === 'api' && authKind === 'api')) && <button className="link link-primary" onClick={() => { void refreshSubscriptionAccess().catch(() => undefined); }}>Relire</button>}</span>
           </div>}
           {!state.station?.activated && role !== 'super_admin' && location.pathname !== '/app/mise-en-route' && (
-            <div className="wg-card mb-5 flex flex-wrap items-center justify-between gap-3 !border-amber-500/30 px-4 py-3">
+            <div className="card mb-5 flex flex-row flex-wrap items-center justify-between gap-3 bg-base-100 px-4 py-3 shadow-xl border-warning/30!">
               <div className="flex items-center gap-2 text-xs">
-                <span className="text-amber-400"><FiHelpCircle size={16} /></span>
+                <span className="text-warning"><FiHelpCircle size={16} /></span>
                 <span><strong>Mise en route en cours.</strong> {missing.length} étape(s) obligatoire(s) manquante(s) — l’exploitation reste fermée.</span>
               </div>
-              <NavLink to="/app/mise-en-route" className="wg-link text-xs">Continuer →</NavLink>
+              <NavLink to="/app/mise-en-route" className="link link-primary text-xs">Continuer →</NavLink>
             </div>
           )}
           {role === 'super_admin' && location.pathname !== '/app/plateforme' ? (
-            <Card className="flex items-start gap-3 border-red-500/30">
-              <FiShield className="mt-0.5 text-xl text-red-400" />
+            <Card className="flex flex-row items-start gap-3 border-error/30">
+              <FiShield className="mt-0.5 text-xl text-error" />
               <div>
                 <h2 className="text-sm font-bold">Espace réservé au support WashGuard</h2>
-                <p className="wg-muted mt-1 text-xs">Ce compte n’est rattaché à aucune station. Seul l’espace plateforme est accessible.</p>
-                <button className="wg-btn wg-btn-primary mt-3" onClick={() => navigate('/app/plateforme')}>Ouvrir l’espace plateforme</button>
+                <p className="mt-1 text-xs text-base-content/60">Ce compte n’est rattaché à aucune station. Seul l’espace plateforme est accessible.</p>
+                <button className="btn btn-sm btn-primary mt-3" onClick={() => navigate('/app/plateforme')}>Ouvrir l’espace plateforme</button>
               </div>
             </Card>
           ) : (
-            <div className="wg-fade-in" key={`${state.session?.userId}:${state.session?.companyId}:${state.session?.stationId}:${location.pathname}`}><Outlet /></div>
+            <div className="animate-fade-in" key={`${state.session?.userId}:${state.session?.companyId}:${state.session?.stationId}:${location.pathname}`}><Outlet /></div>
           )}
         </main>
       </div>

@@ -420,7 +420,14 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     fs.existsSync(path.join(ROOT, 'src/pages/auth/ForgotPassword.tsx')) &&
     fs.existsSync(path.join(ROOT, 'src/pages/auth/ResetPassword.tsx')));
   check('langue fr + devise FCFA', html.includes('lang="fr"') && read('src/lib/format.ts').includes('FCFA'));
-  check('thème sombre par défaut / clair disponible', html.includes('class="dark"') && read('tailwind.config.js').includes("darkMode: 'class'") && read('src/main.tsx').includes("washguard.theme"));
+  check('préférence de thème versionnée : les anciens choix ne bloquent plus cupcake', (() => {
+    const version = (read('src/lib/themes.ts').match(/THEME_PREFERENCE_VERSION = '([^']+)'/) || [])[1];
+    return Boolean(version) &&
+      read('src/lib/store.tsx').includes("localStorage.getItem('washguard.theme.v') === THEME_PREFERENCE_VERSION") &&
+      read('src/lib/store.tsx').includes("localStorage.setItem('washguard.theme.v', THEME_PREFERENCE_VERSION)") &&
+      html.includes(`localStorage.getItem('washguard.theme.v') === '${version}'`);
+  })());
+  check('thème cupcake par défaut, appliqué avant le premier rendu', html.includes('data-theme="cupcake"') && html.includes("'cupcake'") && !html.includes('data-theme="washguard-dark"') && read('src/index.css').includes('@plugin "daisyui/theme"') && read('src/main.tsx').includes("washguard.theme"));
   check('photo unique pour les écrans auth', read('src/pages/auth/AuthLayout.tsx').includes('/images/lav-auto.jpeg') && fs.existsSync(path.join(ROOT,'public/images/lav-auto.jpeg')));
   check('client Supabase prêt, non branché', read('src/lib/supabase.ts').includes('isSupabaseConfigured') && fs.existsSync(path.join(ROOT,'.env.example')));
   check('plus aucun fichier CRA / template', !fs.existsSync(path.join(ROOT,'src/App.jsx')) && !fs.existsSync(path.join(ROOT,'public/index.html')) && !fs.existsSync(path.join(ROOT,'jsconfig.json')));
@@ -485,8 +492,112 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     Boolean(pkg.dependencies.jspdf) && Boolean(pkg.dependencies.zod) && Boolean(pkg.devDependencies['pdfjs-dist']) &&
     String(pkg.dependencies.recharts).startsWith('^2.') &&
     String(pkg.dependencies['react-router-dom']).startsWith('^7.'));
-  check('tokens : focus clavier, mouvement réduit, élévation, squelette',
-    [':focus-visible','prefers-reduced-motion','--wg-elev-2','wg-nav-item-active','wg-skeleton'].every((token) => cssSrc.includes(token)));
+  check('aucune trace de shadcn/ui (ou de sa pile) : DaisyUI est la seule couche UI', (() => {
+    const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+    const forbiddenDeps = [
+      'shadcn', 'shadcn-ui', 'class-variance-authority', 'clsx', 'tailwind-merge',
+      'tailwindcss-animate', 'tw-animate-css', 'lucide-react', 'sonner', 'cmdk',
+    ];
+    const hasForbiddenDep = forbiddenDeps.some((name) => Boolean(deps[name])) ||
+      Object.keys(deps).some((name) => name.startsWith('@radix-ui/'));
+    const hasConfigFile = ['components.json', '.components.json', 'src/components.json']
+      .some((file) => fs.existsSync(path.join(ROOT, file)));
+    const hasUiFolder = fs.existsSync(path.join(ROOT, 'src/components/ui'));
+    const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) return walk(full);
+      return /\.(tsx?|css)$/.test(entry.name) ? [full] : [];
+    });
+    const sources = walk(path.join(ROOT, 'src'));
+    const forbiddenImport = /from\s+['"](@radix-ui\/[^'"]+|class-variance-authority|tailwind-merge|clsx|lucide-react|@\/components\/ui|@\/lib\/utils)['"]/;
+    const hasForbiddenImport = sources.some((file) => forbiddenImport.test(fs.readFileSync(file, 'utf8')));
+    const hasCnHelper = sources.some((file) => /export\s+(function|const)\s+cn\b/.test(fs.readFileSync(file, 'utf8')));
+    const shadcnTokens = sources
+      .filter((file) => file.endsWith('.css'))
+      .some((file) => /--(primary|secondary|muted|accent|destructive|popover|card)-foreground\s*:/.test(fs.readFileSync(file, 'utf8')));
+    return !hasForbiddenDep && !hasConfigFile && !hasUiFolder && !hasForbiddenImport && !hasCnHelper && !shadcnTokens &&
+      Boolean(deps.daisyui) && uiSrc.includes('card bg-base-100');
+  })());
+  check('sélecteur de thème : catalogue complet, persisté et branché dans le shell', (() => {
+    const themesSrc = read('src/lib/themes.ts');
+    const names = [...themesSrc.matchAll(/name: '([a-z0-9-]+)'/g)].map((m) => m[1]);
+    const installed = fs.readdirSync(path.join(ROOT, 'node_modules/daisyui/theme'))
+      .filter((file) => file.endsWith('.css'))
+      .map((file) => file.replace(/\.css$/, ''));
+  check('configuration DaisyUI : 37 thèmes déclarés, cupcake en défaut et en prefers-dark', (() => {
+    const css = read('src/index.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    const block = css.match(/@plugin\s+"daisyui"\s*\{([\s\S]*?)\}/);
+    if (!block) return false;
+    const body = block[1].replace(/^\s*themes\s*:/, '');
+    const declared = body
+      .split(',')
+      .map((entry) => entry.trim().split(/\s+/)[0].replace(/;+$/, ''))
+      .filter(Boolean);
+    const catalogue = [...read('src/lib/themes.ts').matchAll(/name: '([a-z0-9-]+)'/g)].map((m) => m[1]);
+    const sameList = declared.length === catalogue.length &&
+      declared.slice().sort().join() === catalogue.slice().sort().join();
+    // `themes: all` réserverait :where(:root) à `light` : refusé, la racine doit
+    // appartenir à cupcake (DEFAULT_THEME du projet).
+    const usesAll = /(^|[\s,:])all\b/.test(body);
+    const cupcakeDefault = /cupcake\s+--default(\s+--prefersdark)?\b/.test(body) && /cupcake\s+--default\s+--prefersdark\b/.test(body);
+    const darkBlock = css.match(/@plugin\s+"daisyui\/theme"\s*\{\s*name:\s*"washguard-dark";([\s\S]*?)color-scheme/);
+    return sameList && !usesAll && cupcakeDefault && Boolean(darkBlock) &&
+      /default:\s*false/.test(darkBlock[1]) &&
+      /prefersdark:\s*false/.test(darkBlock[1]);
+  })());
+    return names.length === installed.length + 2 &&
+      installed.every((name) => names.includes(name)) &&
+      names.includes('washguard') && names.includes('washguard-dark') &&
+      themesSrc.includes("export const DEFAULT_LIGHT_THEME = 'cupcake'") &&
+      themesSrc.includes('export const DEFAULT_DARK_THEME = \'dim\'') &&
+      shellSrc.includes('<ThemePicker />') &&
+      read('src/lib/store.tsx').includes("localStorage.setItem('washguard.theme.name'") &&
+      html.includes("localStorage.getItem('washguard.theme.name')");
+  })());
+  check('palette DaisyUI partout : aucune couleur codée en dur (classe, hex, rgba)', (() => {
+    // Plus aucune zone exemptée : vitrine et auth suivent le thème comme le reste.
+    const zoned = /$^/;
+    const palette = /(?<![\w-])(text|bg|border|ring|from|via|to|fill|stroke|shadow)-(white|black|slate|zinc|gray|sky|blue|indigo|cyan|amber|emerald|green|red)(-[0-9]{2,3})?\/?[\w.[\]/-]*/g;
+    const repos = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = path.join(dir, entry.name);
+      return entry.isDirectory() ? repos(full) : [full];
+    });
+    const offenders = [];
+    for (const file of repos(path.join(ROOT, 'src'))) {
+      if (!/\.tsx$/.test(file) || zoned.test(file)) continue;
+      for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+        // Voiles de modale : noirs par convention, indépendants du thème.
+        const found = line.replace(/bg-black\/\d+/g, '').match(palette);
+        // Aucune couleur hexadécimale ni rgba() : les graphiques passent par
+        // src/lib/chartTheme.ts (variables CSS du thème).
+        const literals = line.match(/#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)/g);
+        if (found) offenders.push(`${path.relative(ROOT, file)} → ${found.join(' ')}`);
+        else if (literals) offenders.push(`${path.relative(ROOT, file)} → ${literals.join(' ')}`);
+      }
+    }
+    if (offenders.length) console.log('     ' + offenders.slice(0, 4).join(' | '));
+    return offenders.length === 0;
+  })());
+  check('plus aucune classe ni variable wg-* dans les sources React', (() => {
+    const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) return walk(full);
+      return /\.(tsx?|css)$/.test(entry.name) ? [full] : [];
+    });
+    return walk(path.join(ROOT, 'src')).every((file) => {
+      const src = fs.readFileSync(file, 'utf8');
+      return !/\bwg-[a-z0-9-]+/.test(src) && !/var\(--wg-/.test(src);
+    });
+  })());
+  check('thème : DaisyUI 5 configuré en CSS-first, thèmes clair/sombre, focus clavier et mouvement réduit',
+    [':focus-visible','prefers-reduced-motion'].every((token) => cssSrc.includes(token)) &&
+    cssSrc.includes('@import "tailwindcss"') &&
+    /@plugin\s+"daisyui"\s*\{/.test(cssSrc) &&
+    (cssSrc.match(/@plugin\s+"daisyui\/theme"\s*\{/g) || []).length === 2 &&
+    cssSrc.includes('name: "washguard"') && cssSrc.includes('name: "washguard-dark"') &&
+    cssSrc.includes('--color-primary') && cssSrc.includes('--color-base-100') &&
+    /@theme\s*\{/.test(cssSrc) && cssSrc.includes('--animate-fade-in') &&
+    !cssSrc.includes('.wg-'));
   check('états réels branchés : chargement, erreur, confirmation, tableau',
     read('src/App.tsx').includes('LoadingState') &&
     read('src/main.tsx').includes('ErrorBoundary') &&
@@ -542,6 +653,114 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
       check('recherche globale : Entrée navigue vers l’écran cible', w.location.pathname === '/app/caisse', w.location.pathname);
     }
     check('recherche globale : 0 erreur console', errs.length === 0, (errs[0] || '').slice(0, 140));
+    dom.window.close();
+  }
+  {
+    const { dom, w } = makeDom('/app/tableau-de-bord', base());
+    const errs = await mount(acode, w);
+    const click = (el) => el.dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true, view: w }));
+    check('thème cupcake appliqué dès le montage (aucune préférence enregistrée)',
+      w.document.documentElement.getAttribute('data-theme') === 'cupcake' &&
+      !w.document.documentElement.classList.contains('dark'),
+      String(w.document.documentElement.getAttribute('data-theme')));
+    const pickerButton = () => w.document.querySelector('button[aria-label="Choisir un thème"]');
+    const rows = () => [...w.document.querySelectorAll('button[data-theme]')];
+    check('sélecteur de thème : bouton présent dans la topbar, 0 erreur console',
+      Boolean(pickerButton()) && errs.length === 0, (errs[0] || '').slice(0, 140));
+    if (pickerButton()) {
+      click(pickerButton());
+      await wait(120);
+      check('sélecteur de thème : les 37 thèmes sont proposés', rows().length === 37, String(rows().length));
+      const search = w.document.querySelector('input[aria-label="Rechercher un thème"]');
+      if (search) {
+        const setter = Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, 'value').set;
+        setter.call(search, 'drac');
+        search.dispatchEvent(new w.Event('input', { bubbles: true }));
+        await wait(120);
+        const filtered = rows();
+        check('sélecteur de thème : la recherche filtre la liste',
+          filtered.length === 1 && /dracula/i.test(filtered[0].textContent || ''), String(filtered.length));
+      }
+      const target = rows().find((row) => row.getAttribute('data-theme') === 'dracula');
+      if (target) click(target);
+      await wait(140);
+      check('sélecteur de thème : thème appliqué, persisté et schéma synchronisé',
+        w.document.documentElement.getAttribute('data-theme') === 'dracula' &&
+        w.localStorage.getItem('washguard.theme.name') === 'dracula' &&
+        w.localStorage.getItem('washguard.theme') === 'dark' &&
+        w.document.documentElement.classList.contains('dark'));
+      click(pickerButton());
+      await wait(100);
+      check('sélecteur de thème : la recherche est réinitialisée à l’ouverture', rows().length === 37, String(rows().length));
+      const light = rows().find((row) => row.getAttribute('data-theme') === 'washguard');
+      if (light) click(light);
+      await wait(140);
+      check('sélecteur de thème : retour immédiat au thème WashGuard clair',
+        w.document.documentElement.getAttribute('data-theme') === 'washguard' &&
+        !w.document.documentElement.classList.contains('dark'));
+    }
+    dom.window.close();
+  }
+  {
+    // Préférence enregistrée par une génération antérieure (sans version) :
+    // elle doit être ignorée pour que cupcake s'applique enfin partout.
+    const { dom, w } = makeDom('/app/tableau-de-bord', base());
+    w.localStorage.setItem('washguard.theme.name', 'washguard-dark');
+    await mount(acode, w);
+    check('ancienne préférence de thème ignorée au profit de cupcake',
+      w.document.documentElement.getAttribute('data-theme') === 'cupcake',
+      String(w.document.documentElement.getAttribute('data-theme')));
+    check('préférence de thème réécrite à la version courante',
+      w.localStorage.getItem('washguard.theme.v') === '2' &&
+      w.localStorage.getItem('washguard.theme.name') === 'cupcake',
+      String(w.localStorage.getItem('washguard.theme.name')));
+    dom.window.close();
+  }
+  {
+    // Préférence versionnée : le choix explicite de l'utilisateur est respecté.
+    const { dom, w } = makeDom('/app/tableau-de-bord', base());
+    w.localStorage.setItem('washguard.theme.v', '2');
+    w.localStorage.setItem('washguard.theme.name', 'nord');
+    await mount(acode, w);
+    check('préférence de thème versionnée respectée (nord)',
+      w.document.documentElement.getAttribute('data-theme') === 'nord',
+      String(w.document.documentElement.getAttribute('data-theme')));
+    dom.window.close();
+  }
+  {
+    const { dom, w } = makeDom('/app/tableau-de-bord', base());
+    await mount(acode, w);
+    const click = (el) => el.dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true, view: w }));
+    const toggle = () => w.document.querySelector('button[aria-label="Basculer clair / sombre"]');
+    const themeNow = () => w.document.documentElement.getAttribute('data-theme');
+    check('bascule rapide : bouton présent', Boolean(toggle()));
+    if (toggle()) {
+      click(toggle());
+      await wait(140);
+      check('bascule rapide : cupcake → dim (pendant sombre pastel)',
+        themeNow() === 'dim' && w.document.documentElement.classList.contains('dark') &&
+        w.localStorage.getItem('washguard.theme.name') === 'dim' &&
+        w.localStorage.getItem('washguard.theme.dark') === 'dim',
+        String(themeNow()));
+      click(toggle());
+      await wait(140);
+      check('bascule rapide : retour au thème clair mémorisé (cupcake)',
+        themeNow() === 'cupcake' && !w.document.documentElement.classList.contains('dark') &&
+        w.localStorage.getItem('washguard.theme.light') === 'cupcake',
+        String(themeNow()));
+      // Un thème sombre choisi dans le menu devient le pendant de la bascule.
+      click(w.document.querySelector('button[aria-label="Choisir un thème"]'));
+      await wait(120);
+      const dracula = [...w.document.querySelectorAll('button[data-theme]')].find((r) => r.getAttribute('data-theme') === 'dracula');
+      if (dracula) click(dracula);
+      await wait(140);
+      click(toggle());
+      await wait(140);
+      check('bascule rapide : retour au thème clair (cupcake) depuis dracula', themeNow() === 'cupcake', String(themeNow()));
+      click(toggle());
+      await wait(140);
+      check('bascule rapide : mémorise le dernier thème sombre choisi (dracula)', themeNow() === 'dracula', String(themeNow()));
+    }
     dom.window.close();
   }
   {

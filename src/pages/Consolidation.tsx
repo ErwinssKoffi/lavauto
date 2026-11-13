@@ -9,13 +9,14 @@ import { formatDate, formatFCFA, todayISO } from '../lib/format';
 import {
   Alert, Badge, Card, EmptyState, Input, PageHeader, StatCard,
 } from '../components/ui';
+import { CHART_COLORS } from '../lib/chartTheme';
 
 const CHART_WIDTH = 720;
 const CHART_HEIGHT = 260;
-const AXIS = '#94a3b8';
-const GRID = '#334155';
+const AXIS = CHART_COLORS.axis;
+const GRID = CHART_COLORS.grid;
 const TOOLTIP_STYLE = {
-  background: '#0f172a', border: '1px solid #334155', color: '#e2e8f0',
+  background: 'var(--color-base-100)', border: '1px solid var(--color-base-300)', color: 'var(--color-base-content)',
   borderRadius: '10px', fontSize: '12px',
 };
 
@@ -82,10 +83,10 @@ export default function Consolidation() {
           <Input label="Comparer jusqu’au" type="date" value={compareEnd} min={compareStart || undefined} onChange={(e) => setCompareEnd(e.target.value)} />
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
-          <button className="wg-btn wg-btn-primary" onClick={() => { void refreshAnalytics(start, end, cs, ce).catch(() => {}); }}>
+          <button className="btn btn-sm btn-primary" onClick={() => { void refreshAnalytics(start, end, cs, ce).catch(() => {}); }}>
             <FiRefreshCw /> Actualiser les indicateurs
           </button>
-          <button className="wg-btn wg-btn-ghost" onClick={() => {
+          <button className="btn btn-sm" onClick={() => {
             const previous = previousPeriod(start, end);
             setCompareStart(previous.start);
             setCompareEnd(previous.end);
@@ -100,8 +101,8 @@ export default function Consolidation() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Chiffre d’affaires" value={formatFCFA(board.stats.revenue)} hint={definitions.revenue} icon={<FiTrendingUp />} />
         <StatCard label="Encaissements nets" value={formatFCFA(board.stats.collected)} hint={definitions.collected} />
-        <StatCard label="Solde partiel" value={formatFCFA(board.stats.partialBalance)} hint={definitions.partialBalance} accent="bg-amber-500/10 text-amber-400" />
-        <StatCard label="Écart vs période comparée" value={delta === null ? '—' : formatFCFA(delta)} hint="Même définition du chiffre d’affaires" accent="bg-sky-500/10 text-sky-400" />
+        <StatCard label="Solde partiel" value={formatFCFA(board.stats.partialBalance)} hint={definitions.partialBalance} accent="bg-warning/10 text-warning" />
+        <StatCard label="Écart vs période comparée" value={delta === null ? '—' : formatFCFA(delta)} hint="Même définition du chiffre d’affaires" accent="bg-primary/10 text-primary" />
       </div>
 
       <div className="mt-5 grid gap-5 xl:grid-cols-3">
@@ -110,20 +111,20 @@ export default function Consolidation() {
           {trend.length === 0 ? (
             <EmptyState icon={<FiBarChart2 />} title="Aucune donnée sur la période" description="Les points apparaîtront dès que des lavages réels seront enregistrés. Aucune donnée d’exemple n’est fabriquée." />
           ) : (
-            <div className="wg-scroll-x">
+            <div className="overflow-x-auto">
               <LineChart width={CHART_WIDTH} height={CHART_HEIGHT} data={trend} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
                 <XAxis dataKey="date" stroke={AXIS} tickFormatter={shortDate} fontSize={11} />
                 <YAxis stroke={AXIS} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} fontSize={11} />
                 <Tooltip contentStyle={TOOLTIP_STYLE} labelFormatter={(v) => formatDate(String(v))} />
                 <Legend />
-                <Line type="monotone" dataKey="revenue" name="Chiffre d’affaires" stroke="#38bdf8" dot={false} isAnimationActive={false} />
-                <Line type="monotone" dataKey="collected" name="Encaissé" stroke="#34d399" dot={false} isAnimationActive={false} />
-                <Line type="monotone" dataKey="expenses" name="Dépenses" stroke="#fbbf24" dot={false} isAnimationActive={false} />
+                <Line type="monotone" dataKey="revenue" name="Chiffre d’affaires" stroke={CHART_COLORS.revenue} dot={false} isAnimationActive={false} />
+                <Line type="monotone" dataKey="collected" name="Encaissé" stroke={CHART_COLORS.collected} dot={false} isAnimationActive={false} />
+                <Line type="monotone" dataKey="expenses" name="Dépenses" stroke={CHART_COLORS.expenses} dot={false} isAnimationActive={false} />
               </LineChart>
             </div>
           )}
-          <p className="wg-muted mt-2 text-xs">{board.rules.comparison} · {board.rules.netResult}.</p>
+          <p className="text-base-content/60 mt-2 text-xs">{board.rules.comparison} · {board.rules.netResult}.</p>
         </Card>
 
         <Card>
@@ -131,17 +132,17 @@ export default function Consolidation() {
           {rankings.length === 0 ? (
             <EmptyState icon={<FiTrendingUp />} title="Aucune station à classer" description="Le classement utilise uniquement les stations réellement accessibles." />
           ) : (
-            <div className="wg-scroll-x">
+            <div className="overflow-x-auto">
               <BarChart width={380} height={CHART_HEIGHT} data={rankings} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
                 <XAxis dataKey="name" stroke={AXIS} fontSize={10} interval={0} />
                 <YAxis stroke={AXIS} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} fontSize={11} />
                 <Tooltip contentStyle={TOOLTIP_STYLE} />
-                <Bar dataKey="revenue" name="Chiffre d’affaires" fill="#38bdf8" radius={[6, 6, 0, 0]} isAnimationActive={false} />
+                <Bar dataKey="revenue" name="Chiffre d’affaires" fill={CHART_COLORS.revenue} radius={[6, 6, 0, 0]} isAnimationActive={false} />
               </BarChart>
             </div>
           )}
-          <p className="wg-muted mt-2 text-xs">{board.rules.stations}.</p>
+          <p className="text-base-content/60 mt-2 text-xs">{board.rules.stations}.</p>
         </Card>
       </div>
 
@@ -150,24 +151,24 @@ export default function Consolidation() {
           <h2 className="mb-3 text-sm font-bold">Comparaison des périodes</h2>
           {compare ? (
             <div className="space-y-2 text-xs">
-              <div className="flex justify-between"><span className="wg-muted">CA période courante</span><span className="font-bold">{formatFCFA(board.period.revenue)}</span></div>
-              <div className="flex justify-between"><span className="wg-muted">CA période comparée</span><span className="font-bold">{formatFCFA(compare.revenue)}</span></div>
-              <div className="flex justify-between"><span className="wg-muted">Écart</span><Badge tone={(delta ?? 0) >= 0 ? 'success' : 'danger'}>{formatFCFA(delta ?? 0)}</Badge></div>
-              <div className="flex justify-between"><span className="wg-muted">Encaissé comparé</span><span>{formatFCFA(compare.collected)}</span></div>
-              <div className="flex justify-between"><span className="wg-muted">Définition CA</span><span>{compare.definitions.revenue ?? definitions.revenue}</span></div>
+              <div className="flex justify-between"><span className="text-base-content/60">CA période courante</span><span className="font-bold">{formatFCFA(board.period.revenue)}</span></div>
+              <div className="flex justify-between"><span className="text-base-content/60">CA période comparée</span><span className="font-bold">{formatFCFA(compare.revenue)}</span></div>
+              <div className="flex justify-between"><span className="text-base-content/60">Écart</span><Badge tone={(delta ?? 0) >= 0 ? 'success' : 'danger'}>{formatFCFA(delta ?? 0)}</Badge></div>
+              <div className="flex justify-between"><span className="text-base-content/60">Encaissé comparé</span><span>{formatFCFA(compare.collected)}</span></div>
+              <div className="flex justify-between"><span className="text-base-content/60">Définition CA</span><span>{compare.definitions.revenue ?? definitions.revenue}</span></div>
             </div>
           ) : (
-            <p className="wg-muted text-xs">Renseignez deux dates de comparaison pour afficher l’écart.</p>
+            <p className="text-base-content/60 text-xs">Renseignez deux dates de comparaison pour afficher l’écart.</p>
           )}
-          <p className="wg-muted mt-3 text-xs">{board.period.certified ? 'Coûts certifiés : résultat net calculable.' : `Coûts manquants : ${board.period.label}.`}</p>
+          <p className="text-base-content/60 mt-3 text-xs">{board.period.certified ? 'Coûts certifiés : résultat net calculable.' : `Coûts manquants : ${board.period.label}.`}</p>
         </Card>
 
         <Card>
           <h2 className="mb-3 text-sm font-bold">Définitions métier partagées</h2>
           <div className="space-y-2 text-xs">
             {Object.entries(definitions).map(([key, value]) => (
-              <div key={key} className="rounded-lg px-3 py-2" style={{ background: 'var(--wg-surface-2)' }}>
-                <span className="font-bold">{key}</span> · <span className="wg-muted">{value}</span>
+              <div key={key} className="rounded-lg px-3 py-2 bg-base-200">
+                <span className="font-bold">{key}</span> · <span className="text-base-content/60">{value}</span>
               </div>
             ))}
           </div>
@@ -179,22 +180,22 @@ export default function Consolidation() {
         {board.stations.length === 0 ? (
           <EmptyState icon={<FiBarChart2 />} title="Aucune station enregistrée" description="Le détail par station apparaîtra avec les données réelles." />
         ) : (
-          <div className="wg-scroll-x rounded-xl border" style={{ borderColor: 'var(--wg-border)' }}>
-            <table>
+          <div className="overflow-x-auto rounded-xl border">
+            <table className="table min-w-[620px]">
               <thead><tr>
-                <th className="wg-th">Rang</th><th className="wg-th">Station</th><th className="wg-th">Chiffre d’affaires</th>
-                <th className="wg-th">Lavages</th><th className="wg-th">Encaissé</th><th className="wg-th">Solde partiel</th><th className="wg-th">Résultat net</th>
+                <th>Rang</th><th>Station</th><th>Chiffre d’affaires</th>
+                <th>Lavages</th><th>Encaissé</th><th>Solde partiel</th><th>Résultat net</th>
               </tr></thead>
               <tbody>
                 {board.stations.map((s) => (
                   <tr key={s.stationId}>
-                    <td className="wg-td font-bold">#{s.rank}</td>
-                    <td className="wg-td font-bold">{s.name}{s.city && <span className="wg-muted ml-1 text-xs">· {s.city}</span>}</td>
-                    <td className="wg-td font-semibold">{formatFCFA(s.revenue)}</td>
-                    <td className="wg-td">{s.washCount}</td>
-                    <td className="wg-td">{formatFCFA(s.collected)}</td>
-                    <td className="wg-td">{formatFCFA(s.partialBalance)}</td>
-                    <td className="wg-td"><Badge tone="warn">Non calculable</Badge></td>
+                    <td className="font-bold">#{s.rank}</td>
+                    <td className="font-bold">{s.name}{s.city && <span className="text-base-content/60 ml-1 text-xs">· {s.city}</span>}</td>
+                    <td className="font-semibold">{formatFCFA(s.revenue)}</td>
+                    <td>{s.washCount}</td>
+                    <td>{formatFCFA(s.collected)}</td>
+                    <td>{formatFCFA(s.partialBalance)}</td>
+                    <td><Badge tone="warn">Non calculable</Badge></td>
                   </tr>
                 ))}
               </tbody>

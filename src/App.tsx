@@ -74,23 +74,23 @@ function RoleRoute({
   const feature = permissionFeature(required);
   if (feature && subscriptionStatus === 'loading') return <LoadingState label="Vérification de la formule…" />;
   if (feature && subscriptionAccess && !subscriptionAccess.features[feature] && state.session) return (
-    <Card className="flex items-start gap-3 border-amber-500/30"><FiLock className="mt-0.5 text-xl text-amber-400" />
+    <Card className="flex flex-row items-start gap-3 border-warning/30"><FiLock className="mt-0.5 text-xl text-warning" />
       <div><h2 className="text-sm font-bold">Module non inclus dans la formule active</h2>
-        <p className="wg-muted mt-1 text-xs">Les données existantes sont conservées. Une demande de formule ne change les droits qu’après validation administrateur.</p>
-        {can('subscription.manage') && <Link className="wg-link mt-3 inline-block text-xs" to="/app/abonnement">Comparer les formules →</Link>}
+        <p className="text-base-content/60 mt-1 text-xs">Les données existantes sont conservées. Une demande de formule ne change les droits qu’après validation administrateur.</p>
+        {can('subscription.manage') && <Link className="link link-primary mt-3 inline-block text-xs" to="/app/abonnement">Comparer les formules →</Link>}
       </div>
     </Card>
   );
   if (!state.session || !can(required)) {
     return (
-      <Card className="flex items-start gap-3 border-red-500/30">
-        <FiLock className="mt-0.5 text-xl text-red-400" />
+      <Card className="flex flex-row items-start gap-3 border-error/30">
+        <FiLock className="mt-0.5 text-xl text-error" />
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-sm font-bold">Accès refusé</h2>
             <Badge tone="danger">Permission insuffisante</Badge>
           </div>
-          <p className="wg-muted mt-1 text-xs leading-relaxed">
+          <p className="text-base-content/60 mt-1 text-xs leading-relaxed">
             Cet écran demande la permission « {required} » (rôles : {roles.map((r) => ROLE_LABELS[r]).join(', ')}).
             Votre compte est « {role ? ROLE_LABELS[role] : 'non connecté'} ».
           </p>
@@ -108,7 +108,7 @@ function StationSetupGate({ children }: { children: React.ReactNode }) {
   if (setupStatus === 'error') return (
     <Card>
       <Alert kind="warn">Réglages indisponibles : {setupError ?? 'lecture non confirmée'}. Aucune modification locale de remplacement n’est appliquée.</Alert>
-      <button className="wg-btn wg-btn-primary mt-4" onClick={() => { void refreshSetup().catch(() => undefined); }}>Relire et vérifier la station</button>
+      <button className="btn btn-sm btn-primary mt-4" onClick={() => { void refreshSetup().catch(() => undefined); }}>Relire et vérifier la station</button>
     </Card>
   );
   return <>{children}</>;

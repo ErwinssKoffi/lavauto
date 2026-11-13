@@ -69,8 +69,8 @@ export default function Washes() {
         subtitle="File d’attente, postes, affectations multiples, contrôle qualité, 7 statuts et historique véhicule. Le prix de chaque fiche reste figé."
         actions={
           <div className="flex gap-2">
-            <button className="wg-btn wg-btn-ghost" onClick={() => safe(() => refreshWashes())}>Actualiser</button>
-            <button className="wg-btn wg-btn-primary" disabled={!pendingWash && (!activated || !allow('washes.create'))} onClick={() => setCreateOpen(true)}><FiPlus /> {pendingWash ? 'Vérifier la création' : 'Nouvelle fiche'}</button>
+            <button className="btn btn-sm" onClick={() => safe(() => refreshWashes())}>Actualiser</button>
+            <button className="btn btn-sm btn-primary" disabled={!pendingWash && (!activated || !allow('washes.create'))} onClick={() => setCreateOpen(true)}><FiPlus /> {pendingWash ? 'Vérifier la création' : 'Nouvelle fiche'}</button>
           </div>
         }
       />
@@ -84,19 +84,19 @@ export default function Washes() {
         <div className="mb-3 flex items-center gap-2 text-sm font-bold"><FiClipboard /> File d’attente par statut</div>
         <div className="flex flex-wrap gap-2">
           {queue.map((q) => (
-            <button key={q.status} className="wg-btn wg-btn-ghost !py-2" onClick={() => setStatusFilter(statusFilter === q.status ? 'tous' : q.status)}>
+            <button key={q.status} className="btn btn-sm py-2!" onClick={() => setStatusFilter(statusFilter === q.status ? 'tous' : q.status)}>
               <Badge tone={washStatusTone(q.status)}>{WASH_STATUS_LABELS[q.status]}</Badge>
               <span className="ml-1 font-bold">{q.count}</span>
             </button>
           ))}
         </div>
-        <p className="wg-muted mt-3 text-[11px]">« Prêt / terminé » n’est pas « Livré » : la restitution au client est une étape distincte et tracée.</p>
+        <p className="text-base-content/60 mt-3 text-[11px]">« Prêt / terminé » n’est pas « Livré » : la restitution au client est une étape distincte et tracée.</p>
       </Card>
 
       <Card className="mb-5">
         <div className="mb-3 flex items-center gap-2 text-sm font-bold"><FiUsers /> Postes de lavage</div>
         {posts.length === 0 ? (
-          <p className="wg-muted text-xs">Aucun poste configuré pour cette station. Les affectations restent possibles sans poste.</p>
+          <p className="text-base-content/60 text-xs">Aucun poste configuré pour cette station. Les affectations restent possibles sans poste.</p>
         ) : (
           <div className="mb-3 flex flex-wrap gap-2">
             {posts.map((p) => (
@@ -107,7 +107,7 @@ export default function Washes() {
         <div className="grid gap-2 sm:grid-cols-[1fr_120px_auto]">
           <Input disabled={!activated || !allow('washes.assign')} value={postName} onChange={(e) => setPostName(e.target.value)} placeholder="Nom du poste (ex. Piste 1)" />
           <Input type="number" min="1" disabled={!activated || !allow('washes.assign')} value={postCapacity} onChange={(e) => setPostCapacity(readNumber(e.target.value))} />
-          <button className="wg-btn wg-btn-ghost" disabled={!activated || !allow('washes.assign')}
+          <button className="btn btn-sm" disabled={!activated || !allow('washes.assign')}
             onClick={() => safe(async () => { await createWashPost(postName, postCapacity, stationId); setPostName(''); setPostCapacity(1); })}>
             <FiPlus /> Ajouter un poste
           </button>
@@ -117,10 +117,10 @@ export default function Washes() {
       <Card className="mb-5">
         <div className="flex flex-wrap gap-3">
           <div className="relative min-w-[220px] flex-1">
-            <FiSearch className="wg-muted pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" />
-            <input className="wg-input !pl-9" placeholder="Rechercher une fiche, une plaque, un client…" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <FiSearch className="text-base-content/60 pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" />
+            <input className="input input-sm pl-9! w-full" placeholder="Rechercher une fiche, une plaque, un client…" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
-          <select className="wg-input !w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}>
+          <select className="input input-sm w-auto!" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}>
             <option value="tous">Tous les statuts</option>
             {(Object.keys(WASH_STATUS_LABELS) as WashStatus[]).map((s) => <option key={s} value={s}>{WASH_STATUS_LABELS[s]}</option>)}
           </select>
@@ -128,29 +128,29 @@ export default function Washes() {
       </Card>
 
       {washes.length === 0 ? (
-        <EmptyState icon={<FiTruck />} title="Aucune fiche de lavage" description="Les fiches enregistrées apparaîtront ici. Aucune donnée d’exemple n’est ajoutée." action={activated && allow('washes.create') ? <button className="wg-btn wg-btn-primary" onClick={() => setCreateOpen(true)}><FiPlus /> Créer la première fiche</button> : undefined} />
+        <EmptyState icon={<FiTruck />} title="Aucune fiche de lavage" description="Les fiches enregistrées apparaîtront ici. Aucune donnée d’exemple n’est ajoutée." action={activated && allow('washes.create') ? <button className="btn btn-sm btn-primary" onClick={() => setCreateOpen(true)}><FiPlus /> Créer la première fiche</button> : undefined} />
       ) : (
-        <Card className="!p-0 overflow-hidden">
-          <div className="wg-scroll-x">
-            <table>
+        <Card className="p-0! overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="table min-w-[620px]">
               <thead><tr>
-                <th className="wg-th">Fiche</th><th className="wg-th">Date</th><th className="wg-th">Véhicule</th>
-                <th className="wg-th">Client</th><th className="wg-th">Affectés</th><th className="wg-th">Total</th>
-                <th className="wg-th">Payé</th><th className="wg-th">Reste</th><th className="wg-th">Statut</th><th className="wg-th" />
+                <th>Fiche</th><th>Date</th><th>Véhicule</th>
+                <th>Client</th><th>Affectés</th><th>Total</th>
+                <th>Payé</th><th>Reste</th><th>Statut</th><th />
               </tr></thead>
               <tbody>
                 {washes.map((w) => (
-                  <tr key={w.id} className="cursor-pointer hover:bg-sky-500/5" onClick={() => setDetailId(w.id)}>
-                    <td className="wg-td font-bold">{w.number}</td>
-                    <td className="wg-td">{formatDate(w.createdAt)}</td>
-                    <td className="wg-td">{w.vehicleLabel}{w.plate && <span className="wg-muted ml-1 text-xs">· {w.plate}</span>}</td>
-                    <td className="wg-td">{w.clientName ?? <span className="wg-muted">Sans client</span>}</td>
-                    <td className="wg-td">{w.assignedUserIds.length}</td>
-                    <td className="wg-td font-semibold">{formatFCFA(w.total)}</td>
-                    <td className="wg-td">{formatFCFA(w.paid)}</td>
-                    <td className="wg-td">{formatFCFA(Math.max(0, w.total - w.paid))}</td>
-                    <td className="wg-td"><Badge tone={washStatusTone(w.status)}>{WASH_STATUS_LABELS[w.status]}</Badge></td>
-                    <td className="wg-td"><button className="wg-link text-xs">Détails →</button></td>
+                  <tr key={w.id} className="cursor-pointer hover:bg-primary/5" onClick={() => setDetailId(w.id)}>
+                    <td className="font-bold">{w.number}</td>
+                    <td>{formatDate(w.createdAt)}</td>
+                    <td>{w.vehicleLabel}{w.plate && <span className="text-base-content/60 ml-1 text-xs">· {w.plate}</span>}</td>
+                    <td>{w.clientName ?? <span className="text-base-content/60">Sans client</span>}</td>
+                    <td>{w.assignedUserIds.length}</td>
+                    <td className="font-semibold">{formatFCFA(w.total)}</td>
+                    <td>{formatFCFA(w.paid)}</td>
+                    <td>{formatFCFA(Math.max(0, w.total - w.paid))}</td>
+                    <td><Badge tone={washStatusTone(w.status)}>{WASH_STATUS_LABELS[w.status]}</Badge></td>
+                    <td><button className="link link-primary text-xs">Détails →</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -226,11 +226,11 @@ function CreateWashModal({ methods, onClose, onSubmit, onRetry }: {
         <div className="mt-4 space-y-1 text-sm">
           <p>Plaque : <strong>{payload.plate || 'Non renseignée'}</strong></p>
           <p>Encaissement initial : <strong>{payload.payment ? `${formatFCFA(payload.payment.amount)} · ${PAY_METHOD_LABELS[payload.payment.method]}` : 'Aucun'}</strong></p>
-          <p className="wg-muted text-xs">Tentative du {formatDateTime(pendingWash.startedAt)}. La reprise est conservée dans cet onglet ; ne l’effacez pas et ne changez pas d’appareil avant vérification.</p>
+          <p className="text-base-content/60 text-xs">Tentative du {formatDateTime(pendingWash.startedAt)}. La reprise est conservée dans cet onglet ; ne l’effacez pas et ne changez pas d’appareil avant vérification.</p>
         </div>
         <div className="mt-5 flex justify-end gap-2">
-          <button className="wg-btn wg-btn-ghost" disabled={busy} onClick={close}>Fermer</button>
-          <button className="wg-btn wg-btn-primary" disabled={busy || !canWriteSubscription} onClick={() => { void run(onRetry); }}>
+          <button className="btn btn-sm" disabled={busy} onClick={close}>Fermer</button>
+          <button className="btn btn-sm btn-primary" disabled={busy || !canWriteSubscription} onClick={() => { void run(onRetry); }}>
             {busy ? 'Vérification…' : 'Vérifier / réessayer la même opération'}
           </button>
         </div>
@@ -281,15 +281,15 @@ function CreateWashModal({ methods, onClose, onSubmit, onRetry }: {
           </Select>
           {!clientId && <Input label="Nom du client sans fiche (facultatif)" value={clientName} onChange={(e) => setClientName(e.target.value)} hint="Un lavage peut être encaissé sans créer de client." />}
           <div>
-            <p className="wg-label">Employés affectés * (plusieurs possibles)</p>
-            <div className="max-h-[150px] space-y-1 overflow-y-auto rounded-xl border p-2" style={{ borderColor: 'var(--wg-border)' }}>
-              {employees.length === 0 && <p className="wg-muted p-2 text-xs">Aucun employé actif.</p>}
+            <p className="label">Employés affectés * (plusieurs possibles)</p>
+            <div className="max-h-[150px] space-y-1 overflow-y-auto rounded-xl border p-2">
+              {employees.length === 0 && <p className="text-base-content/60 p-2 text-xs">Aucun employé actif.</p>}
               {employees.map((u) => (
-                <label key={u.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs" style={{ background: 'var(--wg-surface-2)' }}>
+                <label key={u.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs bg-base-200">
                   <input type="checkbox" className="accent-sky-500" checked={employeeIds.includes(u.id)}
                     onChange={(e) => setEmployeeIds((ids) => e.target.checked ? [...ids, u.id] : ids.filter((id) => id !== u.id))} />
                   <span className="flex-1 truncate font-medium">{u.name}</span>
-                  <span className="wg-muted">{u.role}</span>
+                  <span className="text-base-content/60">{u.role}</span>
                 </label>
               ))}
             </div>
@@ -297,17 +297,17 @@ function CreateWashModal({ methods, onClose, onSubmit, onRetry }: {
         </div>
 
         <div>
-          <p className="wg-label">Prestations *</p>
-          <div className="max-h-[260px] space-y-2 overflow-y-auto rounded-xl border p-2" style={{ borderColor: 'var(--wg-border)' }}>
-            {svcs.length === 0 && <p className="wg-muted p-3 text-xs">Aucune prestation active.</p>}
+          <p className="label">Prestations *</p>
+          <div className="max-h-[260px] space-y-2 overflow-y-auto rounded-xl border p-2">
+            {svcs.length === 0 && <p className="text-base-content/60 p-3 text-xs">Aucune prestation active.</p>}
             {svcs.map((s) => (
-              <div key={s.id} className="flex items-center gap-2 rounded-lg px-2 py-2 text-xs" style={{ background: 'var(--wg-surface-2)' }}>
+              <div key={s.id} className="flex items-center gap-2 rounded-lg px-2 py-2 text-xs bg-base-200">
                 <input type="checkbox" className="accent-sky-500" aria-label={`Sélectionner ${s.name}`} checked={Object.prototype.hasOwnProperty.call(qty, s.id)}
                   onChange={(e) => setQty((q) => { const next = { ...q }; if (e.target.checked) next[s.id] = 1; else delete next[s.id]; return next; })} />
                 <span className="min-w-0 flex-1 truncate font-medium">{s.name}</span>
-                <span className="wg-muted shrink-0">{s.prices[categoryId] ? formatFCFA(s.prices[categoryId]) : 'Prix manquant'}</span>
+                <span className="text-base-content/60 shrink-0">{s.prices[categoryId] ? formatFCFA(s.prices[categoryId]) : 'Prix manquant'}</span>
                 {Object.prototype.hasOwnProperty.call(qty, s.id) && (
-                  <input type="number" min="1" className="wg-input !w-14 !px-2 !py-1" value={Number.isNaN(qty[s.id]) ? '' : qty[s.id]}
+                  <input type="number" min="1" className="input input-sm w-14! px-2! py-1!" value={Number.isNaN(qty[s.id]) ? '' : qty[s.id]}
                     onChange={(e) => setQty((q) => ({ ...q, [s.id]: readNumber(e.target.value) }))} />
                 )}
               </div>
@@ -315,15 +315,15 @@ function CreateWashModal({ methods, onClose, onSubmit, onRetry }: {
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <Input label="Remise (FCFA)" type="number" min="0" value={discount} onChange={(e) => setDiscount(readNumber(e.target.value))} hint={maxDiscount !== Infinity ? `Max caissier : ${maxDiscount} FCFA` : undefined} />
-            <div className="rounded-xl border p-3" style={{ borderColor: 'var(--wg-border)' }}>
-              <p className="wg-muted text-[11px]">Total estimé de la fiche</p>
+            <div className="rounded-xl border p-3">
+              <p className="text-base-content/60 text-[11px]">Total estimé de la fiche</p>
               <p className="mt-1 text-lg font-bold">{Number.isFinite(total) && total >= 0 ? formatFCFA(total) : '—'}</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="mt-5 rounded-xl border p-4" style={{ borderColor: 'var(--wg-border)' }}>
+      <div className="mt-5 rounded-xl border p-4">
         <p className="mb-3 flex items-center gap-2 text-sm font-bold"><FiCreditCard /> Encaissement à la création (facultatif)</p>
         <div className="grid gap-3 sm:grid-cols-2">
           <Input label="Montant encaissé (FCFA)" type="number" min="0" max={Number.isFinite(total) && total >= 0 ? total : undefined} value={payAmount} onChange={(e) => setPayAmount(readNumber(e.target.value))} hint="0 = encaissement plus tard, total ou partiel." />
@@ -332,15 +332,15 @@ function CreateWashModal({ methods, onClose, onSubmit, onRetry }: {
             {methods.map((m) => <option key={m} value={m}>{PAY_METHOD_LABELS[m]}</option>)}
           </Select>
         </div>
-        <p className="wg-muted mt-2 text-[11px]">Un encaissement en espèces exige une caisse ouverte en mode connecté. Le Mobile Money peut être enregistré à tout moment.</p>
+        <p className="text-base-content/60 mt-2 text-[11px]">Un encaissement en espèces exige une caisse ouverte en mode connecté. Le Mobile Money peut être enregistré à tout moment.</p>
       </div>
       </fieldset>
 
       <Alert kind="info">Les prix sont figés sur la fiche : modifier un tarif dans Prestations ne changera jamais ce lavage.</Alert>
       {error && <div className="mt-3"><Alert kind="danger">{error}</Alert></div>}
       <div className="mt-5 flex justify-end gap-2">
-        <button className="wg-btn wg-btn-ghost" disabled={busy} onClick={close}><FiX /> Annuler</button>
-        <button className="wg-btn wg-btn-primary" disabled={busy || !canWriteSubscription} onClick={submit}><FiCheckCircle /> {busy ? 'Enregistrement…' : 'Enregistrer la fiche'}</button>
+        <button className="btn btn-sm" disabled={busy} onClick={close}><FiX /> Annuler</button>
+        <button className="btn btn-sm btn-primary" disabled={busy || !canWriteSubscription} onClick={submit}><FiCheckCircle /> {busy ? 'Enregistrement…' : 'Enregistrer la fiche'}</button>
       </div>
     </Modal>
   );
@@ -421,28 +421,28 @@ function WashDetail({ washId, methods, onClose, onStatus, onAssign, onQuality, o
       </div>
 
       <div className="mt-4">
-        <button className="wg-btn wg-btn-ghost" onClick={() => setReceipt(buildWashReceipt(
+        <button className="btn btn-sm" onClick={() => setReceipt(buildWashReceipt(
           w, state.company, state.station, identity?.stations ?? [], state.paymentCancellations ?? [],
         ))}><FiFileText /> Reçu client</button>
       </div>
 
-      <div className="mt-5 wg-scroll-x rounded-xl border" style={{ borderColor: 'var(--wg-border)' }}>
-        <table>
-          <thead><tr><th className="wg-th">Prestation</th><th className="wg-th">Prix unitaire (figé)</th><th className="wg-th">Qté</th><th className="wg-th">Montant</th></tr></thead>
+      <div className="mt-5 overflow-x-auto rounded-xl border">
+        <table className="table min-w-[620px]">
+          <thead><tr><th>Prestation</th><th>Prix unitaire (figé)</th><th>Qté</th><th>Montant</th></tr></thead>
           <tbody>
             {w.items.map((it) => (
-              <tr key={it.serviceId}><td className="wg-td">{it.serviceName}</td><td className="wg-td">{formatFCFA(it.unitPrice)}</td><td className="wg-td">{it.qty}</td><td className="wg-td font-semibold">{formatFCFA(it.unitPrice * it.qty)}</td></tr>
+              <tr key={it.serviceId}><td>{it.serviceName}</td><td>{formatFCFA(it.unitPrice)}</td><td>{it.qty}</td><td className="font-semibold">{formatFCFA(it.unitPrice * it.qty)}</td></tr>
             ))}
-            {w.discount > 0 && <tr><td className="wg-td" colSpan={3}>Remise</td><td className="wg-td">− {formatFCFA(w.discount)}</td></tr>}
-            <tr><td className="wg-td font-bold" colSpan={3}>Total</td><td className="wg-td font-bold">{formatFCFA(w.total)}</td></tr>
+            {w.discount > 0 && <tr><td colSpan={3}>Remise</td><td>− {formatFCFA(w.discount)}</td></tr>}
+            <tr><td className="font-bold" colSpan={3}>Total</td><td className="font-bold">{formatFCFA(w.total)}</td></tr>
           </tbody>
         </table>
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <Card className="!p-3"><p className="wg-muted text-[11px]">Total</p><p className="mt-1 font-bold">{formatFCFA(w.total)}</p></Card>
-        <Card className="!p-3"><p className="wg-muted text-[11px]">Encaissé</p><p className="mt-1 font-bold">{formatFCFA(w.paid)}</p></Card>
-        <Card className="!p-3"><p className="wg-muted text-[11px]">Reste à payer</p><p className="mt-1 font-bold">{formatFCFA(Math.max(0, w.total - w.paid))}</p></Card>
+        <Card className="p-3!"><p className="text-base-content/60 text-[11px]">Total</p><p className="mt-1 font-bold">{formatFCFA(w.total)}</p></Card>
+        <Card className="p-3!"><p className="text-base-content/60 text-[11px]">Encaissé</p><p className="mt-1 font-bold">{formatFCFA(w.paid)}</p></Card>
+        <Card className="p-3!"><p className="text-base-content/60 text-[11px]">Reste à payer</p><p className="mt-1 font-bold">{formatFCFA(Math.max(0, w.total - w.paid))}</p></Card>
       </div>
 
       <WhatsappWashPanel key={`${w.id}:${w.status}`} wash={w} />
@@ -450,9 +450,9 @@ function WashDetail({ washId, methods, onClose, onStatus, onAssign, onQuality, o
       <div className="mt-5">
         <p className="mb-2 text-xs font-bold">Historique des statuts</p>
         <div className="space-y-1.5">
-          {w.history.length === 0 && <p className="wg-muted text-xs">Aucun événement.</p>}
+          {w.history.length === 0 && <p className="text-base-content/60 text-xs">Aucun événement.</p>}
           {w.history.map((h) => (
-            <div key={h.id} className="wg-muted flex flex-wrap justify-between gap-2 rounded-lg px-3 py-2 text-xs" style={{ background: 'var(--wg-surface-2)' }}>
+            <div key={h.id} className="text-base-content/60 flex flex-wrap justify-between gap-2 rounded-lg px-3 py-2 text-xs bg-base-200">
               <span>{WASH_STATUS_LABELS[h.toStatus]} · {formatDateTime(h.at)}{h.fromStatus ? ` (depuis ${WASH_STATUS_LABELS[h.fromStatus]})` : ''}</span>
               <span>{h.reason ?? '—'}</span>
             </div>
@@ -468,26 +468,26 @@ function WashDetail({ washId, methods, onClose, onStatus, onAssign, onQuality, o
               const cancelled = Boolean(p.cancelledAt) || (state.paymentCancellations ?? [])
                 .some((c) => c.paymentId === p.id);
               return (
-                <div key={p.id} className="wg-muted flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs" style={{ background: 'var(--wg-surface-2)' }}>
+                <div key={p.id} className="text-base-content/60 flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs bg-base-200">
                   <span>{PAY_METHOD_LABELS[p.method]} · {formatDateTime(p.at)}</span>
                   <span className="flex items-center gap-2">
                     <span className="font-bold">{formatFCFA(p.amount)}</span>
                     {cancelled
                       ? <Badge tone="danger">Annulé{p.cancelReason ? ` · ${p.cancelReason}` : ''}</Badge>
                       : allow('payments.cancel') &&
-                        <button className="wg-link text-xs" onClick={() => { setRefundId(p.id); setRefundReason(''); }}>Annuler</button>}
+                        <button className="link link-primary text-xs" onClick={() => { setRefundId(p.id); setRefundReason(''); }}>Annuler</button>}
                   </span>
                 </div>
               );
             })}
           </div>
           {refundId && (
-            <div className="mt-3 rounded-xl border border-red-500/30 p-3">
+            <div className="mt-3 rounded-xl border border-error/30 p-3">
               <p className="mb-2 text-xs font-bold">Remboursement : le paiement reste tracé, la créance est recalculée</p>
               <Input label="Motif *" disabled={!allow('payments.cancel')} value={refundReason} onChange={(e) => setRefundReason(e.target.value)} placeholder="Ex. client remboursé" />
               <div className="mt-3 flex gap-2">
-                <button className="wg-btn wg-btn-ghost" onClick={() => setRefundId(null)}>Revenir</button>
-                <button className="wg-btn wg-btn-danger" disabled={!allow('payments.cancel')} onClick={() => safe(async () => {
+                <button className="btn btn-sm" onClick={() => setRefundId(null)}>Revenir</button>
+                <button className="btn btn-sm btn-error btn-outline" disabled={!allow('payments.cancel')} onClick={() => safe(async () => {
                   await onRefund(refundId, refundReason); setRefundId(null);
                 })}>Confirmer l’annulation</button>
               </div>
@@ -497,26 +497,26 @@ function WashDetail({ washId, methods, onClose, onStatus, onAssign, onQuality, o
       )}
 
       {((w.total - w.paid > 0 && w.status !== 'cancelled') || paymentAttempt.pending || paymentAttempt.error) && (
-        <div className="mt-4 rounded-xl border p-4" style={{ borderColor: 'var(--wg-border)' }}>
+        <div className="mt-4 rounded-xl border p-4">
           <p className="mb-3 flex items-center gap-2 text-sm font-bold"><FiDollarSign /> Encaisser le reste</p>
           {paymentAttempt.error && <div className="mb-3"><Alert kind="danger">{paymentAttempt.error}</Alert></div>}
           {paymentAttempt.pending && <div className="mb-3"><Alert kind="warn">Résultat incertain ou lecture non confirmée : vérifiez cet encaissement avec sa clé d’origine avant d’en créer un autre. La tentative est conservée dans cet onglet. {!canWriteSubscription && 'La reprise est suspendue en lecture seule ; consultez l’historique et conservez la tentative.'}</Alert></div>}
           <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
             <Input label="Montant à encaisser (FCFA)" type="number" min="1" max={w.total - w.paid} disabled={!allow('payments.create') || payBusy || Boolean(paymentAttempt.pending)} value={paymentAttempt.pending?.amount ?? amount} onChange={(e) => setAmount(readNumber(e.target.value))} />
             <Select label="Moyen de paiement" disabled={!allow('payments.create') || payBusy || Boolean(paymentAttempt.pending)} value={paymentAttempt.pending?.method ?? (methods.includes(method) ? method : '')} onChange={(e) => setMethod(e.target.value as PayMethod)}>{!paymentAttempt.pending && !methods.includes(method) && <option value="">{methods.length === 0 ? 'Aucun moyen configuré' : 'Choisir un moyen'}</option>}{paymentAttempt.pending && !methods.includes(paymentAttempt.pending.method) && <option value={paymentAttempt.pending.method}>{PAY_METHOD_LABELS[paymentAttempt.pending.method]} (tentative initiale)</option>}{methods.map((m) => <option key={m} value={m}>{PAY_METHOD_LABELS[m]}</option>)}</Select>
-            <button className="wg-btn wg-btn-primary" disabled={!allow('payments.create') || payBusy || Boolean(paymentAttempt.error)} onClick={pay}>{payBusy ? 'Vérification…' : paymentAttempt.pending ? 'Vérifier le paiement' : 'Encaisser'}</button>
+            <button className="btn btn-sm btn-primary" disabled={!allow('payments.create') || payBusy || Boolean(paymentAttempt.error)} onClick={pay}>{payBusy ? 'Vérification…' : paymentAttempt.pending ? 'Vérifier le paiement' : 'Encaisser'}</button>
           </div>
         </div>
       )}
 
       {w.plate && (
         <div className="mt-4">
-          <button className="wg-btn wg-btn-ghost" onClick={() => safe(async () => { setHistoryRows(await onVehicleHistory(w.plate)); })}>
+          <button className="btn btn-sm" onClick={() => safe(async () => { setHistoryRows(await onVehicleHistory(w.plate)); })}>
             <FiTruck /> Historique du véhicule {w.plate}
           </button>
           {historyRows && (
-            <div className="mt-2 rounded-xl border p-3" style={{ borderColor: 'var(--wg-border)' }}>
-              {historyRows.length === 0 ? <p className="wg-muted text-xs">Aucun autre lavage pour cette plaque.</p> : (
+            <div className="mt-2 rounded-xl border p-3">
+              {historyRows.length === 0 ? <p className="text-base-content/60 text-xs">Aucun autre lavage pour cette plaque.</p> : (
                 <div className="space-y-1">
                   {historyRows.map((h) => (
                     <div key={h.id} className="flex justify-between text-xs"><span>{h.number} · {formatDate(h.createdAt)}</span><span>{WASH_STATUS_LABELS[h.status]} · {formatFCFA(h.total)}</span></div>
@@ -529,11 +529,11 @@ function WashDetail({ washId, methods, onClose, onStatus, onAssign, onQuality, o
       )}
 
       {assignMode && (
-        <div className="mt-4 rounded-xl border p-4" style={{ borderColor: 'var(--wg-border)' }}>
+        <div className="mt-4 rounded-xl border p-4">
           <p className="mb-2 text-sm font-bold">Affecter / réaffecter</p>
           <div className="max-h-[140px] space-y-1 overflow-y-auto">
             {employees.map((u) => (
-              <label key={u.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs" style={{ background: 'var(--wg-surface-2)' }}>
+              <label key={u.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs bg-base-200">
                 <input type="checkbox" className="accent-sky-500" disabled={!allow('washes.assign')} checked={selected.includes(u.id)}
                   onChange={(e) => setSelected((ids) => e.target.checked ? [...ids, u.id] : ids.filter((id) => id !== u.id))} />
                 <span className="flex-1 truncate">{u.name}</span>
@@ -542,57 +542,57 @@ function WashDetail({ washId, methods, onClose, onStatus, onAssign, onQuality, o
           </div>
           <div className="mt-2"><Select label="Poste" disabled={!allow('washes.assign')} value={postId} onChange={(e) => setPostId(e.target.value)}><option value="">Aucun poste</option>{posts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></div>
           <div className="mt-3 flex gap-2">
-            <button className="wg-btn wg-btn-ghost" onClick={() => setAssignMode(false)}>Revenir</button>
-            <button className="wg-btn wg-btn-primary" disabled={!allow('washes.assign') || selected.length === 0}
+            <button className="btn btn-sm" onClick={() => setAssignMode(false)}>Revenir</button>
+            <button className="btn btn-sm btn-primary" disabled={!allow('washes.assign') || selected.length === 0}
               onClick={() => safe(async () => { await onAssign(selected, postId || null); setAssignMode(false); })}>Valider l’affectation</button>
           </div>
         </div>
       )}
 
       {w.status === 'quality_check' && (
-        <div className="mt-4 rounded-xl border border-sky-500/30 p-4">
+        <div className="mt-4 rounded-xl border border-primary/30 p-4">
           <p className="mb-2 text-sm font-bold">Contrôle qualité obligatoire</p>
           <Input label="Notes (facultatives, obligatoires en cas de refus)" disabled={!allow('washes.quality')} value={qualityNotes} onChange={(e) => setQualityNotes(e.target.value)} />
           <div className="mt-3 flex flex-wrap gap-2">
-            <button className="wg-btn wg-btn-primary" disabled={!allow('washes.quality')}
+            <button className="btn btn-sm btn-primary" disabled={!allow('washes.quality')}
               onClick={() => safe(async () => { await onQuality('approved', qualityNotes); })}><FiCheckCircle /> Valider → Prêt</button>
-            <button className="wg-btn wg-btn-danger" disabled={!allow('washes.quality')}
+            <button className="btn btn-sm btn-error btn-outline" disabled={!allow('washes.quality')}
               onClick={() => safe(async () => { await onQuality('rejected', qualityNotes || 'Reprise demandée'); })}>Refuser → Reprise</button>
           </div>
-          {w.qualityResult && <p className="wg-muted mt-2 text-xs">Dernier contrôle : {w.qualityResult === 'approved' ? 'validé' : 'refusé'}{w.qualityNotes ? ` · ${w.qualityNotes}` : ''}</p>}
+          {w.qualityResult && <p className="text-base-content/60 mt-2 text-xs">Dernier contrôle : {w.qualityResult === 'approved' ? 'validé' : 'refusé'}{w.qualityNotes ? ` · ${w.qualityNotes}` : ''}</p>}
         </div>
       )}
 
       {cancelMode && (
-        <div className="mt-4 rounded-xl border border-red-500/30 p-4">
+        <div className="mt-4 rounded-xl border border-error/30 p-4">
           <p className="mb-2 text-sm font-bold">Annuler la fiche</p>
           <Input label="Motif de l’annulation *" disabled={!allow('washes.update_status')} value={reason} onChange={(e) => setReason(e.target.value)} />
           <div className="mt-3 flex gap-2">
-            <button className="wg-btn wg-btn-ghost" onClick={() => setCancelMode(false)}>Revenir</button>
-            <button className="wg-btn wg-btn-danger" disabled={!allow('washes.update_status') || !reason.trim()}
+            <button className="btn btn-sm" onClick={() => setCancelMode(false)}>Revenir</button>
+            <button className="btn btn-sm btn-error btn-outline" disabled={!allow('washes.update_status') || !reason.trim()}
               onClick={() => { onStatus('cancelled', reason.trim()); setCancelMode(false); onClose(); }}>Confirmer l’annulation</button>
           </div>
         </div>
       )}
 
-      <div className="mt-5 flex flex-wrap gap-2 border-t pt-4" style={{ borderColor: 'var(--wg-border)' }}>
+      <div className="mt-5 flex flex-wrap gap-2 border-t pt-4">
         {next.map((s) => (
-          <button key={s} className={`wg-btn ${s === 'delivered' ? 'wg-btn-primary' : 'wg-btn-ghost'}`}
+          <button key={s} className={`btn btn-sm ${s === 'delivered' ? 'btn-primary' : 'btn-ghost'}`}
             disabled={!allow(s === 'delivered' ? 'washes.quality' : 'washes.update_status')}
             onClick={() => onStatus(s)}>
             {s === 'delivered' && <FiCheckCircle />}{NEXT_LABELS[s] ?? WASH_STATUS_LABELS[s]}
           </button>
         ))}
         {w.status !== 'delivered' && w.status !== 'cancelled' && allow('washes.assign') && (
-          <button className="wg-btn wg-btn-ghost" onClick={() => { setSelected(w.assignedUserIds); setPostId(w.postId ?? ''); setAssignMode(true); }}><FiUsers /> Affecter</button>
+          <button className="btn btn-sm" onClick={() => { setSelected(w.assignedUserIds); setPostId(w.postId ?? ''); setAssignMode(true); }}><FiUsers /> Affecter</button>
         )}
         {w.status !== 'cancelled' && w.status !== 'delivered' && (
-          <button className="wg-btn wg-btn-danger" disabled={!allow('washes.update_status')} onClick={() => setCancelMode(true)}>Annuler</button>
+          <button className="btn btn-sm btn-error btn-outline" disabled={!allow('washes.update_status')} onClick={() => setCancelMode(true)}>Annuler</button>
         )}
-        <button className="wg-btn wg-btn-ghost ml-auto" onClick={onClose}>Fermer</button>
+        <button className="btn btn-sm ml-auto" onClick={onClose}>Fermer</button>
       </div>
-      {w.cancelledReason && <p className="wg-muted mt-2 text-xs">Motif : {w.cancelledReason}</p>}
-      {w.deliveredAt && <p className="wg-muted mt-1 text-xs">Livré le {formatDateTime(w.deliveredAt)} — distinct de « prêt ».</p>}
+      {w.cancelledReason && <p className="text-base-content/60 mt-2 text-xs">Motif : {w.cancelledReason}</p>}
+      {w.deliveredAt && <p className="text-base-content/60 mt-1 text-xs">Livré le {formatDateTime(w.deliveredAt)} — distinct de « prêt ».</p>}
     </Modal>
     {receipt && <WashReceiptModal receipt={receipt} onClose={() => setReceipt(null)} />}
   </>);

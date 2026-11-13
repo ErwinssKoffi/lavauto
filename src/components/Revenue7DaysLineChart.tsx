@@ -7,6 +7,7 @@ import { FiTrendingUp } from 'react-icons/fi';
 import { formatFCFA } from '../lib/format';
 import type { DayChartPoint } from '../lib/metrics';
 import { Badge, Card } from './ui';
+import { CHART_COLORS } from '../lib/chartTheme';
 
 export default function Revenue7DaysLineChart({ data }: { data: DayChartPoint[] }) {
 
@@ -23,28 +24,27 @@ export default function Revenue7DaysLineChart({ data }: { data: DayChartPoint[] 
         <div
           className="rounded-xl border p-3 shadow-xl backdrop-blur-md"
           style={{
-            background: 'rgba(15, 23, 42, 0.95)',
-            borderColor: 'var(--wg-border)',
-            color: '#e2e8f0',
+            background: 'var(--color-base-100)',
+            color: 'var(--color-base-content)',
           }}
         >
-          <div className="flex items-center justify-between gap-3 border-b pb-1.5 mb-2" style={{ borderColor: 'rgba(148, 163, 184, 0.2)' }}>
-            <span className="font-bold text-xs text-slate-200">{point.label} ({point.fullDate})</span>
-            <span className="rounded bg-sky-500/20 px-1.5 py-0.5 text-[10px] font-bold text-sky-400">
+          <div className="flex items-center justify-between gap-3 border-b pb-1.5 mb-2" style={{ borderColor: 'var(--color-base-300)' }}>
+            <span className="font-bold text-xs text-base-content/80">{point.label} ({point.fullDate})</span>
+            <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-bold text-primary">
               {point.washesCount} lavage{point.washesCount > 1 ? 's' : ''}
             </span>
           </div>
           <div className="space-y-1 text-xs">
             <div className="flex items-center justify-between gap-4">
-              <span className="flex items-center gap-1.5 text-sky-400">
-                <span className="h-2 w-2 rounded-full bg-sky-400" />
+              <span className="flex items-center gap-1.5 text-primary">
+                <span className="h-2 w-2 rounded-full bg-primary" />
                 Chiffre d’affaires :
               </span>
               <span className="font-bold">{formatFCFA(point.revenue)}</span>
             </div>
             {point.collected !== null && <div className="flex items-center justify-between gap-4">
-              <span className="flex items-center gap-1.5 text-emerald-400">
-                <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              <span className="flex items-center gap-1.5 text-success">
+                <span className="h-2 w-2 rounded-full bg-success" />
                 Encaissements nets :
               </span>
               <span className="font-bold">{formatFCFA(point.collected)}</span>
@@ -59,17 +59,17 @@ export default function Revenue7DaysLineChart({ data }: { data: DayChartPoint[] 
   return (
     <Card className="overflow-hidden">
       {/* Header and stats */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4 mb-4" style={{ borderColor: 'var(--wg-border)' }}>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-base-300 pb-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="grid h-7 w-7 place-items-center rounded-lg bg-sky-500/15 text-sky-400">
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/15 text-primary">
               <FiTrendingUp size={15} />
             </span>
-            <h2 className="text-sm font-bold text-slate-100">
+            <h2 className="text-sm font-bold text-base-content">
               Évolution du chiffre d’affaires (7 derniers jours)
             </h2>
           </div>
-          <p className="wg-muted mt-0.5 text-xs">
+          <p className="mt-0.5 text-xs text-base-content/60">
             Visualisation en courbe du CA journalier et des encaissements effectifs.
           </p>
         </div>
@@ -77,19 +77,17 @@ export default function Revenue7DaysLineChart({ data }: { data: DayChartPoint[] 
         {/* Quick summary badges */}
         <div className="flex flex-wrap items-center gap-2">
           <div
-            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs border"
-            style={{ background: 'var(--wg-surface-2)', borderColor: 'var(--wg-border)' }}
+            className="flex items-center gap-1.5 rounded-lg border border-base-300 bg-base-200 px-2.5 py-1 text-xs"
           >
-            <span className="wg-muted text-[11px]">Total 7j :</span>
-            <span className="font-bold text-sky-400">{formatFCFA(totalRevenue)}</span>
+            <span className="text-[11px] text-base-content/60">Total 7j :</span>
+            <span className="font-bold text-primary">{formatFCFA(totalRevenue)}</span>
           </div>
 
           <div
-            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs border"
-            style={{ background: 'var(--wg-surface-2)', borderColor: 'var(--wg-border)' }}
+            className="flex items-center gap-1.5 rounded-lg border border-base-300 bg-base-200 px-2.5 py-1 text-xs"
           >
-            <span className="wg-muted text-[11px]">Moyenne/j :</span>
-            <span className="font-bold text-slate-200">{formatFCFA(dailyAverage)}</span>
+            <span className="text-[11px] text-base-content/60">Moyenne/j :</span>
+            <span className="font-bold text-base-content/80">{formatFCFA(dailyAverage)}</span>
           </div>
 
           {totalCollected !== null && <Badge>Encaissements nets : {formatFCFA(totalCollected)}</Badge>}
@@ -103,19 +101,19 @@ export default function Revenue7DaysLineChart({ data }: { data: DayChartPoint[] 
             data={data}
             margin={{ top: 12, right: 16, bottom: 4, left: 8 }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.4} />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-base-300)" opacity={0.4} />
             <XAxis
               dataKey="label"
-              stroke="#94a3b8"
+              stroke="var(--color-base-content)"
               fontSize={11}
               tickLine={false}
-              axisLine={{ stroke: '#334155' }}
+              axisLine={{ stroke: 'var(--color-base-300)' }}
             />
             <YAxis
-              stroke="#94a3b8"
+              stroke="var(--color-base-content)"
               fontSize={11}
               tickLine={false}
-              axisLine={{ stroke: '#334155' }}
+              axisLine={{ stroke: 'var(--color-base-300)' }}
               tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`}
               domain={['auto', 'auto']}
             />
@@ -130,28 +128,28 @@ export default function Revenue7DaysLineChart({ data }: { data: DayChartPoint[] 
               type="monotone"
               dataKey="revenue"
               name="Chiffre d’affaires"
-              stroke="#38bdf8"
+              stroke={CHART_COLORS.revenue}
               strokeWidth={3}
-              dot={{ r: 4, fill: '#0284c7', stroke: '#38bdf8', strokeWidth: 2 }}
-              activeDot={{ r: 7, stroke: '#38bdf8', strokeWidth: 3, fill: '#ffffff' }}
+              dot={{ r: 4, fill: CHART_COLORS.revenue, stroke: CHART_COLORS.revenue, strokeWidth: 2 }}
+              activeDot={{ r: 7, stroke: CHART_COLORS.revenue, strokeWidth: 3, fill: CHART_COLORS.surface }}
               isAnimationActive={false}
             />
             {hasCollections && <Line
               type="monotone"
               dataKey="collected"
               name="Montant encaissé"
-              stroke="#34d399"
+              stroke={CHART_COLORS.collected}
               strokeWidth={2}
               strokeDasharray="4 2"
-              dot={{ r: 3.5, fill: '#059669', stroke: '#34d399', strokeWidth: 1.5 }}
-              activeDot={{ r: 6, stroke: '#34d399', strokeWidth: 2, fill: '#ffffff' }}
+              dot={{ r: 3.5, fill: CHART_COLORS.collected, stroke: CHART_COLORS.collected, strokeWidth: 1.5 }}
+              activeDot={{ r: 6, stroke: CHART_COLORS.collected, strokeWidth: 2, fill: CHART_COLORS.surface }}
               isAnimationActive={false}
             />}
           </LineChart>
         </ResponsiveContainer>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t pt-2.5 text-[11px] wg-muted" style={{ borderColor: 'var(--wg-border)' }}>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-base-300 pt-2.5 text-[11px] text-base-content/60">
         <span>Volume cumulé : <strong>{totalWashes} lavage(s)</strong> sur la période de 7 jours.</span>
         <span>Paiements et annulations comptabilisés à leur date respective.</span>
       </div>

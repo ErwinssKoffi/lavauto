@@ -13,8 +13,8 @@ import {
   emailIssue, emailSuggestion, passwordIssue, phoneIssue,
 } from '../../lib/passwordPolicy';
 
-const fieldCls = 'w-full rounded-xl border bg-slate-50 px-3.5 py-2.5 text-sm outline-none transition focus:bg-white focus:ring-4';
-const labelCls = 'mb-1.5 block text-xs font-bold text-slate-600';
+const fieldCls = 'w-full rounded-xl border bg-base-200 px-3.5 py-2.5 text-sm outline-none transition focus:bg-base-100 focus:ring-4';
+const labelCls = 'mb-1.5 block text-xs font-bold text-base-content/70';
 
 type FieldKey = 'companyName' | 'stationName' | 'phone' | 'city' | 'ownerName' | 'email';
 type Touched = Partial<Record<FieldKey | 'password' | 'confirm', boolean>>;
@@ -119,96 +119,96 @@ export default function SignUp() {
     <AuthLayout>
       <Badge tone="accent">{authKind === 'local' ? 'Espace local' : 'Inscription par e-mail'}</Badge>
       <h1 className="mt-4 text-3xl font-extrabold tracking-tight">Créer mon espace</h1>
-      <p className="mt-2 text-sm text-slate-500">Comparez les formules, puis créez votre entreprise et votre compte.</p>
+      <p className="mt-2 text-sm text-base-content/60">Comparez les formules, puis créez votre entreprise et votre compte.</p>
 
       <form onSubmit={(e) => { void submit(e); }} className="mt-6 space-y-5" noValidate>
-        <fieldset className="rounded-2xl border border-slate-200 p-4">
+        <fieldset className="rounded-2xl border border-base-300 p-4">
           <legend className="px-1 text-sm font-bold">Votre formule souhaitée</legend>
-          <p className="mb-3 text-xs leading-relaxed text-slate-500">L’essai donne accès à tous les modules pendant 14 jours. Standard et Premium sont des demandes, activées seulement après validation administrateur. Aucun paiement automatique.</p>
+          <p className="mb-3 text-xs leading-relaxed text-base-content/60">L’essai donne accès à tous les modules pendant 14 jours. Standard et Premium sont des demandes, activées seulement après validation administrateur. Aucun paiement automatique.</p>
           {plansError && <Alert kind="danger">Formules indisponibles : {plansError}</Alert>}
-          {!plansError && availablePlans.length === 0 && <p role="status" className="text-xs text-slate-500">Chargement des formules…</p>}
+          {!plansError && availablePlans.length === 0 && <p role="status" className="text-xs text-base-content/60">Chargement des formules…</p>}
           <div className="space-y-3">
-            {availablePlans.map((plan) => <label key={plan.id} className={`block cursor-pointer rounded-xl border p-3 ${requestedPlanId === plan.id ? 'border-sky-500 bg-sky-50' : 'border-slate-200'}`}>
+            {availablePlans.map((plan) => <label key={plan.id} className={`block cursor-pointer rounded-xl border p-3 ${requestedPlanId === plan.id ? 'border-primary bg-primary/10' : 'border-base-300'}`}>
               <span className="flex items-center justify-between gap-2 text-sm font-bold">
                 <span className="flex items-center gap-2"><input type="radio" name="plan" value={plan.id} checked={requestedPlanId === plan.id}
                   onChange={() => setRequestedPlanId(plan.id as 'essai' | 'standard' | 'premium')} /> {plan.name}</span>
                 <span>{plan.id === 'essai' ? 'Gratuit · 14 jours' : `${formatFCFA(plan.priceMonthly)} / mois`}</span>
               </span>
-              <div className="mt-2 text-slate-600"><PlanDetails plan={plan} compact /></div>
+              <div className="mt-2 text-base-content/70"><PlanDetails plan={plan} compact /></div>
             </label>)}
           </div>
-          <p className="mt-3 text-[11px] leading-relaxed text-slate-500">Comptes actifs : propriétaire inclus. Tarifs indicatifs à valider commercialement. Une validation payante anticipée met fin immédiatement à l’essai. À son échéance sans validation, les données restent consultables et les écritures ordinaires sont bloquées.</p>
+          <p className="mt-3 text-[11px] leading-relaxed text-base-content/60">Comptes actifs : propriétaire inclus. Tarifs indicatifs à valider commercialement. Une validation payante anticipée met fin immédiatement à l’essai. À son échéance sans validation, les données restent consultables et les écritures ordinaires sont bloquées.</p>
         </fieldset>
 
         {/* Temps 1 */}
-        <section className="rounded-2xl border border-slate-200 p-4">
+        <section className="rounded-2xl border border-base-300 p-4">
           <div className="mb-4 flex items-center gap-2">
-            <span className="grid h-7 w-7 place-items-center rounded-lg bg-sky-100 text-sky-600"><FiBriefcase size={14} aria-hidden="true" /></span>
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/15 text-primary"><FiBriefcase size={14} aria-hidden="true" /></span>
             <div>
               <h2 className="text-sm font-bold">Votre entreprise et sa station</h2>
-              <p className="text-[11px] text-slate-400">Ces informations identifient votre exploitation.</p>
+              <p className="text-[11px] text-base-content/60">Ces informations identifient votre exploitation.</p>
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className={labelCls} htmlFor="companyName">Nom de l’entreprise *</label>
-              <input id="companyName" required maxLength={120} className={`${fieldCls} ${inlineError('companyName') ? 'border-red-300 focus:border-red-500 focus:ring-red-100' : 'border-slate-200 focus:border-sky-500 focus:ring-sky-100'}`}
+              <input id="companyName" required maxLength={120} className={`${fieldCls} ${inlineError('companyName') ? 'border-error/40 focus:border-error focus:ring-error/20' : 'border-base-300 focus:border-primary focus:ring-primary/20'}`}
                 value={form.companyName} onChange={set('companyName')} onBlur={blur('companyName')} placeholder="Ex. SARL Clean Auto"
                 autoComplete="organization" aria-invalid={inlineError('companyName') ? true : undefined} />
-              {inlineError('companyName') && <p className="mt-1.5 text-[11px] font-semibold text-red-600" role="alert">{inlineError('companyName')}</p>}
+              {inlineError('companyName') && <p className="mt-1.5 text-[11px] font-semibold text-error" role="alert">{inlineError('companyName')}</p>}
             </div>
             <div>
               <label className={labelCls} htmlFor="stationName">Nom de la station *</label>
-              <input id="stationName" required maxLength={120} className={`${fieldCls} ${inlineError('stationName') ? 'border-red-300 focus:border-red-500 focus:ring-red-100' : 'border-slate-200 focus:border-sky-500 focus:ring-sky-100'}`}
+              <input id="stationName" required maxLength={120} className={`${fieldCls} ${inlineError('stationName') ? 'border-error/40 focus:border-error focus:ring-error/20' : 'border-base-300 focus:border-primary focus:ring-primary/20'}`}
                 value={form.stationName} onChange={set('stationName')} onBlur={blur('stationName')} placeholder="Ex. Clean Auto Cocody" />
-              {inlineError('stationName') && <p className="mt-1.5 text-[11px] font-semibold text-red-600" role="alert">{inlineError('stationName')}</p>}
+              {inlineError('stationName') && <p className="mt-1.5 text-[11px] font-semibold text-error" role="alert">{inlineError('stationName')}</p>}
             </div>
             <div>
               <label className={labelCls} htmlFor="phone">Téléphone *</label>
-              <input id="phone" required type="tel" inputMode="tel" autoComplete="tel" className={`${fieldCls} ${inlineError('phone') ? 'border-red-300 focus:border-red-500 focus:ring-red-100' : 'border-slate-200 focus:border-sky-500 focus:ring-sky-100'}`}
+              <input id="phone" required type="tel" inputMode="tel" autoComplete="tel" className={`${fieldCls} ${inlineError('phone') ? 'border-error/40 focus:border-error focus:ring-error/20' : 'border-base-300 focus:border-primary focus:ring-primary/20'}`}
                 value={form.phone} onChange={set('phone')} onBlur={blur('phone')} placeholder="+225 00 00 00 00"
                 aria-describedby="phone-hint" aria-invalid={inlineError('phone') ? true : undefined} />
               {inlineError('phone')
-                ? <p className="mt-1.5 text-[11px] font-semibold text-red-600" role="alert">{inlineError('phone')}</p>
-                : <p className="mt-1.5 text-[11px] text-slate-400" id="phone-hint">Indicatif compris, 7 à 15 chiffres.</p>}
+                ? <p className="mt-1.5 text-[11px] font-semibold text-error" role="alert">{inlineError('phone')}</p>
+                : <p className="mt-1.5 text-[11px] text-base-content/60" id="phone-hint">Indicatif compris, 7 à 15 chiffres.</p>}
             </div>
             <div>
               <label className={labelCls} htmlFor="city">Ville *</label>
-              <input id="city" required maxLength={120} className={`${fieldCls} ${inlineError('city') ? 'border-red-300 focus:border-red-500 focus:ring-red-100' : 'border-slate-200 focus:border-sky-500 focus:ring-sky-100'}`}
+              <input id="city" required maxLength={120} className={`${fieldCls} ${inlineError('city') ? 'border-error/40 focus:border-error focus:ring-error/20' : 'border-base-300 focus:border-primary focus:ring-primary/20'}`}
                 value={form.city} onChange={set('city')} onBlur={blur('city')} placeholder="Abidjan" autoComplete="address-level2" />
-              {inlineError('city') && <p className="mt-1.5 text-[11px] font-semibold text-red-600" role="alert">{inlineError('city')}</p>}
+              {inlineError('city') && <p className="mt-1.5 text-[11px] font-semibold text-error" role="alert">{inlineError('city')}</p>}
             </div>
           </div>
         </section>
 
         {/* Temps 2 */}
-        <section className="rounded-2xl border border-slate-200 p-4">
+        <section className="rounded-2xl border border-base-300 p-4">
           <div className="mb-4 flex items-center gap-2">
-            <span className="grid h-7 w-7 place-items-center rounded-lg bg-sky-100 text-sky-600"><FiUser size={14} aria-hidden="true" /></span>
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/15 text-primary"><FiUser size={14} aria-hidden="true" /></span>
             <div>
               <h2 className="text-sm font-bold">Votre compte de propriétaire</h2>
-              <p className="text-[11px] text-slate-400">Il pourra créer les autres comptes depuis Employés.</p>
+              <p className="text-[11px] text-base-content/60">Il pourra créer les autres comptes depuis Employés.</p>
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className={labelCls} htmlFor="ownerName">Votre nom *</label>
-              <input id="ownerName" required maxLength={120} className={`${fieldCls} ${inlineError('ownerName') ? 'border-red-300 focus:border-red-500 focus:ring-red-100' : 'border-slate-200 focus:border-sky-500 focus:ring-sky-100'}`}
+              <input id="ownerName" required maxLength={120} className={`${fieldCls} ${inlineError('ownerName') ? 'border-error/40 focus:border-error focus:ring-error/20' : 'border-base-300 focus:border-primary focus:ring-primary/20'}`}
                 value={form.ownerName} onChange={set('ownerName')} onBlur={blur('ownerName')} placeholder="Prénom et nom" autoComplete="name" />
-              {inlineError('ownerName') && <p className="mt-1.5 text-[11px] font-semibold text-red-600" role="alert">{inlineError('ownerName')}</p>}
+              {inlineError('ownerName') && <p className="mt-1.5 text-[11px] font-semibold text-error" role="alert">{inlineError('ownerName')}</p>}
             </div>
             <div>
               <label className={labelCls} htmlFor="email">Adresse e-mail *</label>
               <input id="email" required type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false}
-                className={`${fieldCls} ${inlineError('email') ? 'border-red-300 focus:border-red-500 focus:ring-red-100' : 'border-slate-200 focus:border-sky-500 focus:ring-sky-100'}`}
+                className={`${fieldCls} ${inlineError('email') ? 'border-error/40 focus:border-error focus:ring-error/20' : 'border-base-300 focus:border-primary focus:ring-primary/20'}`}
                 value={form.email} onChange={set('email')} onBlur={blur('email')} placeholder="vous@exemple.ci"
                 aria-invalid={inlineError('email') ? true : undefined} />
-              {inlineError('email') && <p className="mt-1.5 text-[11px] font-semibold text-red-600" role="alert">{inlineError('email')}</p>}
+              {inlineError('email') && <p className="mt-1.5 text-[11px] font-semibold text-error" role="alert">{inlineError('email')}</p>}
               {!inlineError('email') && suggestion && (
-                <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
-                  <FiAlertCircle className="text-amber-500" aria-hidden="true" />
-                  Vouliez-vous dire <strong className="font-semibold text-slate-700">{suggestion}</strong> ?
-                  <button type="button" className="font-bold text-sky-600 hover:underline"
+                <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-base-content/60">
+                  <FiAlertCircle className="text-warning" aria-hidden="true" />
+                  Vouliez-vous dire <strong className="font-semibold text-base-content/70">{suggestion}</strong> ?
+                  <button type="button" className="font-bold text-primary hover:underline"
                     onClick={() => setForm((f) => ({ ...f, email: suggestion }))}>Utiliser</button>
                 </p>
               )}
@@ -225,7 +225,7 @@ export default function SignUp() {
                 showStrength
                 showChecklist
                 error={inlineError('password')}
-                inputClassName="w-full rounded-xl border bg-slate-50 px-3.5 py-2.5 text-sm outline-none transition focus:bg-white focus:ring-4"
+                inputClassName="w-full rounded-xl border bg-base-200 px-3.5 py-2.5 text-sm outline-none transition focus:bg-base-100 focus:ring-4"
               />
             </div>
             <div className="sm:col-span-2">
@@ -237,7 +237,7 @@ export default function SignUp() {
                 autoComplete="new-password"
                 placeholder="••••••••"
                 error={inlineError('confirm')}
-                inputClassName="w-full rounded-xl border bg-slate-50 px-3.5 py-2.5 text-sm outline-none transition focus:bg-white focus:ring-4"
+                inputClassName="w-full rounded-xl border bg-base-200 px-3.5 py-2.5 text-sm outline-none transition focus:bg-base-100 focus:ring-4"
               />
             </div>
           </div>
@@ -248,15 +248,15 @@ export default function SignUp() {
           <div className="space-y-2 text-xs">
             <Alert kind="success">{notice}</Alert>
             {confirmUrl && (
-              <a href={confirmUrl} className="wg-btn wg-btn-primary w-full !py-2.5">
+              <a href={confirmUrl} className="btn btn-sm btn-primary w-full py-2.5!">
                 Ouvrir le lien de confirmation <FiArrowRight aria-hidden="true" />
               </a>
             )}
           </div>
         )}
 
-        <div className="rounded-xl bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-500">
-          <div className="flex items-start gap-2"><FiInfo className="mt-0.5 shrink-0 text-sky-600" aria-hidden="true" />
+        <div className="rounded-xl bg-base-200 p-3 text-[11px] leading-relaxed text-base-content/60">
+          <div className="flex items-start gap-2"><FiInfo className="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
             {authKind === 'local' ? (
               <p>Aucun e-mail n’est envoyé : l’espace est créé uniquement dans ce navigateur, aucun lien de récupération n’est disponible, et un espace existant ne sera pas remplacé.</p>
             ) : (
@@ -266,21 +266,21 @@ export default function SignUp() {
         </div>
 
         <button type="submit" disabled={busy || !selectedAvailable}
-          className="wg-btn wg-btn-primary w-full !py-3 disabled:opacity-60"
+          className="btn btn-sm btn-primary w-full py-3! disabled:opacity-60"
           aria-describedby={invalidCount > 0 ? 'signup-status' : undefined}>
           {busy ? 'Création…' : 'Créer mon espace'} <FiArrowRight aria-hidden="true" />
         </button>
         {invalidCount > 0 && touched.email && (
-          <p className="text-center text-[11px] text-slate-400" id="signup-status" role="status">
+          <p className="text-center text-[11px] text-base-content/60" id="signup-status" role="status">
             {invalidCount} champ(s) à corriger avant la création.
           </p>
         )}
       </form>
 
-      <p className="mt-5 text-center text-sm text-slate-500">
-        Déjà inscrit ? <Link to="/connexion" className="font-bold text-sky-600 hover:underline">Se connecter</Link>
+      <p className="mt-5 text-center text-sm text-base-content/60">
+        Déjà inscrit ? <Link to="/connexion" className="font-bold text-primary hover:underline">Se connecter</Link>
       </p>
-      <div className="mt-5 flex items-center justify-center gap-2 text-[11px] text-slate-400"><FiCheckCircle aria-hidden="true" /> <FiLock aria-hidden="true" /> {authKind === 'local' ? 'Stockage navigateur · session locale' : 'Authentification serveur sécurisée'}</div>
+      <div className="mt-5 flex items-center justify-center gap-2 text-[11px] text-base-content/60"><FiCheckCircle aria-hidden="true" /> <FiLock aria-hidden="true" /> {authKind === 'local' ? 'Stockage navigateur · session locale' : 'Authentification serveur sécurisée'}</div>
     </AuthLayout>
   );
 }

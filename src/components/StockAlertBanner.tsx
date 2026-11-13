@@ -20,31 +20,31 @@ export default function StockAlertBanner() {
   return (
     <div
       role="alert"
-      className="mb-5 overflow-hidden rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent text-xs"
+      className="mb-5 overflow-hidden rounded-xl border border-warning/30 bg-linear-to-r from-warning/10 via-warning/5 to-transparent text-xs"
     >
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
         <div className="flex items-center gap-3">
-          <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/20 text-amber-400">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-lg bg-amber-400 opacity-30" />
+          <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-warning/20 text-warning">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-lg bg-warning opacity-30" />
             <FiAlertTriangle size={18} />
           </span>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-bold text-amber-300">
+              <span className="font-bold text-warning">
                 Alerte stock critique
               </span>
               {ruptures.length > 0 && (
-                <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] font-bold text-red-300">
+                <span className="rounded-full bg-error/20 px-2 py-0.5 text-[10px] font-bold text-error">
                   {ruptures.length} en rupture
                 </span>
               )}
               {seuils.length > 0 && (
-                <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-300">
+                <span className="rounded-full bg-warning/20 px-2 py-0.5 text-[10px] font-bold text-warning">
                   {seuils.length} sous le seuil
                 </span>
               )}
             </div>
-            <p className="wg-muted mt-0.5 text-[11px]">
+            <p className="mt-0.5 text-[11px] text-base-content/60">
               {alerts.map((a) => `${a.name} (${a.qtyOnHand}/${a.reorderLevel})`).slice(0, 3).join(' · ')}
               {alerts.length > 3 ? ` et ${alerts.length - 3} autre(s)` : ''}.
               Risque d'interruption du service lavage.
@@ -56,7 +56,7 @@ export default function StockAlertBanner() {
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            className="wg-btn wg-btn-ghost !py-1 !text-xs text-amber-300 hover:text-white"
+            className="btn btn-sm text-xs! text-warning hover:text-base-content"
           >
             {expanded ? (
               <>
@@ -70,7 +70,7 @@ export default function StockAlertBanner() {
           </button>
           <Link
             to="/app/stock"
-            className="wg-btn wg-btn-primary !py-1 !text-xs !bg-amber-500 hover:!bg-amber-400 !text-slate-950 font-bold"
+            className="btn btn-sm text-xs! bg-warning! hover:bg-warning! text-base-content! font-bold"
           >
             Gérer le stock
           </Link>
@@ -78,7 +78,7 @@ export default function StockAlertBanner() {
             type="button"
             onClick={() => setDismissed(true)}
             aria-label="Fermer l'alerte"
-            className="wg-muted hover:text-white p-1"
+            className="p-1 text-base-content/60 hover:text-base-content"
           >
             <FiX size={16} />
           </button>
@@ -86,7 +86,7 @@ export default function StockAlertBanner() {
       </div>
 
       {expanded && (
-        <div className="border-t border-amber-500/20 bg-slate-950/40 p-4">
+        <div className="border-t border-warning/20 bg-base-100/40 p-4">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {alerts.map((item) => {
               const level = levelByProductId.get(item.productId);
@@ -97,21 +97,21 @@ export default function StockAlertBanner() {
               return (
                 <div
                   key={item.productId}
-                  className="rounded-lg border border-slate-800 bg-slate-900/80 p-3"
+                  className="rounded-lg border border-base-300 bg-base-100/80 p-3"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <p className="font-bold text-white">{item.name}</p>
-                      <p className="wg-muted text-[11px]">
+                      <p className="font-bold text-base-content">{item.name}</p>
+                      <p className="text-[11px] text-base-content/60">
                         Seuil critique défini : {item.reorderLevel} {unit}
                       </p>
                     </div>
                     <span
                       className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
-                        isRupture
-                          ? 'bg-red-500/20 text-red-300'
-                          : 'bg-amber-500/20 text-amber-300'
-                      }`}
+ isRupture
+ ? 'bg-error/20 text-error'
+ : 'bg-warning/20 text-warning'
+ }`}
                     >
                       {isRupture ? 'RUPTURE' : `${item.qtyOnHand} ${unit} restant(s)`}
                     </span>
@@ -119,30 +119,30 @@ export default function StockAlertBanner() {
 
                   {/* Progress gauge */}
                   <div className="mt-2.5">
-                    <div className="flex justify-between text-[10px] text-slate-400">
+                    <div className="flex justify-between text-[10px] text-base-content/60">
                       <span>Disponible : {item.qtyOnHand} {unit}</span>
                       <span>Seuil : {item.reorderLevel} {unit}</span>
                     </div>
-                    <div className="mt-1 h-1.5 w-full rounded-full bg-slate-800">
+                    <div className="mt-1 h-1.5 w-full rounded-full bg-base-300">
                       <div
                         className={`h-1.5 rounded-full transition-all duration-300 ${
-                          isRupture ? 'bg-red-500 w-0' : 'bg-amber-400'
-                        }`}
+ isRupture ? 'bg-error w-0' : 'bg-warning'
+ }`}
                         style={{ width: `${percent}%` }}
                       />
                     </div>
                   </div>
 
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-800/80 pt-2 text-[11px]">
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-base-300/80 pt-2 text-[11px]">
                     <Link
                       to="/app/parametres#stock"
-                      className="wg-link flex items-center gap-1 text-[11px]"
+                      className="link link-primary flex items-center gap-1 text-[11px]"
                     >
                       <FiSettings size={12} /> {dataSource === 'api' || isLocalStockDemo ? 'Modifier le seuil' : 'Voir le seuil'}
                     </Link>
                     <Link
                       to="/app/stock"
-                      className="wg-link text-[11px] font-semibold"
+                      className="link link-primary text-[11px] font-semibold"
                     >
                       Enregistrer un achat / mouvement →
                     </Link>

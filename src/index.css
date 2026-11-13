@@ -1,194 +1,173 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss" source(none);
 
-/* ─── Thème WashGuard : sombre par défaut, clair disponible ─────────────── */
-/* Prompt 02 : les variables ci-dessous restent LA source de vérité. Les
-   tokens complémentaires (élévation, anneau de focus, superposition) sont
-   ajoutés sans renommer ni retirer une seule classe existante : les 16
-   écrans conservent exactement le même contrat visuel.                     */
-:root {
-  --wg-bg: #f4f7fb;
-  --wg-surface: #ffffff;
-  --wg-surface-2: #f1f5f9;
-  --wg-border: #e2e8f0;
-  --wg-text: #0f172a;
-  --wg-muted: #64748b;
-  --wg-accent: #0284c7;
-  --wg-accent-soft: #e0f2fe;
-  --wg-accent-text: #075985;
-  --wg-success: #15803d;
-  --wg-success-soft: #dcfce7;
-  --wg-warn: #b45309;
-  --wg-warn-soft: #fef3c7;
-  --wg-danger: #b91c1c;
-  --wg-danger-soft: #fee2e2;
-  --wg-shadow: 0 8px 30px rgba(15, 23, 42, 0.06);
+/* Détection explicite des sources : seuls le HTML d'entrée et le code de
+   l'application produisent des classes (la documentation et les tests ne
+   gonflent pas le CSS). */
+@source "../index.html";
+@source "./**/*.{ts,tsx}";
 
-  /* ── Tokens ajoutés au Prompt 02 ── */
-  --wg-radius: 1rem;
-  --wg-radius-sm: 0.75rem;
-  --wg-ring: 0 0 0 3px var(--wg-accent-soft);
-  --wg-overlay: rgba(2, 6, 23, 0.58);
-  --wg-elev-1: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 14px rgba(15, 23, 42, 0.05);
-  --wg-elev-2: 0 12px 32px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06);
-  --wg-nav-hover: rgba(14, 165, 233, 0.09);
-  --wg-skeleton: rgba(148, 163, 184, 0.16);
-  color-scheme: light;
+/* ─── DaisyUI 5 (Tailwind 4, configuration CSS-first) ─────────────────────
+   Liste explicite des 37 thèmes (35 intégrés + les 2 WashGuard) plutôt que
+   `themes: all` : avec `all`, DaisyUI réserve `:where(:root)` au thème `light`
+   et `prefers-color-scheme` au thème `dark` en dur (pluginOptionsHandler.js),
+   en ignorant les clés `default:` / `prefersdark:` de nos blocs ci-dessous.
+   Le thème par défaut du projet est **cupcake** (DEFAULT_THEME) : il tient donc
+   les deux rôles (`:where(:root)` et `prefers-color-scheme`). Les deux thèmes
+   WashGuard restent disponibles dans le sélecteur, et la bascule rapide
+   soleil/lune y ramène l'utilisateur en un clic.
+   La liste est vérifiée par `npm run check` (cohérence avec src/lib/themes.ts
+   et avec les fichiers de node_modules/daisyui/theme).                      */
+@plugin "daisyui" {
+  themes: cupcake --default --prefersdark, washguard-dark, washguard, abyss, acid, aqua, autumn, black, bumblebee, business, caramellatte, cmyk, coffee, corporate, cyberpunk, dark, dim, dracula, emerald, fantasy, forest, garden, halloween, lemonade, light, lofi, luxury, night, nord, pastel, retro, silk, sunset, synthwave, valentine, winter, wireframe;
 }
 
-html.dark {
-  --wg-bg: #080f1d;
-  --wg-surface: #101b2d;
-  --wg-surface-2: #16243a;
-  --wg-border: #22314b;
-  --wg-text: #e9f0fb;
-  --wg-muted: #8ea0bb;
-  --wg-accent: #38bdf8;
-  --wg-accent-soft: #0b3a56;
-  --wg-accent-text: #7dd3fc;
-  --wg-success: #4ade80;
-  --wg-success-soft: #10352a;
-  --wg-warn: #fbbf24;
-  --wg-warn-soft: #3a2a10;
-  --wg-danger: #f87171;
-  --wg-danger-soft: #3d1c22;
-  --wg-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
+@plugin "daisyui/theme" {
+  name: "washguard";
+  default: false;
+  prefersdark: false;
+  color-scheme: light;
 
-  /* ── Tokens ajoutés au Prompt 02 ── */
-  --wg-overlay: rgba(2, 6, 23, 0.76);
-  --wg-elev-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 14px rgba(0, 0, 0, 0.2);
-  --wg-elev-2: 0 18px 48px rgba(0, 0, 0, 0.48), 0 2px 10px rgba(0, 0, 0, 0.3);
-  --wg-nav-hover: rgba(56, 189, 248, 0.1);
-  --wg-skeleton: rgba(142, 160, 187, 0.14);
+  --color-base-100: #ffffff;
+  --color-base-200: #f1f5f9;
+  --color-base-300: #e2e8f0;
+  --color-base-content: #0f172a;
+  --color-primary: #0284c7;
+  --color-primary-content: #ffffff;
+  --color-secondary: #0ea5e9;
+  --color-secondary-content: #ffffff;
+  --color-accent: #22d3ee;
+  --color-accent-content: #083344;
+  --color-neutral: #0f172a;
+  --color-neutral-content: #e9f0fb;
+  --color-info: #0284c7;
+  --color-info-content: #ffffff;
+  --color-success: #15803d;
+  --color-success-content: #ffffff;
+  --color-warning: #b45309;
+  --color-warning-content: #ffffff;
+  --color-error: #b91c1c;
+  --color-error-content: #ffffff;
+
+  --radius-selector: 0.75rem;
+  --radius-field: 0.75rem;
+  --radius-box: 1rem;
+  /* Densité WashGuard : 0,3 rem × 8 = 2,4 rem pour btn-sm / input-sm / select-sm. */
+  --size-field: 0.3rem;
+  --size-selector: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+  name: "washguard-dark";
+  default: false;
+  prefersdark: false;
   color-scheme: dark;
+
+  --color-base-100: #101b2d;
+  --color-base-200: #16243a;
+  --color-base-300: #22314b;
+  --color-base-content: #e9f0fb;
+  --color-primary: #38bdf8;
+  --color-primary-content: #04121e;
+  --color-secondary: #0ea5e9;
+  --color-secondary-content: #04121e;
+  --color-accent: #22d3ee;
+  --color-accent-content: #04121e;
+  --color-neutral: #16243a;
+  --color-neutral-content: #e9f0fb;
+  --color-info: #38bdf8;
+  --color-info-content: #04121e;
+  --color-success: #4ade80;
+  --color-success-content: #04121e;
+  --color-warning: #fbbf24;
+  --color-warning-content: #04121e;
+  --color-error: #f87171;
+  --color-error-content: #04121e;
+
+  --radius-selector: 0.75rem;
+  --radius-field: 0.75rem;
+  --radius-box: 1rem;
+  --size-field: 0.3rem;
+  --size-selector: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+@theme {
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --animate-fade-in: fadeIn 0.32s ease both;
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
+/* Bordure par défaut alignée sur `base-300` du thème actif : un simple
+   `border` reste donc sensible au thème clair/sombre (Tailwind 4 utilise
+   `currentColor` par défaut). */
+@layer base {
+  *, ::before, ::after, ::backdrop {
+    border-color: var(--color-base-300);
+  }
+}
+
+/* ─── Densité et détails WashGuard appliqués aux primitives DaisyUI ───────
+   DaisyUI 5 émet ses composants dans la couche `utilities` : une règle
+   placée en `@layer components` serait donc silencieusement perdre. Ces
+   trois ajustements restent volontairement HORS couche (le non-calque a la
+   priorité sur toutes les couches nommées) pour retrouver le contrat
+   visuel d'origine. Aucun composant n'est remplacé.                       */
+/* Boutons : texte de 14 px conservé (DaisyUI met 12 px en `btn-sm`). */
+.btn.btn-sm {
+  --fontsize: 0.875rem;
+}
+/* Badges en pastille, comme avant la migration. */
+.badge {
+  border-radius: 999px;
+}
+/* En-têtes de tableaux : capitales espacées. */
+.table :where(thead) {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 html, body, #root { min-height: 100%; }
+
+/* Fond applicatif légèrement plus profond que `base-100` (surface des cartes).
+   Il est dérivé du thème actif : les 37 thèmes DaisyUI sont donc tous
+   respectés, sans couleur codée en dur. */
 body {
   margin: 0;
-  background: var(--wg-bg);
-  color: var(--wg-text);
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  background: color-mix(in oklab, var(--color-base-100) 94%, #000);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   font-feature-settings: 'kern', 'tnum';
 }
-* { border-color: var(--wg-border); }
-::selection { background: var(--wg-accent-soft); color: var(--wg-text); }
+
+::selection {
+  background: color-mix(in oklab, var(--color-primary) 18%, transparent);
+  color: var(--color-base-content);
+}
 
 /* Anneau de focus visible au clavier uniquement (accessibilité clavier). */
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
-  outline: 2px solid var(--wg-accent);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--wg-border); border-radius: 999px; border: 3px solid transparent; background-clip: content-box; }
-
-@layer components {
-  .wg-card {
-    background: var(--wg-surface);
-    border: 1px solid var(--wg-border);
-    border-radius: 1rem;
-    box-shadow: var(--wg-shadow);
-  }
-  .wg-input {
-    width: 100%;
-    border-radius: 0.75rem;
-    border: 1px solid var(--wg-border);
-    background: var(--wg-surface-2);
-    color: var(--wg-text);
-    padding: 0.65rem 0.9rem;
-    font-size: 0.875rem;
-    outline: none;
-    transition: box-shadow .15s, border-color .15s;
-  }
-  .wg-input:focus { border-color: var(--wg-accent); box-shadow: 0 0 0 3px var(--wg-accent-soft); }
-  .wg-input::placeholder { color: var(--wg-muted); opacity: .8; }
-  .wg-label { display: block; font-size: .75rem; font-weight: 600; color: var(--wg-muted); margin-bottom: .4rem; }
-  .wg-btn {
-    display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
-    border-radius: .75rem; padding: .6rem 1rem; font-size: .875rem; font-weight: 600;
-    transition: transform .12s, opacity .12s, background .15s;
-    cursor: pointer; white-space: nowrap;
-  }
-  .wg-btn:active { transform: translateY(1px); }
-  .wg-btn:disabled { opacity: .45; cursor: not-allowed; }
-  .wg-btn-primary { background: var(--wg-accent); color: #fff; }
-  html.dark .wg-btn-primary { color: #04121e; }
-  .wg-btn-primary:hover:not(:disabled) { filter: brightness(1.1); }
-  .wg-btn-ghost { background: var(--wg-surface-2); color: var(--wg-text); border: 1px solid var(--wg-border); }
-  .wg-btn-ghost:hover:not(:disabled) { border-color: var(--wg-accent); }
-  .wg-btn-danger { background: var(--wg-danger-soft); color: var(--wg-danger); border: 1px solid transparent; }
-  .wg-link { color: var(--wg-accent-text); font-weight: 600; }
-  .wg-link:hover { text-decoration: underline; }
-  .wg-muted { color: var(--wg-muted); }
-  .wg-badge {
-    display: inline-flex; align-items: center; gap: .3rem; border-radius: 999px;
-    padding: .18rem .6rem; font-size: .7rem; font-weight: 700; line-height: 1.4;
-    background: var(--wg-surface-2); color: var(--wg-muted);
-  }
-  .wg-badge-success { background: var(--wg-success-soft); color: var(--wg-success); }
-  .wg-badge-warn { background: var(--wg-warn-soft); color: var(--wg-warn); }
-  .wg-badge-danger { background: var(--wg-danger-soft); color: var(--wg-danger); }
-  .wg-badge-accent { background: var(--wg-accent-soft); color: var(--wg-accent-text); }
-  .wg-th { text-align: left; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--wg-muted); padding: .7rem .9rem; }
-  .wg-td { padding: .75rem .9rem; font-size: .85rem; border-top: 1px solid var(--wg-border); }
-
-  /* ── Ajouts du Prompt 02 (nouvelles classes, aucune classe retirée) ── */
-  .wg-card-hover { transition: border-color .18s, box-shadow .18s, transform .18s; }
-  .wg-card-hover:hover { border-color: var(--wg-accent); box-shadow: var(--wg-elev-2); }
-  .wg-elev-2 { box-shadow: var(--wg-elev-2); }
-  .wg-elev-1 { box-shadow: var(--wg-elev-1); }
-  .wg-overlay { background: var(--wg-overlay); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
-  .wg-kbd {
-    display: inline-flex; align-items: center; gap: .15rem;
-    border: 1px solid var(--wg-border); border-radius: .4rem;
-    background: var(--wg-surface-2); color: var(--wg-muted);
-    padding: .1rem .35rem; font-size: .65rem; font-weight: 700; letter-spacing: .02em;
-  }
-  .wg-group-label {
-    display: flex; align-items: center; gap: .55rem; width: 100%;
-    padding: .45rem .6rem; border-radius: .65rem;
-    color: var(--wg-muted); font-size: .65rem; font-weight: 800;
-    text-transform: uppercase; letter-spacing: .13em;
-    transition: color .15s, background .15s;
-  }
-  .wg-group-label:hover { color: var(--wg-text); background: var(--wg-nav-hover); }
-  .wg-nav-item {
-    display: flex; align-items: center; gap: .7rem; width: 100%;
-    padding: .55rem .7rem; border-radius: .7rem;
-    font-size: .8125rem; font-weight: 500; line-height: 1.25;
-    color: var(--wg-muted); text-decoration: none;
-    transition: color .15s, background .15s, box-shadow .15s;
-  }
-  .wg-nav-item:hover { color: var(--wg-text); background: var(--wg-nav-hover); }
-  .wg-nav-item-active {
-    background: var(--wg-accent) !important; color: #fff !important;
-    box-shadow: 0 6px 18px rgba(14, 165, 233, .22); font-weight: 600;
-  }
-  html.dark .wg-nav-item-active { color: #04121e !important; }
-  .wg-nav-item-soon { opacity: .62; cursor: not-allowed; }
-  .wg-nav-item-soon:hover { color: var(--wg-muted); background: transparent; }
-  .wg-skeleton {
-    background: linear-gradient(90deg, var(--wg-skeleton) 25%, var(--wg-surface-2) 50%, var(--wg-skeleton) 75%);
-    background-size: 200% 100%; border-radius: .6rem;
-    animation: wgShimmer 1.5s ease-in-out infinite;
-  }
-  .wg-scroll-thin { scrollbar-width: thin; scrollbar-color: var(--wg-border) transparent; }
-  .wg-topbar { background: color-mix(in srgb, var(--wg-bg) 88%, transparent); }
+::-webkit-scrollbar-thumb {
+  background: var(--color-base-300);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
 }
-
-.wg-scroll-x { overflow-x: auto; }
-.wg-scroll-x table { min-width: 620px; width: 100%; border-collapse: collapse; }
-
-.wg-fade-in { animation: wgFade .32s ease both; }
-@keyframes wgFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-@keyframes wgShimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
-
-.wg-gradient { background: linear-gradient(135deg, #0284c7 0%, #0ea5e9 45%, #22d3ee 100%); }
 
 /* Le mouvement peut être désactivé au niveau système : on le respecte. */
 @media (prefers-reduced-motion: reduce) {
@@ -198,29 +177,6 @@ body {
     transition-duration: .01ms !important;
     scroll-behavior: auto !important;
   }
-}
-
-/* ─── Vitrine ixartz/Next-js-Boilerplate ────────────────────────────────────
-   Styles ciblés uniquement : la page `/` reste claire comme le modèle public,
-   même lorsque le thème global WashGuard est sombre. Les autres écrans,
-   les tokens P02 et les composants existants ne sont pas modifiés.          */
-.wg-boilerplate-landing .boilerplate-main p {
-  margin-top: 1.5rem;
-  margin-bottom: 1.5rem;
-}
-.wg-boilerplate-landing .boilerplate-banner a {
-  color: #d946ef;
-}
-.wg-boilerplate-landing .boilerplate-banner a:hover {
-  color: #6366f1;
-}
-.wg-boilerplate-landing select {
-  color: #374151;
-  background: #ffffff;
-  border-color: #d1d5db;
-}
-.wg-boilerplate-landing table {
-  border-color: #d1d5db;
 }
 
 /* Reçu isolé du thème sombre et des contrôles de l'application. */

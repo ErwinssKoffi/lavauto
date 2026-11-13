@@ -77,12 +77,12 @@ export default function Clients() {
   return (
     <div>
       <PageHeader title="Clients" subtitle="Fiche enrichie : contact, canal préféré, fidélité, forfaits, flotte et historique des lavages."
-        actions={<button className="wg-btn wg-btn-primary" disabled={!canEdit} onClick={() => setOpen(true)}><FiPlus /> Nouveau client</button>} />
+        actions={<button className="btn btn-sm btn-primary" disabled={!canEdit} onClick={() => setOpen(true)}><FiPlus /> Nouveau client</button>} />
 
       <Card className="mb-5">
         <div className="relative">
-          <FiSearch className="wg-muted pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" />
-          <input className="wg-input !pl-9" placeholder="Rechercher par nom, téléphone, e-mail ou plaque…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <FiSearch className="text-base-content/60 pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" />
+          <input className="input input-sm pl-9! w-full" placeholder="Rechercher par nom, téléphone, e-mail ou plaque…" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
       </Card>
 
@@ -93,10 +93,10 @@ export default function Clients() {
           {clients.map((c) => {
             const washes = state.washes.filter((w) => w.clientId === c.id && w.status !== 'cancelled');
             return (
-              <Card key={c.id} className="cursor-pointer transition hover:border-sky-500/50" onClick={() => setDetailId(c.id)}>
+              <Card key={c.id} className="cursor-pointer transition hover:border-primary/50" onClick={() => setDetailId(c.id)}>
                 <div className="flex items-center gap-3">
-                  <span className="wg-gradient grid h-10 w-10 place-items-center rounded-xl text-sm font-bold text-white">{c.name.slice(0, 2).toUpperCase()}</span>
-                  <div className="min-w-0"><p className="truncate text-sm font-bold">{c.name}</p><p className="wg-muted truncate text-xs">{c.phone || 'Téléphone non renseigné'}</p></div>
+                  <span className="bg-linear-to-br from-primary via-primary to-secondary grid h-10 w-10 place-items-center rounded-xl text-sm font-bold text-primary-content">{c.name.slice(0, 2).toUpperCase()}</span>
+                  <div className="min-w-0"><p className="truncate text-sm font-bold">{c.name}</p><p className="text-base-content/60 truncate text-xs">{c.phone || 'Téléphone non renseigné'}</p></div>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {c.plate && <Badge tone="accent">{c.plate}</Badge>}
@@ -104,8 +104,8 @@ export default function Clients() {
                   <Badge tone="success">{formatFCFA(washes.reduce((s, w) => s + w.total, 0))}</Badge>
                   {c.preferredChannel && c.preferredChannel !== 'none' && <Badge>{c.preferredChannel}</Badge>}
                 </div>
-                {c.notes && <p className="wg-muted mt-3 truncate text-xs">Notes : {c.notes}</p>}
-                <p className="wg-muted mt-2 text-[11px]">Fiche créée le {formatDate(c.createdAt)}</p>
+                {c.notes && <p className="text-base-content/60 mt-3 truncate text-xs">Notes : {c.notes}</p>}
+                <p className="text-base-content/60 mt-2 text-[11px]">Fiche créée le {formatDate(c.createdAt)}</p>
               </Card>
             );
           })}
@@ -131,8 +131,8 @@ export default function Clients() {
           </div>
         </fieldset>
         <div className="mt-5 flex justify-end gap-2">
-          <button className="wg-btn wg-btn-ghost" onClick={() => setOpen(false)}><FiX /> Annuler</button>
-          <button className="wg-btn wg-btn-primary" disabled={creating || !canEdit} onClick={() => {
+          <button className="btn btn-sm" onClick={() => setOpen(false)}><FiX /> Annuler</button>
+          <button className="btn btn-sm btn-primary" disabled={creating || !canEdit} onClick={() => {
             if (creatingRef.current) return;
             creatingRef.current = true; setCreating(true);
             void safe(async () => {
@@ -169,7 +169,7 @@ export default function Clients() {
             <Input label="Notes" value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} />
             {showLoyalty && <label className="flex items-center gap-2 self-end pb-2 text-xs"><input type="checkbox" checked={draft.loyaltyOptIn} onChange={(e) => setDraft({ ...draft, loyaltyOptIn: e.target.checked })} /> Fidélité activée</label>}
           </fieldset>
-          <div className="mt-4 flex justify-end"><button className="wg-btn wg-btn-primary" disabled={!canEdit} onClick={() => safe(async () => {
+          <div className="mt-4 flex justify-end"><button className="btn btn-sm btn-primary" disabled={!canEdit} onClick={() => safe(async () => {
             validateCustomer({ stationId, name: draft.name, phone: draft.phone, email: draft.email }); validatePlate(draft.plate);
             await saveCustomerProfile({
               stationId, customerId: detail.id, name: draft.name, phone: draft.phone,
@@ -188,18 +188,18 @@ export default function Clients() {
           <WhatsappConsentPanel key={`${detail.id}:${detail.phone}`} customerId={detail.id} phone={detail.phone} />
 
           {showLoyalty && <div className="mt-6 grid gap-3 sm:grid-cols-3">
-            <Card><p className="wg-muted text-[11px] uppercase">Cartes de fidélité</p><p className="mt-1 text-lg font-bold">{cards.length}</p><p className="wg-muted text-xs">{cards.reduce((s, c) => s + c.pointsBalance, 0)} point(s)</p></Card>
-            <Card><p className="wg-muted text-[11px] uppercase">Forfaits</p><p className="mt-1 text-lg font-bold">{packages.filter((p) => p.status === 'active').length}</p><p className="wg-muted text-xs">{packages.reduce((s, p) => s + p.washesRemaining, 0)} lavage(s) restant(s)</p></Card>
-            <Card><p className="wg-muted text-[11px] uppercase">File CRM historique</p><p className="mt-1 text-lg font-bold">{notifications.filter((n) => n.status === 'pending').length}</p><p className="wg-muted text-xs">en attente, aucun envoi ; hors avis lavage prêt</p></Card>
+            <Card><p className="text-base-content/60 text-[11px] uppercase">Cartes de fidélité</p><p className="mt-1 text-lg font-bold">{cards.length}</p><p className="text-base-content/60 text-xs">{cards.reduce((s, c) => s + c.pointsBalance, 0)} point(s)</p></Card>
+            <Card><p className="text-base-content/60 text-[11px] uppercase">Forfaits</p><p className="mt-1 text-lg font-bold">{packages.filter((p) => p.status === 'active').length}</p><p className="text-base-content/60 text-xs">{packages.reduce((s, p) => s + p.washesRemaining, 0)} lavage(s) restant(s)</p></Card>
+            <Card><p className="text-base-content/60 text-[11px] uppercase">File CRM historique</p><p className="mt-1 text-lg font-bold">{notifications.filter((n) => n.status === 'pending').length}</p><p className="text-base-content/60 text-xs">en attente, aucun envoi ; hors avis lavage prêt</p></Card>
           </div>}
 
           <h3 className="mt-6 text-sm font-bold">Historique des lavages</h3>
-          {history.length === 0 ? <p className="wg-muted mt-2 text-xs">Aucun lavage rattaché à cette fiche.</p> : (
-            <div className="wg-scroll-x mt-3 rounded-xl border" style={{ borderColor: 'var(--wg-border)' }}>
-              <table>
-                <thead><tr><th className="wg-th">Fiche</th><th className="wg-th">Date</th><th className="wg-th">Véhicule</th><th className="wg-th">Total</th><th className="wg-th">Payé</th></tr></thead>
+          {history.length === 0 ? <p className="text-base-content/60 mt-2 text-xs">Aucun lavage rattaché à cette fiche.</p> : (
+            <div className="overflow-x-auto mt-3 rounded-xl border">
+              <table className="table min-w-[620px]">
+                <thead><tr><th>Fiche</th><th>Date</th><th>Véhicule</th><th>Total</th><th>Payé</th></tr></thead>
                 <tbody>{history.map((w) => (
-                  <tr key={w.id}><td className="wg-td font-bold">{w.number}</td><td className="wg-td">{formatDate(w.createdAt)}</td><td className="wg-td">{w.vehicleLabel}</td><td className="wg-td">{formatFCFA(w.total)}</td><td className="wg-td">{formatFCFA(w.paid)}</td></tr>
+                  <tr key={w.id}><td className="font-bold">{w.number}</td><td>{formatDate(w.createdAt)}</td><td>{w.vehicleLabel}</td><td>{formatFCFA(w.total)}</td><td>{formatFCFA(w.paid)}</td></tr>
                 ))}</tbody>
               </table>
             </div>

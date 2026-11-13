@@ -78,7 +78,7 @@ export default function Reports() {
       : loadError || stationMetricsError;
     return <div>
       <PageHeader title="Rapports" subtitle={`Station : ${state.station?.name ?? '—'} · ${label}.`}
-        actions={<button className="wg-btn wg-btn-ghost" onClick={reload}><FiRefreshCw /> Actualiser</button>} />
+        actions={<button className="btn btn-sm" onClick={reload}><FiRefreshCw /> Actualiser</button>} />
       <div className="mb-5"><Tabs value={period} onChange={setPeriod} options={PERIODS} /></div>
       <Alert kind={unavailable ? 'danger' : 'info'}>{unavailable ? `Rapport indisponible : ${unavailable}` : 'Chargement du rapport exhaustif…'}</Alert>
     </div>;
@@ -128,9 +128,9 @@ export default function Reports() {
     <div>
       <PageHeader title="Rapports" subtitle={`Station ${state.station?.name ?? '—'} · jour / semaine / mois : CA, encaissé, créances, coûts et solde partiel (${label}).`}
         actions={<div className="flex gap-2">
-          {dataSource !== 'local' && <button className="wg-btn wg-btn-ghost" onClick={reload}><FiRefreshCw /> Actualiser</button>}
-          <button className="wg-btn wg-btn-ghost" disabled={!canCertify} title={!hasStock ? 'Module stock non inclus' : !canWriteSubscription ? 'Abonnement en lecture seule' : undefined} onClick={() => setCertOpen(true)}><FiFileText /> {connected ? 'Certification entreprise' : 'Certifier les coûts'}</button>
-          <button className="wg-btn wg-btn-primary" onClick={exportCSV}><FiDownload /> Exporter en CSV</button>
+          {dataSource !== 'local' && <button className="btn btn-sm" onClick={reload}><FiRefreshCw /> Actualiser</button>}
+          <button className="btn btn-sm" disabled={!canCertify} title={!hasStock ? 'Module stock non inclus' : !canWriteSubscription ? 'Abonnement en lecture seule' : undefined} onClick={() => setCertOpen(true)}><FiFileText /> {connected ? 'Certification entreprise' : 'Certifier les coûts'}</button>
+          <button className="btn btn-sm btn-primary" onClick={exportCSV}><FiDownload /> Exporter en CSV</button>
         </div>} />
       <div className="mb-5"><Tabs value={period} onChange={setPeriod} options={PERIODS} /></div>
 
@@ -147,7 +147,7 @@ export default function Reports() {
         <StatCard label="Chiffre d’affaires" value={formatFCFA(p.revenue)} hint="Total des fiches" />
         <StatCard label="Encaissements" value={formatFCFA(p.collected)} hint={`${detail.byMethod.reduce((n, m) => n + m.count, 0)} paiement(s)`} />
         <StatCard label="Créances" value={formatFCFA(p.receivables)} hint="Reste dû par fiche" />
-        <StatCard label="Solde partiel" value={formatFCFA(p.partialBalance)} hint="Encaissé − dépenses, PAS un bénéfice" accent="bg-amber-500/10 text-amber-400" />
+        <StatCard label="Solde partiel" value={formatFCFA(p.partialBalance)} hint="Encaissé − dépenses, PAS un bénéfice" accent="bg-warning/10 text-warning" />
       </div>
 
       <Card className="mt-5">
@@ -155,21 +155,21 @@ export default function Reports() {
           <h2 className="text-sm font-bold">Décomposition financière</h2>
           <Badge tone={p.costsMissing ? 'warn' : 'success'}>{fromRpc ? 'RPC station' : 'Calcul local'} · {stockCostsUnavailable ? 'coûts indisponibles' : p.certified ? 'coûts certifiés' : 'coûts manquants'}</Badge>
         </div>
-        <div className="wg-scroll-x rounded-xl border" style={{ borderColor: 'var(--wg-border)' }}>
-          <table>
-            <thead><tr><th className="wg-th">Indicateur</th><th className="wg-th">Définition</th><th className="wg-th">Valeur</th></tr></thead>
+        <div className="overflow-x-auto rounded-xl border">
+          <table className="table min-w-[620px]">
+            <thead><tr><th>Indicateur</th><th>Définition</th><th>Valeur</th></tr></thead>
             <tbody>
               {indicatorRows.map(([name, detail, value]) => (
                 <tr key={name}>
-                  <td className="wg-td font-semibold">{name}</td>
-                  <td className="wg-muted wg-td text-xs">{detail}</td>
-                  <td className="wg-td whitespace-nowrap font-bold">{typeof value === 'number' ? formatFCFA(value) : value}</td>
+                  <td className="font-semibold">{name}</td>
+                  <td className="text-xs text-base-content/60">{detail}</td>
+                  <td className="whitespace-nowrap font-bold">{typeof value === 'number' ? formatFCFA(value) : value}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <p className="wg-muted mt-3 text-xs">Marge brute : {amount(p.grossMargin)} · Résultat net : {amount(p.result)} · {p.missing.length} poste(s) manquant(s) : {p.missing.join(', ') || 'aucun'}. {p.attestation ? `Attestation : ${p.attestation}.` : ''}</p>
+        <p className="text-base-content/60 mt-3 text-xs">Marge brute : {amount(p.grossMargin)} · Résultat net : {amount(p.result)} · {p.missing.length} poste(s) manquant(s) : {p.missing.join(', ') || 'aucun'}. {p.attestation ? `Attestation : ${p.attestation}.` : ''}</p>
       </Card>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
@@ -209,9 +209,9 @@ export default function Reports() {
         </div>
         <Textarea label="Attestation *" value={cert.attestation} onChange={(e) => setCert({ ...cert, attestation: e.target.value })}
           placeholder="Je certifie les achats rattachés, les mouvements valorisés et les commissions validées de la période." />
-        <p className="wg-muted mt-3 text-xs">La publication du résultat net est refusée si des coûts sont ambigus, non valorisés ou non validés. Le relevé certifié est immuable.</p>
-        <div className="mt-5 flex justify-end gap-2"><button className="wg-btn wg-btn-ghost" onClick={() => setCertOpen(false)}>Annuler</button>
-          <button className="wg-btn wg-btn-primary" disabled={!canCertify} onClick={() => safe(async () => {
+        <p className="text-base-content/60 mt-3 text-xs">La publication du résultat net est refusée si des coûts sont ambigus, non valorisés ou non validés. Le relevé certifié est immuable.</p>
+        <div className="mt-5 flex justify-end gap-2"><button className="btn btn-sm" onClick={() => setCertOpen(false)}>Annuler</button>
+          <button className="btn btn-sm btn-primary" disabled={!canCertify} onClick={() => safe(async () => {
             await certifyCosts(cert);
             await refreshFinance(from, to);
             setCert({ ...cert, attestation: '' });
@@ -219,21 +219,21 @@ export default function Reports() {
           })}>Certifier</button></div>
       </Modal>
 
-      <p className="wg-muted mt-4 text-xs">L’export CSV reprend exactement ces indicateurs. Aucune donnée d’exemple n’est incluse ; les valeurs NULL ne sont jamais remplacées par un faux zéro.</p>
+      <p className="text-base-content/60 mt-4 text-xs">L’export CSV reprend exactement ces indicateurs. Aucune donnée d’exemple n’est incluse ; les valeurs NULL ne sont jamais remplacées par un faux zéro.</p>
     </div>
   );
 }
 
 function EmptyLine() {
-  return <p className="wg-muted py-6 text-center text-xs">Aucune donnée sur la période.</p>;
+  return <p className="text-base-content/60 py-6 text-center text-xs">Aucune donnée sur la période.</p>;
 }
 
 function SimpleTable({ head, rows }: { head: string[]; rows: string[][] }) {
   return (
-    <div className="wg-scroll-x rounded-xl border" style={{ borderColor: 'var(--wg-border)' }}>
-      <table>
-        <thead><tr>{head.map((h) => <th key={h} className="wg-th">{h}</th>)}</tr></thead>
-        <tbody>{rows.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j} className={`wg-td ${j > 0 ? 'whitespace-nowrap' : ''}`}>{c}</td>)}</tr>)}</tbody>
+    <div className="overflow-x-auto rounded-xl border">
+      <table className="table min-w-[620px]">
+        <thead><tr>{head.map((h) => <th key={h}>{h}</th>)}</tr></thead>
+        <tbody>{rows.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j} className={j > 0 ? 'whitespace-nowrap' : undefined}>{c}</td>)}</tr>)}</tbody>
       </table>
     </div>
   );

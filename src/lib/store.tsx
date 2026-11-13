@@ -8,6 +8,7 @@ import type {
 } from '../types';
 import { ApiError, PAY_METHOD_DB_KEY } from '../types';
 import { canTransitionWash, normalizeWashes, washEvent } from './washLifecycle';
+import { DEFAULT_DARK_THEME, DEFAULT_LIGHT_THEME, DEFAULT_THEME, THEME_PREFERENCE_VERSION, isKnownTheme, themeScheme } from './themes';
 import { mapCatalogToState } from './catalog';
 import { theoreticalCash } from './metrics';
 import {
@@ -309,8 +310,14 @@ interface Ctx {
   toasts: Toast[];
   notify: (kind: Toast['kind'], message: string) => void;
   dismissToast: (id: string) => void;
+  /** Schéma de couleurs du thème actif, conservé pour la bascule rapide. */
   theme: 'dark' | 'light';
+  /** Bascule rapide entre les deux thèmes WashGuard. */
   toggleTheme: () => void;
+  /** Thème DaisyUI actif (`data-theme`), parmi les 37 thèmes disponibles. */
+  themeName: string;
+  /** Applique et persiste un thème DaisyUI ; les noms inconnus sont ignorés. */
+  setTheme: (name: string) => void;
   /** Formules affichées : cache du repli local ou lignes lues dans `plans`. */
   plans: Plan[];
   /** Source active (diagnostic) : `local` par défaut, `supabase` en lecture seule. */
@@ -565,10 +572,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const localWashReservations = useRef(new Set<string>());
   const localAccountReservations = useRef(new Set<string>());
   const [setupLoad, setSetupLoad] = useState<{ epoch: number; status: 'loading' | 'ready' | 'error'; error: string | null }>({ epoch: -1, status: 'loading', error: null });
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    try { return localStorage.getItem('washguard.theme') === 'light' ? 'light' : 'dark'; }
-    catch { return 'dark'; }
+  // Thème DaisyUI actif : `washguard.theme.name` fait foi. L'ancienne clé
+  // `washguard.theme` (dark|light) reste lue et maintenue pour compatibilité
+  // (script inline de index.html, préférences déjà enregistrées).
+  const [themeName, setThemeName] = useState<string>(() => {
+    try {
+      const savedName = localStorage.getItem('washguard.theme.name');
+      // Une préférence enregistrée par une génération antérieure (avant le
+      // passage à cupcake) est ignorée une seule fois.
+      const versioned = localStorage.getItem('washguard.theme.v') === THEME_PREFERENCE_VERSION;
+      return versioned && isKnownTheme(savedName) ? savedName : DEFAULT_THEME;
+    } catch { return DEFAULT_THEME; }
   });
+  const theme = themeScheme(themeName);
   const stateRef = useRef(state);
   stateRef.current = state;
   useEffect(() => {
@@ -1102,14 +1118,75 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
   }, [adapter, serverSubscription, authReady, identity?.isPlatformAdmin, beginRequest]);
 
+  // Paire clair/sombre mémorisée : la bascule rapide alterne entre les derniers
+  // thèmes clair et sombre choisis (cupcake / dim par défaut), et non plus entre
+  // les deux thèmes de la marque.
+  const themePair = useRef<{ light: string; dark: string }>({
+    light: DEFAULT_LIGHT_THEME,
+    dark: DEFAULT_DARK_THEME,
+  });
+
+  const rememberTheme = useCallback((name: string) => {
+    if (!isKnownTheme(name)) return;
+    const scheme = themeScheme(name);
+    themePair.current = { ...themePair.current, [scheme]: name };
+    try {
+      localStorage.setItem(`washguard.theme.${scheme}`, name);
+    } catch { /* préférence facultative */ }
+  }, []);
+
+  // Amorce la paire clair/sombre depuis le stockage, et enregistre le thème
+  // courant : la bascule est correcte dès le premier clic, même après
+  // rechargement (le thème initial est déjà lu dans `useState`).
+  useEffect(() => {
+    const stored = (key: string, fallback: string, scheme: 'light' | 'dark') => {
+      try {
+        const value = localStorage.getItem(key);
+        return isKnownTheme(value) && themeScheme(value) === scheme ? value : fallback;
+      } catch { return fallback; }
+    };
+    themePair.current = {
+      light: stored('washguard.theme.light', DEFAULT_LIGHT_THEME, 'light'),
+      dark: stored('washguard.theme.dark', DEFAULT_DARK_THEME, 'dark'),
+    };
+    rememberTheme(themeName);
+  }, [rememberTheme, themeName]);
+
+  const setTheme = useCallback((name: string) => {
+    if (!isKnownTheme(name)) return;
+    rememberTheme(name);
+    setThemeName(name);
+  }, [rememberTheme]);
+
+  // Bascule rapide clair/sombre : elle revient au dernier thème clair (ou
+  // sombre) utilisé, avec cupcake / dim comme valeurs par défaut.
   const toggleTheme = useCallback(() => {
-    setTheme((t) => {
-      const next = t === 'dark' ? 'light' : 'dark';
-      try { localStorage.setItem('washguard.theme', next); } catch { /* préférence facultative */ }
-      document.documentElement.classList.toggle('dark', next === 'dark');
-      return next;
+    setThemeName((current) => {
+      const target = themeScheme(current) === 'dark' ? themePair.current.light : themePair.current.dark;
+      return isKnownTheme(target) ? target : DEFAULT_THEME;
     });
   }, []);
+
+  // Persistance + application au document. `data-theme` est la source de vérité
+  // de DaisyUI ; la classe `dark` est conservée pour compatibilité.
+  useEffect(() => {
+    const scheme = themeScheme(themeName);
+    const root = document.documentElement;
+    root.classList.toggle('dark', scheme === 'dark');
+    root.setAttribute('data-theme', themeName);
+    try {
+      localStorage.setItem('washguard.theme.name', themeName);
+      localStorage.setItem('washguard.theme', scheme);
+      localStorage.setItem('washguard.theme.v', THEME_PREFERENCE_VERSION);
+    } catch { /* préférence facultative */ }
+    // La barre du navigateur mobile (et l'écran de démarrage PWA) suivent le
+    // thème actif : on recopie `base-100` dans la balise `theme-color`.
+    try {
+      const meta = document.querySelector('meta[name="theme-color"]');
+      const base = getComputedStyle(root).getPropertyValue('--color-base-100').trim();
+      if (meta && base) meta.setAttribute('content', base);
+    } catch { /* balise absente ou CSS non calculable */ }
+  }, [themeName]);
 
   const onboarding = useMemo(() => computeOnboarding(state), [state]);
   const missing = useMemo(() => missingRequired(state), [state]);
@@ -3226,7 +3303,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   });
 
   const value: Ctx = {
-    state, toasts, notify: (kind, message) => { if (!isRemoteAuth || viewEpoch === scopeRef.current.epoch) notify(kind, message); }, dismissToast, theme, toggleTheme, plans, dataSource, isLocalStockDemo, demoStorageIssue, demoStoragePending, isServerStock: serverStock, plansError,
+    state, toasts, notify: (kind, message) => { if (!isRemoteAuth || viewEpoch === scopeRef.current.epoch) notify(kind, message); }, dismissToast, theme, toggleTheme, themeName, setTheme, plans, dataSource, isLocalStockDemo, demoStorageIssue, demoStoragePending, isServerStock: serverStock, plansError,
     subscriptionAccess, subscriptionStatus, subscriptionError, canWriteSubscription, refreshSubscriptionAccess,
     subscriptionRequests, subscriptionRequestsError, refreshSubscriptionRequests, decideSubscriptionRequest,
     onboarding, missing,

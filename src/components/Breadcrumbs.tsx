@@ -11,11 +11,11 @@ export function Breadcrumbs({ items }: { items: Crumb[] }) {
         const last = index === items.length - 1;
         return (
           <span key={`${crumb.label}-${index}`} className="flex min-w-0 items-center gap-1">
-            {index > 0 && <FiChevronRight className="wg-muted shrink-0" size={13} aria-hidden="true" />}
+            {index > 0 && <FiChevronRight className="shrink-0 text-base-content/60" size={13} aria-hidden="true" />}
             {crumb.to && !last ? (
-              <Link to={crumb.to} className="wg-link truncate">{crumb.label}</Link>
+              <Link to={crumb.to} className="link link-primary truncate">{crumb.label}</Link>
             ) : (
-              <span className={`truncate ${last ? 'font-bold' : 'wg-muted'}`} aria-current={last ? 'page' : undefined}>{crumb.label}</span>
+              <span className={`truncate ${last ? 'font-bold' : 'text-base-content/60'}`} aria-current={last ? 'page' : undefined}>{crumb.label}</span>
             )}
           </span>
         );

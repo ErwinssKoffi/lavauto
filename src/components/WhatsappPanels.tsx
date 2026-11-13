@@ -114,27 +114,27 @@ export function WhatsappConsentPanel({ customerId, phone }: { customerId: string
     } finally { busyRef.current = false; setBusy(false); }
   };
   return (
-    <section className="mt-6 rounded-xl border border-emerald-500/30 p-4" aria-label="Consentement WhatsApp">
+    <section className="mt-6 rounded-xl border border-success/30 p-4" aria-label="Consentement WhatsApp">
       <h3 className="text-sm font-bold">Consentement WhatsApp · lavage prêt</h3>
-      <p className="wg-muted mt-2 text-xs">Accord distinct du canal préféré et de la fidélité. Il couvre uniquement les messages de disponibilité du lavage, automatiques ou manuels, au numéro enregistré. Le client peut demander son retrait à tout moment.</p>
+      <p className="text-base-content/60 mt-2 text-xs">Accord distinct du canal préféré et de la fidélité. Il couvre uniquement les messages de disponibilité du lavage, automatiques ou manuels, au numéro enregistré. Le client peut demander son retrait à tout moment.</p>
       {connected && !canWriteSubscription && <div className="mt-3"><Alert kind="warn">Après expiration, vous pouvez demander le retrait avec sa preuve ; le serveur vérifiera les droits et la station. Un nouvel accord reste bloqué en lecture seule. Si le retrait est refusé ou non confirmé, contactez le support avant toute reprise des envois.</Alert></div>}
-      {!connected ? <p className="wg-muted mt-3 text-xs">Enregistrement du consentement WhatsApp actif lorsque le connecteur Meta Cloud API est configuré.</p> : <>
+      {!connected ? <p className="text-base-content/60 mt-3 text-xs">Enregistrement du consentement WhatsApp actif lorsque le connecteur Meta Cloud API est configuré.</p> : <>
         {error && <div className="mt-3 space-y-2"><Alert kind="danger">{error}</Alert>
-          <button className="wg-btn wg-btn-ghost" disabled={busy} onClick={() => { void reload(); }}><FiRefreshCw /> Actualiser le consentement</button>
+          <button className="btn btn-sm" disabled={busy} onClick={() => { void reload(); }}><FiRefreshCw /> Actualiser le consentement</button>
         </div>}
         {notice && <div className="mt-3"><Alert kind="info">{notice}</Alert></div>}
-        {!data && !error && <p className="wg-muted mt-3 text-xs">Chargement du consentement…</p>}
+        {!data && !error && <p className="text-base-content/60 mt-3 text-xs">Chargement du consentement…</p>}
         {data && <>
           <p className="mt-3 text-xs"><Badge tone={data.granted ? 'success' : 'warn'}>{data.granted ? 'Accord enregistré' : 'Aucun accord actif'}</Badge>{data.granted && <> · {data.phone} · {formatDateTime(data.at)}</>}</p>
-          <p className="wg-muted mt-2 text-xs">Téléphone actuellement enregistré : {phone || 'non renseigné'}. Pour accorder le consentement, utilisez un numéro international avec + et indicatif, par exemple +2250700000000. Enregistrez la fiche client avant cet accord.</p>
+          <p className="text-base-content/60 mt-2 text-xs">Téléphone actuellement enregistré : {phone || 'non renseigné'}. Pour accorder le consentement, utilisez un numéro international avec + et indicatif, par exemple +2250700000000. Enregistrez la fiche client avant cet accord.</p>
           {can('customers.manage') && <div className="mt-3 space-y-3">
             <Input label="Origine / preuve de l’accord ou du retrait *" disabled={busy || (!data.granted && !canWriteSubscription)} value={source} maxLength={500} onChange={(e) => setSource(e.target.value)} placeholder="Ex. accord oral au comptoir le 12/11/2026" hint="Indiquez la façon dont le client a donné ou retiré son accord, sans données sensibles." />
             {!data.granted && <label className="flex items-start gap-2 text-xs"><input type="checkbox" disabled={!canWriteSubscription || busy} checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} /><span>Je confirme que le client a explicitement accepté de recevoir sur WhatsApp les avis de lavage prêt à ce numéro.</span></label>}
             <div className="flex flex-wrap gap-2">
-              {!data.granted && <button className="wg-btn wg-btn-primary" disabled={!canWriteSubscription || busy || !confirmed || source.trim().length < 5} onClick={() => { void save(true); }}>Enregistrer l’accord WhatsApp</button>}
-              {data.granted && <button className="wg-btn wg-btn-danger" disabled={busy || source.trim().length < 5} onClick={() => { void save(false); }}>Retirer l’accord WhatsApp</button>}
+              {!data.granted && <button className="btn btn-sm btn-primary" disabled={!canWriteSubscription || busy || !confirmed || source.trim().length < 5} onClick={() => { void save(true); }}>Enregistrer l’accord WhatsApp</button>}
+              {data.granted && <button className="btn btn-sm btn-error btn-outline" disabled={busy || source.trim().length < 5} onClick={() => { void save(false); }}>Retirer l’accord WhatsApp</button>}
             </div>
-            <p className="wg-muted text-[11px]">Un retrait ou un changement de numéro annule les demandes non encore réclamées. Une transmission déjà réclamée ne peut pas être rappelée et peut encore atteindre Meta.</p>
+            <p className="text-base-content/60 text-[11px]">Un retrait ou un changement de numéro annule les demandes non encore réclamées. Une transmission déjà réclamée ne peut pas être rappelée et peut encore atteindre Meta.</p>
           </div>}
           {data.history.length > 0 && <details className="mt-3 text-xs"><summary className="cursor-pointer font-semibold">Historique des accords et retraits</summary>
             <ul className="mt-2 space-y-1">{data.history.map((event, index) => <li key={`${event.at}-${index}`}>
@@ -196,20 +196,20 @@ export function WhatsappWashPanel({ wash }: { wash: Wash }) {
   };
   const existing = entries?.some((entry) => IN_FLIGHT_OR_FINISHED.includes(entry.status));
   return (
-    <section className="mt-5 rounded-xl border border-emerald-500/30 p-4" aria-label="Notifications WhatsApp">
+    <section className="mt-5 rounded-xl border border-success/30 p-4" aria-label="Notifications WhatsApp">
       <h3 className="text-sm font-bold">Notification WhatsApp · lavage prêt</h3>
-      {!connected ? <p className="wg-muted mt-2 text-xs">L’envoi automatique WhatsApp requiert la configuration du fournisseur Meta Cloud API.</p> : <>
-        <p className="wg-muted mt-2 text-xs">Une demande automatique est créée au passage à « prêt ». L’envoi nécessite un accord explicite, un fournisseur configuré et un ordonnanceur actif. La demande manuelle ne duplique pas un envoi déjà en cours ou confirmé.</p>
+      {!connected ? <p className="text-base-content/60 mt-2 text-xs">L’envoi automatique WhatsApp requiert la configuration du fournisseur Meta Cloud API.</p> : <>
+        <p className="text-base-content/60 mt-2 text-xs">Une demande automatique est créée au passage à « prêt ». L’envoi nécessite un accord explicite, un fournisseur configuré et un ordonnanceur actif. La demande manuelle ne duplique pas un envoi déjà en cours ou confirmé.</p>
         {error && <div className="mt-3"><Alert kind="danger">{error}</Alert></div>}
         {notice && <div className="mt-3"><Alert kind="info">{notice}</Alert></div>}
-        {!entries && !error && <p className="wg-muted mt-3 text-xs">Chargement du journal…</p>}
+        {!entries && !error && <p className="text-base-content/60 mt-3 text-xs">Chargement du journal…</p>}
         {entries && <div className="mt-3 space-y-2">
-          {entries.length === 0 && <p className="wg-muted text-xs">Aucune demande enregistrée pour cette fiche.</p>}
-          {entries.map((entry) => <div key={entry.id} className="rounded-lg border p-3 text-xs" style={{ borderColor: 'var(--wg-border)' }}>
+          {entries.length === 0 && <p className="text-base-content/60 text-xs">Aucune demande enregistrée pour cette fiche.</p>}
+          {entries.map((entry) => <div key={entry.id} className="rounded-lg border p-3 text-xs">
             <div className="flex flex-wrap items-center gap-2"><Badge tone={tone(entry.status)}>{label[entry.status]}</Badge>
               <span>{entry.origin === 'automatic' ? 'Automatique' : 'Manuelle'} · {formatDateTime(entry.createdAt)}</span></div>
-            {entry.reason && <p className="wg-muted mt-2">{reason(entry.reason)}</p>}
-            {entry.providerMessageId && <p className="wg-muted mt-1 break-all">Référence Meta : {entry.providerMessageId}</p>}
+            {entry.reason && <p className="text-base-content/60 mt-2">{reason(entry.reason)}</p>}
+            {entry.providerMessageId && <p className="text-base-content/60 mt-1 break-all">Référence Meta : {entry.providerMessageId}</p>}
             {entry.events.length > 0 && <details className="mt-2"><summary className="cursor-pointer font-semibold">Détail du journal</summary>
               <ul className="mt-2 space-y-1">{entry.events.map((event, index) => <li key={`${event.at}-${index}`}>
                 {label[event.kind]} · {formatDateTime(event.at)}{event.providerAt ? ` (heure Meta : ${formatDateTime(event.providerAt)})` : ''}{event.reason ? ` · ${reason(event.reason)}` : ''}
@@ -218,11 +218,11 @@ export function WhatsappWashPanel({ wash }: { wash: Wash }) {
           </div>)}
         </div>}
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button className="wg-btn wg-btn-ghost" disabled={busy} onClick={() => { void refresh().catch((e: unknown) => setError(e instanceof Error ? e.message : 'Journal inaccessible.')); }}><FiRefreshCw /> Actualiser le journal</button>
-          {(can('notifications.enqueue') || can('customers.manage')) && <button className="wg-btn wg-btn-primary" disabled={!canWriteSubscription || busy || !entries || wash.status !== 'ready' || !wash.clientId || existing} onClick={() => { void enqueue(); }}><FiSend /> Demander l’envoi WhatsApp</button>}
+          <button className="btn btn-sm" disabled={busy} onClick={() => { void refresh().catch((e: unknown) => setError(e instanceof Error ? e.message : 'Journal inaccessible.')); }}><FiRefreshCw /> Actualiser le journal</button>
+          {(can('notifications.enqueue') || can('customers.manage')) && <button className="btn btn-sm btn-primary" disabled={!canWriteSubscription || busy || !entries || wash.status !== 'ready' || !wash.clientId || existing} onClick={() => { void enqueue(); }}><FiSend /> Demander l’envoi WhatsApp</button>}
         </div>
-        {existing && <p className="wg-muted mt-2 text-[11px]">Une demande est déjà en attente, en cours ou confirmée. Un résultat incertain ne doit pas être réexpédié sans vérification.</p>}
-        {wash.status !== 'ready' && <p className="wg-muted mt-2 text-[11px]">La demande manuelle est disponible uniquement lorsque le lavage est prêt et non encore livré.</p>}
+        {existing && <p className="text-base-content/60 mt-2 text-[11px]">Une demande est déjà en attente, en cours ou confirmée. Un résultat incertain ne doit pas être réexpédié sans vérification.</p>}
+        {wash.status !== 'ready' && <p className="text-base-content/60 mt-2 text-[11px]">La demande manuelle est disponible uniquement lorsque le lavage est prêt et non encore livré.</p>}
       </>}
     </section>
   );

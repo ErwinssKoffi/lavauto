@@ -156,7 +156,7 @@ export default function Employees() {
   return (
     <div>
       <PageHeader title="Employés" subtitle="Comptes et rôles, affectations multi-stations, invitations, activation / désactivation et liens de réinitialisation."
-        actions={canInvite ? <button className="wg-btn wg-btn-primary" disabled={!canEditEmployees || busy} onClick={() => { setInviteLink(null); setOpen(true); }}><FiPlus /> Inviter un employé</button> : null} />
+        actions={canInvite ? <button className="btn btn-sm btn-primary" disabled={!canEditEmployees || busy} onClick={() => { setInviteLink(null); setOpen(true); }}><FiPlus /> Inviter un employé</button> : null} />
 
       {revocationRecoveryLoading && <div role="status" className="mb-5"><Alert kind="info">Vérification des révocations précédentes dans cet onglet…</Alert></div>}
       {revocationRecoveryError && <div role="alert" className="mb-5"><Alert kind="warn">
@@ -164,7 +164,7 @@ export default function Employees() {
       </Alert></div>}
       {employeeReadWarning && <div role="alert" className="mb-5"><Alert kind="warn">
         {employeeReadWarning} Les états affichés peuvent être périmés.{' '}
-        <button type="button" className="wg-btn wg-btn-ghost !px-2 !py-1" disabled={busy} onClick={() => { void reloadEmployees(); }}>
+        <button type="button" className="btn btn-sm px-2! py-1!" disabled={busy} onClick={() => { void reloadEmployees(); }}>
           {busy ? 'Actualisation en cours…' : 'Actualiser les comptes et invitations'}
         </button>
       </Alert></div>}
@@ -176,7 +176,7 @@ export default function Employees() {
       </Alert></div>}
       {unconfirmedRevocation && <div role="alert" className="mb-5"><Alert kind="warn">
         {unconfirmedRevocation.message}{' '}
-        <button type="button" className="wg-btn wg-btn-ghost !px-2 !py-1"
+        <button type="button" className="btn btn-sm px-2! py-1!"
           disabled={busy || !recoveryReady || !canWriteSubscription || Boolean(employeeReadWarning) || Boolean(unconfirmedInvitation) || Boolean(unconfirmedAccountUpdate) || !canInvite || !canDisable
             || !invitations.some((invitation) => invitation.id === unconfirmedRevocation.id)}
           onClick={() => setRevokeTarget(unconfirmedRevocation.id)}>Reprendre la même révocation</button>
@@ -184,13 +184,13 @@ export default function Employees() {
       <div className="mb-5"><Alert kind="info">Chaque nouvel employé reçoit une invitation et définit son propre mot de passe ; un mot de passe oublié se réinitialise uniquement via un lien sécurisé à usage unique.</Alert></div>
       {authKind === 'local' && <div className="mb-5"><Alert kind="warn">Mode stockage navigateur : aucun e-mail n’est envoyé sans serveur connecté.</Alert></div>}
 
-      <Card className="!p-0 overflow-hidden">
-        <div className="wg-scroll-x">
-          <table>
+      <Card className="p-0! overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="table min-w-[620px]">
             <thead><tr>
-              <th className="wg-th">Employé</th><th className="wg-th">Rôle</th><th className="wg-th">Téléphone</th>
-              <th className="wg-th">Stations</th><th className="wg-th">Créé le</th><th className="wg-th">Activité</th>
-              <th className="wg-th">Commission</th><th className="wg-th">État</th><th className="wg-th">Actions</th>
+              <th>Employé</th><th>Rôle</th><th>Téléphone</th>
+              <th>Stations</th><th>Créé le</th><th>Activité</th>
+              <th>Commission</th><th>État</th><th>Actions</th>
             </tr></thead>
             <tbody>
               {state.users.map((u) => {
@@ -198,15 +198,15 @@ export default function Employees() {
                 const ids = u.stationIds ?? (u.stationId ? [u.stationId] : []);
                 return (
                   <tr key={u.id}>
-                    <td className="wg-td"><p className="font-bold">{u.name}</p><p className="wg-muted text-xs">{u.email}</p></td>
-                    <td className="wg-td"><Badge tone={u.role === 'proprietaire' ? 'accent' : 'neutral'}>{ROLE_LABELS[u.role]}</Badge></td>
-                    <td className="wg-td">{u.phone || '—'}</td>
-                    <td className="wg-td"><div className="flex flex-wrap gap-1">{ids.length ? ids.map((id) => <Badge key={id}>{stationName(id)}</Badge>) : <span className="wg-muted text-xs">—</span>}</div></td>
-                    <td className="wg-td">{formatDate(u.createdAt)}</td>
-                    <td className="wg-td">{washes.length} lavage(s) · {formatFCFA(washes.reduce((sum, w) => sum + w.total, 0))}</td>
-                    <td className="wg-td">
+                    <td><p className="font-bold">{u.name}</p><p className="text-base-content/60 text-xs">{u.email}</p></td>
+                    <td><Badge tone={u.role === 'proprietaire' ? 'accent' : 'neutral'}>{ROLE_LABELS[u.role]}</Badge></td>
+                    <td>{u.phone || '—'}</td>
+                    <td><div className="flex flex-wrap gap-1">{ids.length ? ids.map((id) => <Badge key={id}>{stationName(id)}</Badge>) : <span className="text-base-content/60 text-xs">—</span>}</div></td>
+                    <td>{formatDate(u.createdAt)}</td>
+                    <td>{washes.length} lavage(s) · {formatFCFA(washes.reduce((sum, w) => sum + w.total, 0))}</td>
+                    <td>
                       {isLocalStockDemo || (dataSource === 'api' && canManage) ? <>
-                        <input key={`${u.id}:${u.commissionRateOverride ?? ''}`} type="number" min="0" max="100" placeholder="Barème station" className="wg-input !w-28 !py-1 text-xs"
+                        <input key={`${u.id}:${u.commissionRateOverride ?? ''}`} type="number" min="0" max="100" placeholder="Barème station" className="input input-sm w-28! py-1! text-xs"
                           disabled={!canEditEmployees || busy} defaultValue={u.commissionRateOverride ?? ''}
                           onBlur={(e) => {
                             const rate = e.target.value === '' ? null : Number(e.target.value);
@@ -215,16 +215,16 @@ export default function Employees() {
                             }
                           }}
                           onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }} />
-                        <p className="wg-muted mt-1 text-[10px]">Vide = barème de la station</p>
-                      </> : <p className="wg-muted text-xs">Barème individuel : {u.commissionRateOverride !== undefined && u.commissionRateOverride !== null ? `${u.commissionRateOverride} %` : 'barème station'}</p>}
+                        <p className="text-base-content/60 mt-1 text-[10px]">Vide = barème de la station</p>
+                      </> : <p className="text-base-content/60 text-xs">Barème individuel : {u.commissionRateOverride !== undefined && u.commissionRateOverride !== null ? `${u.commissionRateOverride} %` : 'barème station'}</p>}
                     </td>
-                    <td className="wg-td"><Badge tone={u.active ? 'success' : 'danger'}>{u.active ? 'Actif' : 'Désactivé'}</Badge></td>
-                    <td className="wg-td">
+                    <td><Badge tone={u.active ? 'success' : 'danger'}>{u.active ? 'Actif' : 'Désactivé'}</Badge></td>
+                    <td>
                       <div className="flex gap-1.5">
-                        {canReset && <button className="wg-btn wg-btn-ghost !px-2 !py-1 text-[11px]" disabled={!canEditEmployees || busy} title="Envoyer un lien de réinitialisation" onClick={() => { setResetLink(null); setResetTarget(u.id); }}><FiKey /></button>}
-                        {canManage && u.role !== 'proprietaire' && <button className="wg-btn wg-btn-ghost !px-2 !py-1 text-[11px]" disabled={!canEditEmployees || busy} title="Rôle, état et stations" onClick={() => openEdit(u.id)}><FiSettings /></button>}
+                        {canReset && <button className="btn btn-sm px-2! py-1! text-[11px]" disabled={!canEditEmployees || busy} title="Envoyer un lien de réinitialisation" onClick={() => { setResetLink(null); setResetTarget(u.id); }}><FiKey /></button>}
+                        {canManage && u.role !== 'proprietaire' && <button className="btn btn-sm px-2! py-1! text-[11px]" disabled={!canEditEmployees || busy} title="Rôle, état et stations" onClick={() => openEdit(u.id)}><FiSettings /></button>}
                         {canDisable && u.role !== 'proprietaire' && (
-                          <button className="wg-btn wg-btn-ghost !px-2 !py-1 text-[11px]" disabled={!canEditEmployees || busy} title={u.active ? 'Désactiver' : 'Activer'}
+                          <button className="btn btn-sm px-2! py-1! text-[11px]" disabled={!canEditEmployees || busy} title={u.active ? 'Désactiver' : 'Activer'}
                             onClick={() => safe(() => updateUser({ userId: u.id, active: !u.active }))}>
                             {u.active ? <FiUserX /> : <FiUserCheck />}
                           </button>
@@ -242,19 +242,19 @@ export default function Employees() {
       {canManage && (
         <Card className="mt-5">
           <h2 className="mb-3 text-sm font-bold">Invitations</h2>
-          {invitations.length === 0 ? <p className="wg-muted text-xs">Aucune invitation enregistrée.</p> : (
-            <div className="wg-scroll-x">
-              <table>
-                <thead><tr><th className="wg-th">E-mail</th><th className="wg-th">Rôle</th><th className="wg-th">Stations</th><th className="wg-th">Expire le</th><th className="wg-th">État</th><th className="wg-th">Action</th></tr></thead>
+          {invitations.length === 0 ? <p className="text-base-content/60 text-xs">Aucune invitation enregistrée.</p> : (
+            <div className="overflow-x-auto">
+              <table className="table min-w-[620px]">
+                <thead><tr><th>E-mail</th><th>Rôle</th><th>Stations</th><th>Expire le</th><th>État</th><th>Action</th></tr></thead>
                 <tbody>{invitations.map((i) => (
                   <tr key={i.id}>
-                    <td className="wg-td">{i.email}</td>
-                    <td className="wg-td"><Badge>{ROLE_LABELS[i.role]}</Badge></td>
-                    <td className="wg-td">{i.stationIds.map(stationName).join(', ') || '—'}</td>
-                    <td className="wg-td">{formatDate(i.expiresAt)}</td>
-                    <td className="wg-td"><Badge tone={i.revokedAt ? 'danger' : i.acceptedAt ? 'success' : 'warn'}>{i.revokedAt ? 'Révoquée' : i.acceptedAt ? 'Acceptée' : 'En attente'}</Badge></td>
-                    <td className="wg-td">{!i.acceptedAt && !i.revokedAt && canInvite && canDisable && (
-                      <button className="wg-btn wg-btn-ghost !px-2 !py-1 text-[11px]" disabled={!canEditEmployees || busy} title="Révoquer" onClick={() => setRevokeTarget(i.id)}><FiTrash2 /></button>
+                    <td>{i.email}</td>
+                    <td><Badge>{ROLE_LABELS[i.role]}</Badge></td>
+                    <td>{i.stationIds.map(stationName).join(', ') || '—'}</td>
+                    <td>{formatDate(i.expiresAt)}</td>
+                    <td><Badge tone={i.revokedAt ? 'danger' : i.acceptedAt ? 'success' : 'warn'}>{i.revokedAt ? 'Révoquée' : i.acceptedAt ? 'Acceptée' : 'En attente'}</Badge></td>
+                    <td>{!i.acceptedAt && !i.revokedAt && canInvite && canDisable && (
+                      <button className="btn btn-sm px-2! py-1! text-[11px]" disabled={!canEditEmployees || busy} title="Révoquer" onClick={() => setRevokeTarget(i.id)}><FiTrash2 /></button>
                     )}</td>
                   </tr>
                 ))}</tbody>
@@ -268,12 +268,12 @@ export default function Employees() {
         {inviteLink ? (
           <div className="space-y-4">
             <Alert kind="success">Invitation enregistrée. Partagez ce lien sécurisé avec l’employé pour qu’il active son compte et choisisse son mot de passe :</Alert>
-            <div className="rounded-xl border p-3 text-xs break-all" style={{ borderColor: 'var(--wg-border)', background: 'var(--wg-surface-2)' }}>{inviteLink}</div>
+            <div className="rounded-xl border p-3 text-xs break-all bg-base-200">{inviteLink}</div>
             <div className="flex justify-end gap-2">
-              <button type="button" className="wg-btn wg-btn-ghost" onClick={() => { void copyLink(inviteLink); }}>
+              <button type="button" className="btn btn-sm" onClick={() => { void copyLink(inviteLink); }}>
                 {copiedUrl ? <FiCheck /> : <FiCopy />} {copiedUrl ? 'Lien copié' : 'Copier le lien'}
               </button>
-              <button type="button" className="wg-btn wg-btn-primary" onClick={() => { setOpen(false); setInviteLink(null); }}>Fermer</button>
+              <button type="button" className="btn btn-sm btn-primary" onClick={() => { setOpen(false); setInviteLink(null); }}>Fermer</button>
             </div>
           </div>
         ) : (
@@ -293,11 +293,11 @@ export default function Employees() {
                   {stations.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </Select>
               </div>
-              <p className="wg-muted text-xs">Le collaborateur reçoit un lien pour définir son propre mot de passe.</p>
+              <p className="text-base-content/60 text-xs">Le collaborateur reçoit un lien pour définir son propre mot de passe.</p>
             </fieldset>
             <div className="mt-5 flex justify-end gap-2">
-              <button className="wg-btn wg-btn-ghost" disabled={busy} onClick={() => setOpen(false)}><FiX /> Annuler</button>
-              <button className="wg-btn wg-btn-primary" disabled={busy || !canEditEmployees} onClick={() => { void submitInvite(); }}><FiPlus /> {busy ? 'Invitation en cours…' : 'Envoyer l’invitation'}</button>
+              <button className="btn btn-sm" disabled={busy} onClick={() => setOpen(false)}><FiX /> Annuler</button>
+              <button className="btn btn-sm btn-primary" disabled={busy || !canEditEmployees} onClick={() => { void submitInvite(); }}><FiPlus /> {busy ? 'Invitation en cours…' : 'Envoyer l’invitation'}</button>
             </div>
           </>
         )}
@@ -306,17 +306,17 @@ export default function Employees() {
       <Modal open={Boolean(revoking)} onClose={() => { if (!busy) setRevokeTarget(null); }} title="Révoquer l’invitation">
         <p className="text-sm">Révoquer l’invitation de <strong>{revoking?.email}</strong> désactive aussi son accès à l’application.</p>
         {authKind === 'supabase' ? (
-          <p className="wg-muted mt-3 text-xs">Le compte, le lien et les sessions Supabase Auth ne sont pas supprimés. Réactiver le compte peut lui rendre l’accès.</p>
+          <p className="text-base-content/60 mt-3 text-xs">Le compte, le lien et les sessions Supabase Auth ne sont pas supprimés. Réactiver le compte peut lui rendre l’accès.</p>
         ) : authKind === 'api' ? (
-          <p className="wg-muted mt-3 text-xs">Les jetons d’invitation associés sont invalidés et l’accès du compte est désactivé sur le serveur.</p>
+          <p className="text-base-content/60 mt-3 text-xs">Les jetons d’invitation associés sont invalidés et l’accès du compte est désactivé sur le serveur.</p>
         ) : (
-          <p className="wg-muted mt-3 text-xs">Mode stockage navigateur : l’invitation locale est marquée révoquée.</p>
+          <p className="text-base-content/60 mt-3 text-xs">Mode stockage navigateur : l’invitation locale est marquée révoquée.</p>
         )}
-        {!canWriteSubscription && <p className="mt-3 text-xs text-amber-500">Abonnement en lecture seule : révocation indisponible.</p>}
+        {!canWriteSubscription && <p className="mt-3 text-xs text-warning">Abonnement en lecture seule : révocation indisponible.</p>}
         {unconfirmedRevocation?.id === revokeTarget && <div className="mt-3"><Alert kind="warn">{unconfirmedRevocation.message}</Alert></div>}
         <div className="mt-5 flex justify-end gap-2">
-          <button className="wg-btn wg-btn-ghost" disabled={busy} onClick={() => setRevokeTarget(null)}>Annuler</button>
-          <button className="wg-btn wg-btn-danger" disabled={busy || !canRevokeTarget || !canInvite || !canDisable} onClick={() => { void submitRevoke(); }}>
+          <button className="btn btn-sm" disabled={busy} onClick={() => setRevokeTarget(null)}>Annuler</button>
+          <button className="btn btn-sm btn-error btn-outline" disabled={busy || !canRevokeTarget || !canInvite || !canDisable} onClick={() => { void submitRevoke(); }}>
             {busy ? 'Révocation en cours…' : unconfirmedRevocation?.id === revokeTarget ? 'Vérifier / réessayer la même révocation' : 'Révoquer et désactiver'}
           </button>
         </div>
@@ -338,8 +338,8 @@ export default function Employees() {
           </label>
         </fieldset>
         <div className="mt-5 flex justify-end gap-2">
-          <button className="wg-btn wg-btn-ghost" disabled={busy} onClick={() => setEditingId(null)}>Annuler</button>
-          <button className="wg-btn wg-btn-primary" disabled={busy || !canEditEmployees} onClick={() => { void submitEdit(); }}><FiSettings /> {busy ? 'Enregistrement en cours…' : 'Enregistrer'}</button>
+          <button className="btn btn-sm" disabled={busy} onClick={() => setEditingId(null)}>Annuler</button>
+          <button className="btn btn-sm btn-primary" disabled={busy || !canEditEmployees} onClick={() => { void submitEdit(); }}><FiSettings /> {busy ? 'Enregistrement en cours…' : 'Enregistrer'}</button>
         </div>
       </Modal>
 
@@ -347,21 +347,21 @@ export default function Employees() {
         {resetLink ? (
           <div className="space-y-4">
             <Alert kind="success">Lien de réinitialisation à usage unique pour <strong>{resetUser?.email}</strong> :</Alert>
-            <div className="rounded-xl border p-3 text-xs break-all" style={{ borderColor: 'var(--wg-border)', background: 'var(--wg-surface-2)' }}>{resetLink}</div>
+            <div className="rounded-xl border p-3 text-xs break-all bg-base-200">{resetLink}</div>
             <div className="flex justify-end gap-2">
-              <button type="button" className="wg-btn wg-btn-ghost" onClick={() => { void copyLink(resetLink); }}>
+              <button type="button" className="btn btn-sm" onClick={() => { void copyLink(resetLink); }}>
                 {copiedUrl ? <FiCheck /> : <FiCopy />} {copiedUrl ? 'Lien copié' : 'Copier le lien'}
               </button>
-              <button type="button" className="wg-btn wg-btn-primary" onClick={() => { setResetTarget(null); setResetLink(null); }}>Fermer</button>
+              <button type="button" className="btn btn-sm btn-primary" onClick={() => { setResetTarget(null); setResetLink(null); }}>Fermer</button>
             </div>
           </div>
         ) : (
           <>
-            <p className="wg-muted mb-4 text-sm">Un lien signé sera généré pour <strong>{resetUser?.email}</strong>. Vous ne verrez jamais le nouveau mot de passe.</p>
+            <p className="text-base-content/60 mb-4 text-sm">Un lien signé sera généré pour <strong>{resetUser?.email}</strong>. Vous ne verrez jamais le nouveau mot de passe.</p>
             {!canWriteSubscription && <Alert kind="warn">En lecture seule, l’envoi depuis cet écran est suspendu. Chaque utilisateur peut toujours récupérer son propre accès depuis la page de connexion.</Alert>}
             <div className="mt-5 flex justify-end gap-2">
-              <button className="wg-btn wg-btn-ghost" disabled={busy} onClick={() => setResetTarget(null)}>Annuler</button>
-              <button className="wg-btn wg-btn-primary" disabled={busy || !canEditEmployees} onClick={() => { void submitReset(); }}><FiMail /> {busy ? 'Génération…' : 'Générer / envoyer le lien'}</button>
+              <button className="btn btn-sm" disabled={busy} onClick={() => setResetTarget(null)}>Annuler</button>
+              <button className="btn btn-sm btn-primary" disabled={busy || !canEditEmployees} onClick={() => { void submitReset(); }}><FiMail /> {busy ? 'Génération…' : 'Générer / envoyer le lien'}</button>
             </div>
           </>
         )}
