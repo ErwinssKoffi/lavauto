@@ -48,8 +48,8 @@ export default function Commissions() {
     return (
       <div>
         <PageHeader title="Commissions" subtitle="Réservé au propriétaire et au gérant." />
-        <Card className="flex flex-row items-start gap-3 border-red-500/30">
-          <FiLock className="mt-0.5 text-xl text-red-400" />
+        <Card className="flex flex-row items-start gap-3 border-error/30">
+          <FiLock className="mt-0.5 text-xl text-error" />
           <div><h2 className="text-sm font-bold">Accès refusé</h2><p className="text-base-content/60 mt-1 text-xs">Ce module affiche ce que la station doit à chaque laveur. Il est réservé au propriétaire et au gérant.</p></div>
         </Card>
       </div>
@@ -127,7 +127,7 @@ export default function Commissions() {
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard label={periodLines.length ? 'Montant total figé' : 'Aperçu brouillon (non dû)'} value={formatFCFA(periodLines.length ? frozenTotal : totalDue)} hint={`${periodLines.length || lines.length} ligne(s) · ${periodLines.length ? 'relevés validés' : 'aucun relevé validé'}`} icon={<FiPieChart />} />
         <StatCard label="Base des lavages terminés" value={formatFCFA(totalBase)} hint={`${lines.reduce((s, l) => s + l.washes, 0)} lavage(s) terminé(s)`} />
-        <StatCard label="Barème de la station" value={`${state.station?.commissionRate ?? 0} %`} hint="Modifiable dans Paramètres" accent="bg-emerald-500/10 text-emerald-400" />
+        <StatCard label="Barème de la station" value={`${state.station?.commissionRate ?? 0} %`} hint="Modifiable dans Paramètres" accent="bg-success/10 text-success" />
       </div>
 
       <Card className="mt-5">
@@ -173,7 +173,7 @@ export default function Commissions() {
           emptyTitle="Aucun relevé validé"
           emptyDescription="Créez une période puis validez-la : les montants seront figés et ne pourront plus être recalculés."
           footer={periodLines.length > 0 ? (
-            <tr><td className="font-bold" colSpan={5}>Total figé de tous les relevés</td><td className="font-bold text-emerald-400">{formatFCFA(frozenTotal)}</td><td /></tr>
+            <tr><td className="font-bold" colSpan={5}>Total figé de tous les relevés</td><td className="font-bold text-success">{formatFCFA(frozenTotal)}</td><td /></tr>
           ) : undefined}
         />
       </Card>

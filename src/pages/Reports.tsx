@@ -147,7 +147,7 @@ export default function Reports() {
         <StatCard label="Chiffre d’affaires" value={formatFCFA(p.revenue)} hint="Total des fiches" />
         <StatCard label="Encaissements" value={formatFCFA(p.collected)} hint={`${detail.byMethod.reduce((n, m) => n + m.count, 0)} paiement(s)`} />
         <StatCard label="Créances" value={formatFCFA(p.receivables)} hint="Reste dû par fiche" />
-        <StatCard label="Solde partiel" value={formatFCFA(p.partialBalance)} hint="Encaissé − dépenses, PAS un bénéfice" accent="bg-amber-500/10 text-amber-400" />
+        <StatCard label="Solde partiel" value={formatFCFA(p.partialBalance)} hint="Encaissé − dépenses, PAS un bénéfice" accent="bg-warning/10 text-warning" />
       </div>
 
       <Card className="mt-5">

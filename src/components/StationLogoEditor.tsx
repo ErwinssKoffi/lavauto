@@ -111,10 +111,10 @@ export function StationLogoEditor() {
       )}
       {serverReady && logoPath && (
         <div className="mt-3" aria-live="polite">
-          {preview.url && <img src={preview.url} alt="Logo actuel de la station" onError={preview.imageFailed} className="h-20 w-20 rounded-xl border bg-white object-contain p-1" />}
+          {preview.url && <img src={preview.url} alt="Logo actuel de la station" onError={preview.imageFailed} className="h-20 w-20 rounded-xl border bg-base-100 object-contain p-1" />}
           {preview.loading && <p className="text-base-content/60 text-xs">Chargement de l’aperçu sécurisé…</p>}
           {preview.error && (
-            <div className="flex flex-wrap items-center gap-2 text-xs text-amber-400">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-warning">
               <span>Impossible d’afficher le logo. Vérifiez votre connexion et vos droits.</span>
               <button type="button" className="link link-primary inline-flex items-center gap-1" onClick={preview.retry}><FiRefreshCw /> Réessayer l’aperçu</button>
             </div>
@@ -128,11 +128,11 @@ export function StationLogoEditor() {
         type="file"
         accept={LOGO_ACCEPT}
         aria-describedby={`${inputId}-hint`}
-        className="block w-full text-xs text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-sky-500/15 file:px-3 file:py-2 file:font-semibold file:text-sky-300 disabled:opacity-50"
+        className="block w-full text-xs text-base-content/70 file:mr-3 file:rounded-lg file:border-0 file:bg-primary/15 file:px-3 file:py-2 file:font-semibold file:text-primary disabled:opacity-50"
         disabled={!serverReady || !canWriteSubscription || Boolean(busy)}
         onChange={selectFile}
       />
-      {error && <p role="alert" className="mt-2 text-xs text-red-400">{error}</p>}
+      {error && <p role="alert" className="mt-2 text-xs text-error">{error}</p>}
       <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" className="btn btn-sm btn-primary" disabled={!serverReady || !canWriteSubscription || !file || Boolean(busy)} onClick={() => { void upload(); }}>
           <FiUpload /> {busy === 'upload' ? 'Enregistrement…' : 'Enregistrer le logo'}

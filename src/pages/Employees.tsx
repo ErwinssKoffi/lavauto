@@ -312,7 +312,7 @@ export default function Employees() {
         ) : (
           <p className="text-base-content/60 mt-3 text-xs">Mode stockage navigateur : l’invitation locale est marquée révoquée.</p>
         )}
-        {!canWriteSubscription && <p className="mt-3 text-xs text-amber-500">Abonnement en lecture seule : révocation indisponible.</p>}
+        {!canWriteSubscription && <p className="mt-3 text-xs text-warning">Abonnement en lecture seule : révocation indisponible.</p>}
         {unconfirmedRevocation?.id === revokeTarget && <div className="mt-3"><Alert kind="warn">{unconfirmedRevocation.message}</Alert></div>}
         <div className="mt-5 flex justify-end gap-2">
           <button className="btn btn-sm" disabled={busy} onClick={() => setRevokeTarget(null)}>Annuler</button>

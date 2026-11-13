@@ -68,14 +68,14 @@ export function ConfirmDialog({
     >
       <div ref={dialogRef} className="modal-box max-w-md p-5">
         <div className="flex items-start gap-3">
-          <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${tone === 'danger' ? 'bg-red-500/15 text-red-400' : 'bg-sky-500/15 text-sky-400'}`}>
+          <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${tone === 'danger' ? 'bg-error/15 text-error' : 'bg-primary/15 text-primary'}`}>
             <FiAlertTriangle aria-hidden="true" />
           </span>
           <div className="min-w-0 flex-1">
             <h2 id={titleId} className="text-base font-bold">{title}</h2>
             {description && <p id={descriptionId} className="mt-1.5 text-sm leading-relaxed text-base-content/60">{description}</p>}
           </div>
-          <button type="button" className="text-base-content/60 hover:text-sky-400" onClick={onClose} aria-label="Fermer"><FiX size={18} /></button>
+          <button type="button" className="text-base-content/60 hover:text-primary" onClick={onClose} aria-label="Fermer"><FiX size={18} /></button>
         </div>
         <div className="modal-action mt-5 gap-2">
           <button ref={cancelRef} type="button" className="btn btn-sm" onClick={onClose}>{cancelLabel}</button>

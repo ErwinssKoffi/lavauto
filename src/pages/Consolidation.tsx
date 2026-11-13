@@ -12,10 +12,10 @@ import {
 
 const CHART_WIDTH = 720;
 const CHART_HEIGHT = 260;
-const AXIS = '#94a3b8';
-const GRID = '#334155';
+const AXIS = 'var(--color-base-content)';
+const GRID = 'var(--color-base-300)';
 const TOOLTIP_STYLE = {
-  background: '#0f172a', border: '1px solid #334155', color: '#e2e8f0',
+  background: 'var(--color-base-100)', border: '1px solid var(--color-base-300)', color: 'var(--color-base-content)',
   borderRadius: '10px', fontSize: '12px',
 };
 
@@ -100,8 +100,8 @@ export default function Consolidation() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Chiffre d’affaires" value={formatFCFA(board.stats.revenue)} hint={definitions.revenue} icon={<FiTrendingUp />} />
         <StatCard label="Encaissements nets" value={formatFCFA(board.stats.collected)} hint={definitions.collected} />
-        <StatCard label="Solde partiel" value={formatFCFA(board.stats.partialBalance)} hint={definitions.partialBalance} accent="bg-amber-500/10 text-amber-400" />
-        <StatCard label="Écart vs période comparée" value={delta === null ? '—' : formatFCFA(delta)} hint="Même définition du chiffre d’affaires" accent="bg-sky-500/10 text-sky-400" />
+        <StatCard label="Solde partiel" value={formatFCFA(board.stats.partialBalance)} hint={definitions.partialBalance} accent="bg-warning/10 text-warning" />
+        <StatCard label="Écart vs période comparée" value={delta === null ? '—' : formatFCFA(delta)} hint="Même définition du chiffre d’affaires" accent="bg-primary/10 text-primary" />
       </div>
 
       <div className="mt-5 grid gap-5 xl:grid-cols-3">

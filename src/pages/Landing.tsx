@@ -47,7 +47,7 @@ export default function Landing() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'lavages' | 'caisse' | 'stock' | 'commissions'>('caisse');
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 antialiased selection:bg-sky-500 selection:text-white">
+    <div data-theme="washguard-dark" className="min-h-screen bg-slate-950 text-slate-100 antialiased selection:bg-sky-500 selection:text-white">
       {/* ── Top Announcement Banner ────────────────────────────────────────── */}
       <div className="border-b border-sky-500/20 bg-linear-to-r from-sky-950 via-slate-900 to-indigo-950 px-4 py-2 text-center text-xs font-medium text-sky-200">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-500/20 px-2.5 py-0.5 font-bold text-sky-300">

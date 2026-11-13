@@ -74,7 +74,7 @@ function RoleRoute({
   const feature = permissionFeature(required);
   if (feature && subscriptionStatus === 'loading') return <LoadingState label="Vérification de la formule…" />;
   if (feature && subscriptionAccess && !subscriptionAccess.features[feature] && state.session) return (
-    <Card className="flex flex-row items-start gap-3 border-amber-500/30"><FiLock className="mt-0.5 text-xl text-amber-400" />
+    <Card className="flex flex-row items-start gap-3 border-warning/30"><FiLock className="mt-0.5 text-xl text-warning" />
       <div><h2 className="text-sm font-bold">Module non inclus dans la formule active</h2>
         <p className="text-base-content/60 mt-1 text-xs">Les données existantes sont conservées. Une demande de formule ne change les droits qu’après validation administrateur.</p>
         {can('subscription.manage') && <Link className="link link-primary mt-3 inline-block text-xs" to="/app/abonnement">Comparer les formules →</Link>}
@@ -83,8 +83,8 @@ function RoleRoute({
   );
   if (!state.session || !can(required)) {
     return (
-      <Card className="flex flex-row items-start gap-3 border-red-500/30">
-        <FiLock className="mt-0.5 text-xl text-red-400" />
+      <Card className="flex flex-row items-start gap-3 border-error/30">
+        <FiLock className="mt-0.5 text-xl text-error" />
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-sm font-bold">Accès refusé</h2>

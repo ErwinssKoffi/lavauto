@@ -114,7 +114,7 @@ export function WhatsappConsentPanel({ customerId, phone }: { customerId: string
     } finally { busyRef.current = false; setBusy(false); }
   };
   return (
-    <section className="mt-6 rounded-xl border border-emerald-500/30 p-4" aria-label="Consentement WhatsApp">
+    <section className="mt-6 rounded-xl border border-success/30 p-4" aria-label="Consentement WhatsApp">
       <h3 className="text-sm font-bold">Consentement WhatsApp · lavage prêt</h3>
       <p className="text-base-content/60 mt-2 text-xs">Accord distinct du canal préféré et de la fidélité. Il couvre uniquement les messages de disponibilité du lavage, automatiques ou manuels, au numéro enregistré. Le client peut demander son retrait à tout moment.</p>
       {connected && !canWriteSubscription && <div className="mt-3"><Alert kind="warn">Après expiration, vous pouvez demander le retrait avec sa preuve ; le serveur vérifiera les droits et la station. Un nouvel accord reste bloqué en lecture seule. Si le retrait est refusé ou non confirmé, contactez le support avant toute reprise des envois.</Alert></div>}
@@ -196,7 +196,7 @@ export function WhatsappWashPanel({ wash }: { wash: Wash }) {
   };
   const existing = entries?.some((entry) => IN_FLIGHT_OR_FINISHED.includes(entry.status));
   return (
-    <section className="mt-5 rounded-xl border border-emerald-500/30 p-4" aria-label="Notifications WhatsApp">
+    <section className="mt-5 rounded-xl border border-success/30 p-4" aria-label="Notifications WhatsApp">
       <h3 className="text-sm font-bold">Notification WhatsApp · lavage prêt</h3>
       {!connected ? <p className="text-base-content/60 mt-2 text-xs">L’envoi automatique WhatsApp requiert la configuration du fournisseur Meta Cloud API.</p> : <>
         <p className="text-base-content/60 mt-2 text-xs">Une demande automatique est créée au passage à « prêt ». L’envoi nécessite un accord explicite, un fournisseur configuré et un ordonnanceur actif. La demande manuelle ne duplique pas un envoi déjà en cours ou confirmé.</p>

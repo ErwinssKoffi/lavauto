@@ -87,7 +87,7 @@ export default function Stock() {
         <StatCard label="Valeur du stock" value={formatFCFA(state.stockValuation.stockValueMinor)} hint="Quantité × coût moyen" icon={<FiPackage />} />
         <StatCard label="Produits valorisés" value={String(state.stockValuation.productsValued)} hint={`${state.products.length} produit(s)`} />
         <StatCard label="Commandes ouvertes" value={String(state.stockValuation.openOrders)} hint="Créées sans stock" icon={<FiTruck />} />
-        <StatCard label="Alertes de seuil" value={String(state.stockAlerts.length)} hint={`${state.stockAlerts.filter((a) => a.severity === 'rupture').length} rupture(s)`} accent="bg-amber-500/10 text-amber-400" />
+        <StatCard label="Alertes de seuil" value={String(state.stockAlerts.length)} hint={`${state.stockAlerts.filter((a) => a.severity === 'rupture').length} rupture(s)`} accent="bg-warning/10 text-warning" />
         <StatCard label="Consommations valorisées" value={formatFCFA(state.stockValuation.consumptionCostMinor)} hint="Mouvements de sortie" icon={<FiBox />} />
       </div>
 

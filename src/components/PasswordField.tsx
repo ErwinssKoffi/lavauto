@@ -10,10 +10,10 @@ import {
 // persistance est explicite dans les pages qui l'exposent.
 
 const TONE_BAR: Record<string, string> = {
-  danger: 'bg-red-500',
-  warn: 'bg-amber-500',
-  accent: 'bg-sky-500',
-  success: 'bg-emerald-500',
+  danger: 'bg-error',
+  warn: 'bg-warning',
+  accent: 'bg-primary',
+  success: 'bg-success',
 };
 
 export function PasswordStrengthMeter({ password, id }: { password: string; id?: string }) {
@@ -26,13 +26,13 @@ export function PasswordStrengthMeter({ password, id }: { password: string; id?:
           <span
             key={step}
             className={`h-1.5 flex-1 rounded-full transition-colors ${
- step <= strength.score ? TONE_BAR[strength.tone] : 'bg-slate-200'
+ step <= strength.score ? TONE_BAR[strength.tone] : 'bg-base-300'
  }`}
           />
         ))}
       </div>
-      <p className="mt-1.5 text-[11px] leading-snug text-slate-500">
-        <span className="font-bold text-slate-700">{strength.label}</span> · {strength.hint}
+      <p className="mt-1.5 text-[11px] leading-snug text-base-content/60">
+        <span className="font-bold text-base-content/70">{strength.label}</span> · {strength.hint}
       </p>
     </div>
   );
@@ -43,13 +43,13 @@ export function PasswordChecklist({
 }: { password: string; email?: string; rules?: PasswordRule[] }) {
   const list = rules ?? passwordRules(password, email);
   return (
-    <ul className="mt-2 grid gap-1 text-[11px] text-slate-500 sm:grid-cols-2">
+    <ul className="mt-2 grid gap-1 text-[11px] text-base-content/60 sm:grid-cols-2">
       {list.map((rule) => (
         <li key={rule.id} className="flex items-center gap-1.5">
           {rule.ok
-            ? <FiCheck className="shrink-0 text-emerald-600" aria-hidden="true" />
-            : <FiX className="shrink-0 text-slate-300" aria-hidden="true" />}
-          <span className={rule.ok ? 'text-slate-600' : ''}>{rule.label}</span>
+            ? <FiCheck className="shrink-0 text-success" aria-hidden="true" />
+            : <FiX className="shrink-0 text-base-content/70" aria-hidden="true" />}
+          <span className={rule.ok ? 'text-base-content/70' : ''}>{rule.label}</span>
         </li>
       ))}
     </ul>
@@ -91,15 +91,15 @@ export function PasswordField({
   const errorId = useId();
   const describedBy = [hint ? hintId : '', error ? errorId : ''].filter(Boolean).join(' ') || undefined;
   const base = inputClassName
-    ?? 'w-full rounded-xl border bg-slate-50 px-3.5 py-3 text-sm outline-none transition focus:bg-white focus:ring-4';
+    ?? 'w-full rounded-xl border bg-base-200 px-3.5 py-3 text-sm outline-none transition focus:bg-base-100 focus:ring-4';
   const border = error
-    ? 'border-red-300 focus:border-red-500 focus:ring-red-100'
-    : 'border-slate-200 focus:border-sky-500 focus:ring-sky-100';
+    ? 'border-error/40 focus:border-error focus:ring-error/20'
+    : 'border-base-300 focus:border-primary focus:ring-primary/20';
 
   return (
     <div>
       <div className="mb-1.5 flex items-center justify-between gap-3">
-        <label className="text-xs font-bold text-slate-600" htmlFor={id}>{label}</label>
+        <label className="text-xs font-bold text-base-content/70" htmlFor={id}>{label}</label>
         {labelAction}
       </div>
       <div className="relative">
@@ -127,7 +127,7 @@ export function PasswordField({
         <button
           type="button"
           onClick={() => setVisible((v) => !v)}
-          className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-500"
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-lg p-2 text-base-content/60 transition hover:bg-base-200 hover:text-base-content/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-500"
           aria-label={visible ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
           aria-pressed={visible}
           tabIndex={0}
@@ -136,13 +136,13 @@ export function PasswordField({
         </button>
       </div>
       {capsLock && (
-        <p className="mt-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-amber-600">
+        <p className="mt-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-warning">
           <FiAlertCircle aria-hidden="true" /> Verrouillage majuscules activé.
         </p>
       )}
-      {hint && !error && <p className="mt-1.5 text-[11px] text-slate-400" id={hintId}>{hint}</p>}
+      {hint && !error && <p className="mt-1.5 text-[11px] text-base-content/60" id={hintId}>{hint}</p>}
       {error && (
-        <p className="mt-1.5 flex items-start gap-1.5 text-[11px] font-semibold text-red-600" id={errorId} role="alert">
+        <p className="mt-1.5 flex items-start gap-1.5 text-[11px] font-semibold text-error" id={errorId} role="alert">
           <FiAlertCircle className="mt-0.5 shrink-0" aria-hidden="true" /> {error}
         </p>
       )}

@@ -112,11 +112,11 @@ function CategoriesForm() {
         {state.vehicleCategories.length === 0 && <EmptyLine text="Aucune catégorie enregistrée." />}
         {state.vehicleCategories.map((c) => (
           <div key={c.id} className="flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm">
-            <FiTruck className="text-sky-400" />
+            <FiTruck className="text-primary" />
             <span className="flex-1 font-medium">{c.name}</span>
             <Badge tone={c.active ? 'success' : 'neutral'}>{c.active ? 'Active' : 'Désactivée'}</Badge>
             <button className="btn btn-sm px-2! py-1! text-xs" onClick={() => { void safe(() => toggleCategory(c.id)); }}>{c.active ? 'Désactiver' : 'Activer'}</button>
-            <button className="text-base-content/60 hover:text-red-400" onClick={() => { void safe(() => removeCategory(c.id)); }} aria-label="Supprimer"><FiTrash2 size={15} /></button>
+            <button className="text-base-content/60 hover:text-error" onClick={() => { void safe(() => removeCategory(c.id)); }} aria-label="Supprimer"><FiTrash2 size={15} /></button>
           </div>
         ))}
       </div>
@@ -152,7 +152,7 @@ function ServicesForm() {
             <div className="min-w-0 flex-1"><p className="font-medium">{v.name}</p>{v.description && <p className="text-base-content/60 truncate text-xs">{v.description}</p>}</div>
             <Badge tone={v.active ? 'success' : 'neutral'}>{v.active ? 'Active' : 'Désactivée'}</Badge>
             <button className="btn btn-sm px-2! py-1! text-xs" onClick={() => { void safe(() => updateService(v.id, { active: !v.active })); }}>{v.active ? 'Désactiver' : 'Activer'}</button>
-            <button className="text-base-content/60 hover:text-red-400" onClick={() => { void safe(() => removeService(v.id)); }} aria-label="Supprimer"><FiTrash2 size={15} /></button>
+            <button className="text-base-content/60 hover:text-error" onClick={() => { void safe(() => removeService(v.id)); }} aria-label="Supprimer"><FiTrash2 size={15} /></button>
           </div>
         ))}
       </div>
@@ -209,10 +209,10 @@ function PaymentsForm() {
       <p className="text-base-content/60 mb-4 text-sm">Sélectionnez les moyens de paiement acceptés. Par défaut, un encaissement en espèces exigera une caisse ouverte ; le Mobile Money peut être enregistré à tout moment.</p>
       <div className="grid gap-2 sm:grid-cols-2">
         {METHODS.map((m) => (
-          <label key={m} className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 text-sm ${selected.includes(m) ? 'border-sky-500 bg-sky-500/5' : ''}`} style={selected.includes(m) ? {} : { borderColor: 'oklch(var(--b3))' }}>
+          <label key={m} className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 text-sm ${selected.includes(m) ? 'border-primary bg-primary/5' : ''}`} style={selected.includes(m) ? {} : { borderColor: 'oklch(var(--b3))' }}>
             <input type="checkbox" className="accent-sky-500" checked={selected.includes(m)} onChange={() => toggle(m)} />
             <span className="font-medium">{PAY_METHOD_LABELS[m]}</span>
-            {selected.includes(m) && <FiCheck className="ml-auto text-sky-400" />}
+            {selected.includes(m) && <FiCheck className="ml-auto text-primary" />}
           </label>
         ))}
       </div>
@@ -228,7 +228,7 @@ function TeamForm() {
     <div>
       <p className="text-base-content/60 mb-4 text-sm">Facultatif à l’ouverture : le compte propriétaire suffit. Vous pourrez ajouter l’équipe à tout moment depuis Employés.</p>
       <Card className="flex flex-row items-center gap-3">
-        <FiUsers className="text-xl text-sky-400" />
+        <FiUsers className="text-xl text-primary" />
         <div className="flex-1"><p className="text-sm font-bold">{others.length} autre(s) compte(s)</p><p className="text-base-content/60 text-xs">Propriétaire : {state.users.find((u) => u.role === 'proprietaire')?.name ?? '—'}</p></div>
         <Link to="/app/employes" className="btn btn-sm">Gérer l’équipe <FiArrowRight /></Link>
       </Card>
@@ -299,7 +299,7 @@ function ActivationForm() {
     <div>
       {done ? (
         <div className="text-center">
-          <FiCheckCircle className="mx-auto text-5xl text-emerald-400" />
+          <FiCheckCircle className="mx-auto text-5xl text-success" />
           <h3 className="mt-4 text-lg font-bold">Station activée</h3>
           <p className="text-base-content/60 mx-auto mt-2 max-w-md text-sm">{canWriteSubscription ? 'L’exploitation est ouverte : fiches, encaissements, caisse et dépenses sont disponibles.' : 'La station reste activée, mais l’abonnement est en lecture seule : les données restent consultables.'}</p>
           <p className="text-base-content/60 mt-1 text-xs">Activée le {state.station?.activatedAt ? new Date(state.station.activatedAt).toLocaleDateString('fr-FR') : '—'}</p>
@@ -307,7 +307,7 @@ function ActivationForm() {
         </div>
       ) : (
         <>
-          <p className="text-base-content/60 mb-4 text-sm">L’activation constate les étapes obligatoires sur vos données. Elle ouvre l’exploitation et lève le <code className="text-amber-400">409 onboarding_incomplete</code>.</p>
+          <p className="text-base-content/60 mb-4 text-sm">L’activation constate les étapes obligatoires sur vos données. Elle ouvre l’exploitation et lève le <code className="text-warning">409 onboarding_incomplete</code>.</p>
           {blockers.length > 0 ? (
             <Alert kind="warn">Il manque {blockers.length} étape(s) obligatoire(s) : {blockers.join(', ')}.</Alert>
           ) : (
@@ -392,8 +392,8 @@ export default function Onboarding() {
           {identity?.permissions.includes('subscription.manage') && <Link to="/app/abonnement" className="link link-primary text-xs">Gérer l’abonnement →</Link>}
         </div>
         <p className="text-base-content/60 mt-3 text-xs">Essai de 14 jours avec tous les modules ; Standard et Premium nécessitent une demande et une validation administrateur. Une validation anticipée met fin immédiatement à l’essai. Aucun paiement automatique. Après expiration, les données restent consultables.</p>
-        {plansError ? <p className="mt-3 text-xs text-amber-400">Formules indisponibles : {plansError}</p> :
-          <details className="mt-3 text-xs"><summary className="cursor-pointer font-bold text-sky-400">Comparer tarifs, limites et modules</summary>
+        {plansError ? <p className="mt-3 text-xs text-warning">Formules indisponibles : {plansError}</p> :
+          <details className="mt-3 text-xs"><summary className="cursor-pointer font-bold text-primary">Comparer tarifs, limites et modules</summary>
             <div className="mt-3 grid gap-3 lg:grid-cols-3">{plans.filter((p) => ['essai', 'standard', 'premium'].includes(p.id)).map((p) => <div key={p.id} className="rounded-xl border p-3">
               <p className="mb-2 font-bold">{p.name} · {p.id === 'essai' ? 'Gratuit / 14 jours' : `${formatFCFA(p.priceMonthly)} / mois`}</p><PlanDetails plan={p} compact />
             </div>)}</div><p className="text-base-content/60 mt-2">Comptes actifs : propriétaire inclus. Tarifs indicatifs à valider commercialement.</p>
@@ -407,7 +407,7 @@ export default function Onboarding() {
         </div>
         <div className="mt-3"><Progress value={doneRequired} max={required.length} tone={doneRequired === required.length ? 'success' : 'accent'} /></div>
         <div className="mt-4 flex items-start gap-2 text-xs leading-relaxed text-base-content/60">
-          <FiInfo className="mt-0.5 shrink-0 text-sky-400" />
+          <FiInfo className="mt-0.5 shrink-0 text-primary" />
           <span>Tant que la station n’est pas activée, le serveur refuse les fiches, les encaissements, la caisse et les dépenses (<code>409 onboarding_incomplete</code>) avec la liste de ce qui manque. Aucun prix n’est inventé et aucune donnée d’exemple n’est ajoutée.</span>
         </div>
       </Card>
@@ -419,7 +419,7 @@ export default function Onboarding() {
               const selected = step.id === active.id;
               return (
                 <button key={step.id} onClick={() => setActiveId(step.id)}
-                  className={`flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition ${selected ? 'bg-sky-500/10' : 'hover:bg-sky-500/5'}`}>
+                  className={`flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition ${selected ? 'bg-primary/10' : 'hover:bg-primary/5'}`}>
                   <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-[10px] font-bold ${step.done ? 'badge badge-success' : 'bg-base-200 text-base-content/60'}`}>
                     {step.done ? <FiCheck /> : i + 1}
                   </span>

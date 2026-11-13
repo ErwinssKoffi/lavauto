@@ -79,6 +79,34 @@ Vérifié sur tout le dépôt (code, configuration, `package.json`, CSS) :
 
 Rien n'a donc été supprimé : il n'y avait aucun shadcn à retirer. DaisyUI est la seule couche UI, et le contrôle `npm run check` « aucune trace de shadcn/ui (ou de sa pile) » échoue désormais si l'une de ces dépendances, de ces imports, de ce helper ou de ces tokens réapparaît.
 
+### Palette : plus aucune couleur codée en dur
+
+Avec 37 thèmes sélectionnables, une classe `slate`/`sky`/`amber` codée en dur devient un bug : elle ignore le thème et casse le contraste sur un thème clair. Les surfaces et les textes de l'application (`/app`, dialogs, primitives partagées) utilisent donc uniquement les tokens DaisyUI.
+
+| Avant (Tailwind brut) | Après (DaisyUI) | Rôle |
+| --- | --- | --- |
+| `bg-slate-950`, `bg-slate-900/80`, `bg-slate-800` | `bg-base-100`, `bg-base-100/80`, `bg-base-300` | surfaces |
+| `text-slate-100…400`, `text-slate-950` | `text-base-content`, `text-base-content/80`, `/70`, `/60` | texte hiérarchisé |
+| `border-slate-800`, `border-slate-200` | `border-base-300` | séparateurs |
+| `text-sky-400`, `bg-sky-500`, `border-sky-500`, `ring-sky-100` | `text-primary`, `bg-primary`, `border-primary`, `ring-primary/20` | marque / action |
+| `from-sky-600 via-sky-500 to-cyan-400` | `from-primary via-primary to-secondary` | dégradés |
+| `text-emerald-400`, `bg-emerald-500` | `text-success`, `bg-success` | positif, validé |
+| `text-amber-400`, `bg-amber-500/10` | `text-warning`, `bg-warning/10` | alerte, seuil |
+| `text-red-400`, `bg-red-500`, `border-red-500/30` | `text-error`, `bg-error`, `border-error/30` | erreur, négatif |
+| `text-white` sur une surface colorée | `text-primary-content`, `text-error-content`… | contraste garanti |
+| `bg-white`, `bg-slate-50` | `bg-base-100`, `bg-base-200` | champs, pages |
+
+Deux zones gardent volontairement une **identité sombre fixe** ; elles épinglent localement leur thème pour que les composants partagés restent lisibles quel que soit le choix de l'utilisateur :
+
+- `pages/Landing.tsx` → `data-theme="washguard-dark"` sur la racine (vitrine sombre) ;
+- `pages/auth/AuthLayout.tsx` → `data-theme="washguard"` sur la racine (colonne formulaire claire + panneau photo sombre en couleurs littérales).
+
+Les voiles de modale conservent `bg-black/60` (convention, indépendante du thème).
+
+Les graphiques (recharts) suivent aussi le thème pour tout ce qui est **chrome** : axes et grille en `var(--color-base-content)` / `var(--color-base-300)`, infobulles en `var(--color-base-100)` / `var(--color-base-content)`. Seules les **couleurs de série** (ligne CA `#38bdf8`, encaissé `#34d399`, dépenses `#fbbf24`) restent des hexadécimaux fixes : ce sont des identités de données, lisibles sur fond clair comme sombre.
+
+Le contrôle `npm run check` « palette DaisyUI partout » parcourt tous les `.tsx` et échoue sur toute classe `text|bg|border|ring|from|via|to|shadow-{slate,sky,amber,emerald,red,white…}` hors de ces deux zones.
+
 ## 3. Composants réels
 
 | Fichier | Composant | Comportement réel | Branché sur |
@@ -157,7 +185,7 @@ Responsive : sidebar desktop / drawer mobile, topbar qui tronque, tableaux `tabl
 | --- | --- |
 | `npm run typecheck` | ✅ 0 erreur (TS strict) |
 | `npm run lint` | ✅ 26 règles statiques |
-| `npm run check` | ✅ **250 contrôles OK / 0 KO** (dont le rendu des 15 écrans en JSDOM) |
+| `npm run check` | ✅ **251 contrôles OK / 0 KO** (dont le rendu des 15 écrans en JSDOM) |
 | `npm run test:unit` | ✅ 288 tests / 34 fichiers |
 | `npm run build` | ✅ build Vite + PWA (39 entrées pré-cachées) · CSS 192,3 kB / gzip 30,2 kB |
 

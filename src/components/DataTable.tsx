@@ -97,7 +97,7 @@ export function DataTable<T>({
                       style={column.align === 'right' ? { textAlign: 'right' } : undefined}
                     >
                       {column.sortValue ? (
-                        <button type="button" className="inline-flex items-center gap-1 hover:text-sky-400" onClick={() => toggleSort(column)}>
+                        <button type="button" className="inline-flex items-center gap-1 hover:text-primary" onClick={() => toggleSort(column)}>
                           {column.header}
                           {active && (sort.direction === 'asc' ? <FiArrowUp size={11} aria-hidden="true" /> : <FiArrowDown size={11} aria-hidden="true" />)}
                         </button>

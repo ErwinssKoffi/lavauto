@@ -110,7 +110,7 @@ export function CommandPalette({
               aria-selected={index === active}
               onMouseEnter={() => setActive(index)}
               onClick={() => { if (entry.to) { navigate(entry.to); onClose(); } }}
-              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition ${index === active ? 'bg-primary font-semibold text-primary-content shadow-lg shadow-sky-500/20' : 'text-base-content/60 hover:bg-primary/10 hover:text-base-content'}`}
+              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition ${index === active ? 'bg-primary font-semibold text-primary-content shadow-lg shadow-primary/20' : 'text-base-content/60 hover:bg-primary/10 hover:text-base-content'}`}
             >
               <span className="text-base">{entry.icon}</span>
               <span className="min-w-0 flex-1">

@@ -116,12 +116,12 @@ export default function Settings() {
         </Card>
 
         {/* ── Section dédiée : Seuils d'alerte stock & Consommables ──── */}
-        {can('inventory.view') && <Card id="stock" className="lg:col-span-2 border-amber-500/30">
+        {can('inventory.view') && <Card id="stock" className="lg:col-span-2 border-warning/30">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="flex items-center gap-2">
-                <FiBox className="text-amber-400" size={18} />
-                <h3 className="text-sm font-bold text-white">Seuils d’alerte stock & Consommables critiques</h3>
+                <FiBox className="text-warning" size={18} />
+                <h3 className="text-sm font-bold text-base-content">Seuils d’alerte stock & Consommables critiques</h3>
                 {state.stockAlerts.length > 0 ? (
                   <Badge tone="warn">{state.stockAlerts.length} produit(s) sous le seuil critique</Badge>
                 ) : (
@@ -154,16 +154,16 @@ export default function Settings() {
                   <div key={p.id} className="py-3 flex flex-wrap items-center justify-between gap-4 text-xs">
                     <div className="min-w-[200px]">
                       <div className="flex items-center gap-2">
-                        <p className="font-bold text-white">{p.name}</p>
-                        <span className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">{p.sku}</span>
+                        <p className="font-bold text-base-content">{p.name}</p>
+                        <span className="rounded bg-base-300 px-1.5 py-0.5 font-mono text-[10px] text-base-content/60">{p.sku}</span>
                       </div>
                       <p className="text-base-content/60 text-[11px]">{p.category || 'Consommable'} · Unité : {p.unit}</p>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-4">
                       <div className="text-right">
-                        <p className="text-[10px] text-slate-400 uppercase font-semibold">Stock actuel</p>
-                        <p className={`font-bold ${isRupture ? 'text-red-400' : isAlert ? 'text-amber-400' : 'text-emerald-400'}`}>
+                        <p className="text-[10px] text-base-content/60 uppercase font-semibold">Stock actuel</p>
+                        <p className={`font-bold ${isRupture ? 'text-error' : isAlert ? 'text-warning' : 'text-success'}`}>
                           {qty} {p.unit}
                         </p>
                       </div>
@@ -171,7 +171,7 @@ export default function Settings() {
                       <div className="w-32">
                         {canEditThreshold ? (
                           <>
-                            <label htmlFor={`stock-threshold-${p.id}`} className="text-[10px] text-slate-400 block mb-0.5 font-semibold">Seuil critique ({p.unit})</label>
+                            <label htmlFor={`stock-threshold-${p.id}`} className="text-[10px] text-base-content/60 block mb-0.5 font-semibold">Seuil critique ({p.unit})</label>
                             <input
                               key={`${p.id}:${p.reorderLevel}`}
                               id={`stock-threshold-${p.id}`}
@@ -186,7 +186,7 @@ export default function Settings() {
                           </>
                         ) : (
                           <>
-                            <p className="text-[10px] text-slate-400 mb-0.5 font-semibold">Seuil critique</p>
+                            <p className="text-[10px] text-base-content/60 mb-0.5 font-semibold">Seuil critique</p>
                             <p className="font-bold">{p.reorderLevel} {p.unit}</p>
                           </>
                         )}

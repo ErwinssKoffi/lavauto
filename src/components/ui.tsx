@@ -14,15 +14,15 @@ import { Link } from 'react-router-dom';
 export function Logo({ compact = false, light = false }: { compact?: boolean; light?: boolean }) {
   return (
     <div className="flex items-center gap-2.5 select-none">
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-linear-to-br from-sky-600 via-sky-500 to-cyan-400 shadow-lg shadow-sky-500/20">
-        <svg viewBox="0 0 24 24" className="h-5 w-5 text-white" fill="currentColor" aria-hidden>
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-linear-to-br from-primary via-primary to-secondary shadow-lg shadow-primary/20">
+        <svg viewBox="0 0 24 24" className="h-5 w-5 text-primary-content" fill="currentColor" aria-hidden>
           <path d="M12 2.5c.4 0 .75.26.87.64l1.05 3.35a3 3 0 0 1 1.59.92l3.4-.85a.9.9 0 0 1 1.03 1.27l-1.6 3.12a3 3 0 0 1 0 1.9l1.6 3.12a.9.9 0 0 1-1.03 1.27l-3.4-.85a3 3 0 0 1-1.59.92l-1.05 3.35a.9.9 0 0 1-1.74 0l-1.05-3.35a3 3 0 0 1-1.59-.92l-3.4.85A.9.9 0 0 1 5.06 15.9l1.6-3.12a3 3 0 0 1 0-1.9l-1.6-3.12A.9.9 0 0 1 6.09 6.5l3.4.85a3 3 0 0 1 1.59-.92l1.05-3.35A.9.9 0 0 1 12 2.5Z" />
-          <circle cx="12" cy="12" r="2.6" fill="#0284c7" />
+          <circle cx="12" cy="12" r="2.6" fill="var(--color-primary-content)" />
         </svg>
       </span>
       {!compact && (
-        <span className={`text-[17px] font-extrabold tracking-tight ${light ? 'text-white' : ''}`}>
-          Wash<span className="text-sky-400">Guard</span>
+        <span className={`text-[17px] font-extrabold tracking-tight ${light ? 'text-base-content' : ''}`}>
+          Wash<span className="text-primary">Guard</span>
         </span>
       )}
     </div>
@@ -122,7 +122,7 @@ export function StatCard({ label, value, hint, icon, accent, sparkline }: {
           {hint && <p className="mt-1 truncate text-xs text-base-content/60">{hint}</p>}
         </div>
         {icon && (
-          <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl text-lg ${accent ?? 'bg-sky-500/10 text-sky-400'}`}>
+          <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl text-lg ${accent ?? 'bg-primary/10 text-primary'}`}>
             {icon}
           </span>
         )}
@@ -201,9 +201,9 @@ export function LockedPanel() {
   const { state, missing } = useStore();
   const steps = missing;
   return (
-    <Card className="border-amber-500/30">
+    <Card className="border-warning/30">
       <div className="flex items-start gap-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-500/15 text-amber-500"><FiLock size={18} /></span>
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-warning/15 text-warning"><FiLock size={18} /></span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-base font-bold">Exploitation fermée</h2>
@@ -223,7 +223,7 @@ export function LockedPanel() {
           <Link to="/app/mise-en-route" className="btn btn-sm btn-primary mt-4">Ouvrir la mise en route</Link>
         </div>
       </div>
-      {state.company?.suspended && <p className="mt-3 text-xs text-red-400">Cette entreprise est suspendue par le support WashGuard.</p>}
+      {state.company?.suspended && <p className="mt-3 text-xs text-error">Cette entreprise est suspendue par le support WashGuard.</p>}
     </Card>
   );
 }
@@ -250,9 +250,9 @@ export function ToastHost() {
       {toasts.map((t) => (
         <div
           key={t.id}
-          className={`card pointer-events-auto flex-row animate-fade-in items-start gap-3 bg-base-100 p-3.5 text-sm shadow-xl ${t.kind === 'error' ? 'border-red-500/40' : t.kind === 'success' ? 'border-emerald-500/40' : 'border-base-300'}`}
+          className={`card pointer-events-auto flex-row animate-fade-in items-start gap-3 bg-base-100 p-3.5 text-sm shadow-xl ${t.kind === 'error' ? 'border-error/40' : t.kind === 'success' ? 'border-success/40' : 'border-base-300'}`}
         >
-          <span className={`mt-0.5 ${t.kind === 'error' ? 'text-red-400' : t.kind === 'success' ? 'text-emerald-400' : 'text-sky-400'}`}>
+          <span className={`mt-0.5 ${t.kind === 'error' ? 'text-error' : t.kind === 'success' ? 'text-success' : 'text-primary'}`}>
             {t.kind === 'error' ? <FiAlertCircle /> : t.kind === 'success' ? <FiCheck /> : <FiInfo />}
           </span>
           <span className="flex-1 text-xs leading-relaxed">{t.message}</span>

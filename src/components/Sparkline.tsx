@@ -11,21 +11,21 @@ const TONE_PALETTE = {
     fillTop: 'rgba(56, 189, 248, 0.30)',
     fillBottom: 'rgba(56, 189, 248, 0.02)',
     dot: '#0ea5e9',
-    text: 'text-sky-400',
+    text: 'text-primary',
   },
   emerald: {
     stroke: '#34d399',
     fillTop: 'rgba(52, 211, 153, 0.30)',
     fillBottom: 'rgba(52, 211, 153, 0.02)',
     dot: '#10b981',
-    text: 'text-emerald-400',
+    text: 'text-success',
   },
   amber: {
     stroke: '#fbbf24',
     fillTop: 'rgba(251, 191, 36, 0.28)',
     fillBottom: 'rgba(251, 191, 36, 0.02)',
     dot: '#f59e0b',
-    text: 'text-amber-400',
+    text: 'text-warning',
   },
 } as const;
 
@@ -98,7 +98,7 @@ export default function Sparkline({
         <span className="truncate text-base-content/60">
           {activePoint ? activePoint.label : title}
         </span>
-        <span className={`font-semibold tabular-nums ${activePoint ? palette.text : deltaPct !== null && deltaPct !== 0 ? (deltaPct > 0 ? 'text-emerald-400' : 'text-amber-400') : 'text-base-content/60'}`}>
+        <span className={`font-semibold tabular-nums ${activePoint ? palette.text : deltaPct !== null && deltaPct !== 0 ? (deltaPct > 0 ? 'text-success' : 'text-warning') : 'text-base-content/60'}`}>
           {activePoint
             ? formatValue(activePoint.value)
             : deltaPct !== null && deltaPct !== 0
@@ -147,7 +147,7 @@ export default function Sparkline({
             cy={activePoint.y}
             r="3.8"
             fill={palette.dot}
-            stroke="#ffffff"
+            stroke="var(--color-base-100)"
             strokeWidth="1.5"
           />
         ) : (
@@ -156,7 +156,7 @@ export default function Sparkline({
             cy={last.y}
             r="3"
             fill={palette.dot}
-            stroke="#ffffff"
+            stroke="var(--color-base-100)"
             strokeWidth="1.2"
           />
         )}

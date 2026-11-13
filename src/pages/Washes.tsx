@@ -140,7 +140,7 @@ export default function Washes() {
               </tr></thead>
               <tbody>
                 {washes.map((w) => (
-                  <tr key={w.id} className="cursor-pointer hover:bg-sky-500/5" onClick={() => setDetailId(w.id)}>
+                  <tr key={w.id} className="cursor-pointer hover:bg-primary/5" onClick={() => setDetailId(w.id)}>
                     <td className="font-bold">{w.number}</td>
                     <td>{formatDate(w.createdAt)}</td>
                     <td>{w.vehicleLabel}{w.plate && <span className="text-base-content/60 ml-1 text-xs">· {w.plate}</span>}</td>
@@ -482,7 +482,7 @@ function WashDetail({ washId, methods, onClose, onStatus, onAssign, onQuality, o
             })}
           </div>
           {refundId && (
-            <div className="mt-3 rounded-xl border border-red-500/30 p-3">
+            <div className="mt-3 rounded-xl border border-error/30 p-3">
               <p className="mb-2 text-xs font-bold">Remboursement : le paiement reste tracé, la créance est recalculée</p>
               <Input label="Motif *" disabled={!allow('payments.cancel')} value={refundReason} onChange={(e) => setRefundReason(e.target.value)} placeholder="Ex. client remboursé" />
               <div className="mt-3 flex gap-2">
@@ -550,7 +550,7 @@ function WashDetail({ washId, methods, onClose, onStatus, onAssign, onQuality, o
       )}
 
       {w.status === 'quality_check' && (
-        <div className="mt-4 rounded-xl border border-sky-500/30 p-4">
+        <div className="mt-4 rounded-xl border border-primary/30 p-4">
           <p className="mb-2 text-sm font-bold">Contrôle qualité obligatoire</p>
           <Input label="Notes (facultatives, obligatoires en cas de refus)" disabled={!allow('washes.quality')} value={qualityNotes} onChange={(e) => setQualityNotes(e.target.value)} />
           <div className="mt-3 flex flex-wrap gap-2">
@@ -564,7 +564,7 @@ function WashDetail({ washId, methods, onClose, onStatus, onAssign, onQuality, o
       )}
 
       {cancelMode && (
-        <div className="mt-4 rounded-xl border border-red-500/30 p-4">
+        <div className="mt-4 rounded-xl border border-error/30 p-4">
           <p className="mb-2 text-sm font-bold">Annuler la fiche</p>
           <Input label="Motif de l’annulation *" disabled={!allow('washes.update_status')} value={reason} onChange={(e) => setReason(e.target.value)} />
           <div className="mt-3 flex gap-2">

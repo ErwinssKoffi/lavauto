@@ -123,14 +123,14 @@ export default function AppShell() {
                         onClick={() => setMobileOpen(false)}
                         aria-label={collapsed ? entry.label : undefined}
                         title={collapsed ? entry.label : undefined}
-                        className={({ isActive }) => `flex w-full items-center gap-3 rounded-xl px-3 py-2 text-[13px] font-medium leading-snug no-underline transition hover:bg-primary/10 hover:text-base-content ${isActive ? 'bg-primary font-semibold text-primary-content shadow-lg shadow-sky-500/20' : 'text-base-content/60'}`}
+                        className={({ isActive }) => `flex w-full items-center gap-3 rounded-xl px-3 py-2 text-[13px] font-medium leading-snug no-underline transition hover:bg-primary/10 hover:text-base-content ${isActive ? 'bg-primary font-semibold text-primary-content shadow-lg shadow-primary/20' : 'text-base-content/60'}`}
                       >
                         <span className="text-base" aria-hidden="true">{entry.icon}</span>
                         {!collapsed && (
                           <>
                             <span className="flex-1">{entry.label}</span>
                             {entry.to === '/app/mise-en-route' && !state.station?.activated && missing.length > 0 && (
-                              <span className="rounded-full bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-400">{missing.length}</span>
+                              <span className="rounded-full bg-warning/20 px-1.5 py-0.5 text-[10px] font-bold text-warning">{missing.length}</span>
                             )}
                           </>
                         )}
@@ -147,7 +147,7 @@ export default function AppShell() {
       <div className="shrink-0 border-t border-base-300 p-2">
         <div className="rounded-xl bg-base-200 p-2">
           <div className="flex items-center gap-2">
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-linear-to-br from-sky-600 via-sky-500 to-cyan-400 text-white" aria-hidden="true"><FiActivity size={15} /></span>
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-linear-to-br from-primary via-primary to-secondary text-primary-content" aria-hidden="true"><FiActivity size={15} /></span>
             {!collapsed && (
               <div className="min-w-0">
                 <p className="truncate text-xs font-bold">{stationName}</p>
@@ -222,13 +222,13 @@ export default function AppShell() {
               <button
                 type="button"
                 onClick={() => setAlertsOpen((v) => !v)}
-                className={`btn btn-sm px-2.5! relative ${state.stockAlerts.length > 0 ? 'text-amber-400!' : ''}`}
+                className={`btn btn-sm px-2.5! relative ${state.stockAlerts.length > 0 ? 'text-warning!' : ''}`}
                 aria-label="Alertes stock"
                 title={state.stockAlerts.length > 0 ? `${state.stockAlerts.length} produit(s) sous le seuil critique` : 'Stock normal'}
               >
                 <FiBell size={16} />
                 {state.stockAlerts.length > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-black text-white animate-pulse">
+                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-error text-[9px] font-black text-error-content animate-pulse">
                     {state.stockAlerts.length}
                   </span>
                 )}
@@ -236,8 +236,8 @@ export default function AppShell() {
               {alertsOpen && (
                 <div className="card absolute right-0 top-12 z-50 w-72 bg-base-100 p-3 shadow-xl sm:w-80">
                   <div className="flex items-center justify-between border-b border-base-300 pb-2">
-                    <div className="flex items-center gap-1.5 font-bold text-xs text-white">
-                      <FiBell className="text-amber-400" />
+                    <div className="flex items-center gap-1.5 font-bold text-xs text-base-content">
+                      <FiBell className="text-warning" />
                       <span>Alertes Stock en direct</span>
                     </div>
                     <Badge tone={state.stockAlerts.length > 0 ? 'warn' : 'success'}>
@@ -252,7 +252,7 @@ export default function AppShell() {
                         <div key={a.productId} className="rounded-lg bg-base-200 p-2">
                           <div className="flex items-center justify-between font-bold">
                             <span className="truncate">{a.name}</span>
-                            <span className={a.severity === 'rupture' ? 'text-red-400' : 'text-amber-400'}>
+                            <span className={a.severity === 'rupture' ? 'text-error' : 'text-warning'}>
                               {a.severity === 'rupture' ? 'RUPTURE' : `${a.qtyOnHand} restant(s)`}
                             </span>
                           </div>
@@ -282,8 +282,8 @@ export default function AppShell() {
             </div>}
 
             <div className="relative">
-              <button type="button" onClick={() => setMenuOpen((value) => !value)} className="flex items-center gap-2 rounded-xl px-2 py-1.5 hover:bg-sky-500/10" aria-expanded={menuOpen} aria-label="Menu du compte">
-                <span className="grid h-8 w-8 place-items-center rounded-lg text-xs font-bold text-white bg-linear-to-br from-sky-600 via-sky-500 to-cyan-400">
+              <button type="button" onClick={() => setMenuOpen((value) => !value)} className="flex items-center gap-2 rounded-xl px-2 py-1.5 hover:bg-primary/10" aria-expanded={menuOpen} aria-label="Menu du compte">
+                <span className="grid h-8 w-8 place-items-center rounded-lg text-xs font-bold text-primary-content bg-linear-to-br from-primary via-primary to-secondary">
                   {(state.session?.name ?? '?').split(' ').map((word) => word[0]).slice(0, 2).join('').toUpperCase()}
                 </span>
                 <div className="hidden text-left sm:block">
@@ -312,24 +312,24 @@ export default function AppShell() {
         <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
           {can('inventory.view') && <StockAlertBanner key={`${state.session?.userId}:${state.session?.stationId}`} />}
           {role !== 'super_admin' && subscriptionStatus === 'loading' && <div role="status" className="card mb-5 bg-base-100 px-4 py-3 text-xs shadow-xl">Vérification de l’abonnement ; les écritures ordinaires sont momentanément bloquées.</div>}
-          {role !== 'super_admin' && subscriptionStatus !== 'loading' && !canWriteSubscription && <div role="status" className="card mb-5 flex flex-row flex-wrap items-center justify-between gap-3 bg-base-100 px-4 py-3 text-xs shadow-xl border-amber-500/40!">
+          {role !== 'super_admin' && subscriptionStatus !== 'loading' && !canWriteSubscription && <div role="status" className="card mb-5 flex flex-row flex-wrap items-center justify-between gap-3 bg-base-100 px-4 py-3 text-xs shadow-xl border-warning/40!">
             <span><strong>{subscriptionAccess ? 'Abonnement en lecture seule.' : 'Abonnement non confirmé.'}</strong>{' '}
               {subscriptionAccess ? 'Les données restent consultables ; les écritures ordinaires sont bloquées jusqu’à validation. Après expiration, un retrait WhatsApp peut être demandé sous réserve des droits.' : `Les écritures ordinaires sont bloquées. ${subscriptionError ?? ''}`}</span>
             <span className="flex gap-3">{can('subscription.manage') && <NavLink to="/app/abonnement" className="link link-primary">Voir l’abonnement →</NavLink>}
               {((dataSource === 'supabase' && authKind === 'supabase') || (dataSource === 'api' && authKind === 'api')) && <button className="link link-primary" onClick={() => { void refreshSubscriptionAccess().catch(() => undefined); }}>Relire</button>}</span>
           </div>}
           {!state.station?.activated && role !== 'super_admin' && location.pathname !== '/app/mise-en-route' && (
-            <div className="card mb-5 flex flex-row flex-wrap items-center justify-between gap-3 bg-base-100 px-4 py-3 shadow-xl border-amber-500/30!">
+            <div className="card mb-5 flex flex-row flex-wrap items-center justify-between gap-3 bg-base-100 px-4 py-3 shadow-xl border-warning/30!">
               <div className="flex items-center gap-2 text-xs">
-                <span className="text-amber-400"><FiHelpCircle size={16} /></span>
+                <span className="text-warning"><FiHelpCircle size={16} /></span>
                 <span><strong>Mise en route en cours.</strong> {missing.length} étape(s) obligatoire(s) manquante(s) — l’exploitation reste fermée.</span>
               </div>
               <NavLink to="/app/mise-en-route" className="link link-primary text-xs">Continuer →</NavLink>
             </div>
           )}
           {role === 'super_admin' && location.pathname !== '/app/plateforme' ? (
-            <Card className="flex flex-row items-start gap-3 border-red-500/30">
-              <FiShield className="mt-0.5 text-xl text-red-400" />
+            <Card className="flex flex-row items-start gap-3 border-error/30">
+              <FiShield className="mt-0.5 text-xl text-error" />
               <div>
                 <h2 className="text-sm font-bold">Espace réservé au support WashGuard</h2>
                 <p className="mt-1 text-xs text-base-content/60">Ce compte n’est rattaché à aucune station. Seul l’espace plateforme est accessible.</p>

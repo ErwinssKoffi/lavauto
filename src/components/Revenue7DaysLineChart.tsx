@@ -23,27 +23,27 @@ export default function Revenue7DaysLineChart({ data }: { data: DayChartPoint[] 
         <div
           className="rounded-xl border p-3 shadow-xl backdrop-blur-md"
           style={{
-            background: 'rgba(15, 23, 42, 0.95)',
-            color: '#e2e8f0',
+            background: 'var(--color-base-100)',
+            color: 'var(--color-base-content)',
           }}
         >
-          <div className="flex items-center justify-between gap-3 border-b pb-1.5 mb-2" style={{ borderColor: 'rgba(148, 163, 184, 0.2)' }}>
-            <span className="font-bold text-xs text-slate-200">{point.label} ({point.fullDate})</span>
-            <span className="rounded bg-sky-500/20 px-1.5 py-0.5 text-[10px] font-bold text-sky-400">
+          <div className="flex items-center justify-between gap-3 border-b pb-1.5 mb-2" style={{ borderColor: 'var(--color-base-300)' }}>
+            <span className="font-bold text-xs text-base-content/80">{point.label} ({point.fullDate})</span>
+            <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-bold text-primary">
               {point.washesCount} lavage{point.washesCount > 1 ? 's' : ''}
             </span>
           </div>
           <div className="space-y-1 text-xs">
             <div className="flex items-center justify-between gap-4">
-              <span className="flex items-center gap-1.5 text-sky-400">
-                <span className="h-2 w-2 rounded-full bg-sky-400" />
+              <span className="flex items-center gap-1.5 text-primary">
+                <span className="h-2 w-2 rounded-full bg-primary" />
                 Chiffre d’affaires :
               </span>
               <span className="font-bold">{formatFCFA(point.revenue)}</span>
             </div>
             {point.collected !== null && <div className="flex items-center justify-between gap-4">
-              <span className="flex items-center gap-1.5 text-emerald-400">
-                <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              <span className="flex items-center gap-1.5 text-success">
+                <span className="h-2 w-2 rounded-full bg-success" />
                 Encaissements nets :
               </span>
               <span className="font-bold">{formatFCFA(point.collected)}</span>
@@ -61,10 +61,10 @@ export default function Revenue7DaysLineChart({ data }: { data: DayChartPoint[] 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-base-300 pb-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="grid h-7 w-7 place-items-center rounded-lg bg-sky-500/15 text-sky-400">
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/15 text-primary">
               <FiTrendingUp size={15} />
             </span>
-            <h2 className="text-sm font-bold text-slate-100">
+            <h2 className="text-sm font-bold text-base-content">
               Évolution du chiffre d’affaires (7 derniers jours)
             </h2>
           </div>
@@ -79,14 +79,14 @@ export default function Revenue7DaysLineChart({ data }: { data: DayChartPoint[] 
             className="flex items-center gap-1.5 rounded-lg border border-base-300 bg-base-200 px-2.5 py-1 text-xs"
           >
             <span className="text-[11px] text-base-content/60">Total 7j :</span>
-            <span className="font-bold text-sky-400">{formatFCFA(totalRevenue)}</span>
+            <span className="font-bold text-primary">{formatFCFA(totalRevenue)}</span>
           </div>
 
           <div
             className="flex items-center gap-1.5 rounded-lg border border-base-300 bg-base-200 px-2.5 py-1 text-xs"
           >
             <span className="text-[11px] text-base-content/60">Moyenne/j :</span>
-            <span className="font-bold text-slate-200">{formatFCFA(dailyAverage)}</span>
+            <span className="font-bold text-base-content/80">{formatFCFA(dailyAverage)}</span>
           </div>
 
           {totalCollected !== null && <Badge>Encaissements nets : {formatFCFA(totalCollected)}</Badge>}
@@ -100,19 +100,19 @@ export default function Revenue7DaysLineChart({ data }: { data: DayChartPoint[] 
             data={data}
             margin={{ top: 12, right: 16, bottom: 4, left: 8 }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.4} />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-base-300)" opacity={0.4} />
             <XAxis
               dataKey="label"
-              stroke="#94a3b8"
+              stroke="var(--color-base-content)"
               fontSize={11}
               tickLine={false}
-              axisLine={{ stroke: '#334155' }}
+              axisLine={{ stroke: 'var(--color-base-300)' }}
             />
             <YAxis
-              stroke="#94a3b8"
+              stroke="var(--color-base-content)"
               fontSize={11}
               tickLine={false}
-              axisLine={{ stroke: '#334155' }}
+              axisLine={{ stroke: 'var(--color-base-300)' }}
               tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`}
               domain={['auto', 'auto']}
             />

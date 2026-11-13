@@ -83,7 +83,7 @@ export default function Platform() {
     return (
       <div>
         <PageHeader title="Espace plateforme" subtitle="Réservé au support WashGuard." />
-        <Card className="flex flex-row items-start gap-3 border-red-500/30"><FiLock className="mt-0.5 text-xl text-red-400" />
+        <Card className="flex flex-row items-start gap-3 border-error/30"><FiLock className="mt-0.5 text-xl text-error" />
           <div><h2 className="text-sm font-bold">Accès refusé</h2><p className="text-base-content/60 mt-1 text-xs">Cet espace est réservé au support WashGuard : entreprises clientes, formules, abonnements, suspension, quotas et journaux.</p></div>
         </Card>
       </div>
@@ -108,9 +108,9 @@ export default function Platform() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Entreprises clientes" value={String(stats.companies)} hint="Réellement enregistrées" icon={<FiBriefcase />} />
-        <StatCard label="Suspendues" value={String(stats.suspendedCompanies)} hint="Accès coupé, données conservées" accent="bg-red-500/10 text-red-400" />
-        <StatCard label="Formules / limites" value={`${stats.plans} / ${stats.planLimits}`} hint="Lues depuis la base" accent="bg-emerald-500/10 text-emerald-400" />
-        <StatCard label="Quotas dépassés" value={String(stats.quotasExceeded)} hint="Aucune insertion au-delà de la limite" accent="bg-amber-500/10 text-amber-400" />
+        <StatCard label="Suspendues" value={String(stats.suspendedCompanies)} hint="Accès coupé, données conservées" accent="bg-error/10 text-error" />
+        <StatCard label="Formules / limites" value={`${stats.plans} / ${stats.planLimits}`} hint="Lues depuis la base" accent="bg-success/10 text-success" />
+        <StatCard label="Quotas dépassés" value={String(stats.quotasExceeded)} hint="Aucune insertion au-delà de la limite" accent="bg-warning/10 text-warning" />
       </div>
 
       <Card className="mt-5">

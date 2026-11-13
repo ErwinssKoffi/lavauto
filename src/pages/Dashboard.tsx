@@ -103,7 +103,7 @@ export default function Dashboard() {
           value={day.washesCount === null ? '—' : String(day.washesCount)}
           hint={day.finishedCount === null ? 'Indisponible' : `${day.finishedCount} terminé(s)`}
           icon={<FiDroplet />}
-          accent="bg-emerald-500/10 text-emerald-400"
+          accent="bg-success/10 text-success"
           sparkline={!connected || current ? (
             <Sparkline
               title="Tendance lavages · 7j"
@@ -113,8 +113,8 @@ export default function Dashboard() {
             />
           ) : undefined}
         />
-        <StatCard label="Encaissements du jour" value={day.collected === null ? '—' : formatFCFA(day.collected)} hint={day.collected === null ? 'Indisponible' : `${day.byMethod.reduce((n, m) => n + m.count, 0)} paiement(s)`} icon={<FiCreditCard />} accent="bg-sky-500/10 text-sky-400" />
-        <StatCard label="Dépenses du jour" value={day.expenses === null ? '—' : formatFCFA(day.expenses)} hint={day.collected === null || day.expenses === null ? 'Indisponible' : `Solde partiel : ${formatFCFA(day.collected - day.expenses)} · PAS un bénéfice`} icon={<FiCreditCard />} accent="bg-amber-500/10 text-amber-400" />
+        <StatCard label="Encaissements du jour" value={day.collected === null ? '—' : formatFCFA(day.collected)} hint={day.collected === null ? 'Indisponible' : `${day.byMethod.reduce((n, m) => n + m.count, 0)} paiement(s)`} icon={<FiCreditCard />} accent="bg-primary/10 text-primary" />
+        <StatCard label="Dépenses du jour" value={day.expenses === null ? '—' : formatFCFA(day.expenses)} hint={day.collected === null || day.expenses === null ? 'Indisponible' : `Solde partiel : ${formatFCFA(day.collected - day.expenses)} · PAS un bénéfice`} icon={<FiCreditCard />} accent="bg-warning/10 text-warning" />
       </div>
 
       <div className="mt-5">
@@ -171,7 +171,7 @@ export default function Dashboard() {
           </Card>
 
           <Card>
-            <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-bold">Objectif du mois</h2><FiActivity className="text-sky-400" /></div>
+            <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-bold">Objectif du mois</h2><FiActivity className="text-primary" /></div>
             <p className="text-xl font-bold">{monthRevenue === null ? '—' : formatFCFA(monthRevenue)}</p>
             <p className="text-base-content/60 text-xs">sur {target > 0 ? formatFCFA(target) : 'aucun objectif fixé'}</p>
             {monthRevenue !== null && <div className="mt-3"><Progress value={monthRevenue} max={target || 1} tone={target && monthRevenue >= target ? 'success' : 'accent'} /></div>}
@@ -181,7 +181,7 @@ export default function Dashboard() {
           {can('inventory.view') && <Card>
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-bold flex items-center gap-1.5">
-                <FiBox className="text-amber-400" /> Consommables & Alertes
+                <FiBox className="text-warning" /> Consommables & Alertes
               </h2>
               <Badge tone={state.stockAlerts.length > 0 ? 'warn' : 'success'}>
                 {state.stockAlerts.length > 0 ? `${state.stockAlerts.length} alerte(s)` : 'Normal'}
@@ -195,11 +195,11 @@ export default function Dashboard() {
                   <div key={a.productId} className="rounded-lg p-2 bg-base-200">
                     <div className="flex justify-between font-bold">
                       <span className="truncate">{a.name}</span>
-                      <span className={a.severity === 'rupture' ? 'text-red-400' : 'text-amber-400'}>
+                      <span className={a.severity === 'rupture' ? 'text-error' : 'text-warning'}>
                         {a.severity === 'rupture' ? 'Rupture (0)' : `${a.qtyOnHand} restant(s)`}
                       </span>
                     </div>
-                    <div className="mt-1 flex justify-between text-[11px] text-slate-400">
+                    <div className="mt-1 flex justify-between text-[11px] text-base-content/60">
                       <span>Seuil critique défini : {a.reorderLevel}</span>
                     </div>
                   </div>
@@ -216,7 +216,7 @@ export default function Dashboard() {
 
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
         <Card>
-          <h2 className="mb-3 flex items-center gap-2 text-sm font-bold"><FiAlertTriangle className="text-amber-400" /> Alertes</h2>
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-bold"><FiAlertTriangle className="text-warning" /> Alertes</h2>
           {alerts.length === 0 ? <p className="text-base-content/60 text-xs">Aucune alerte pour le moment.</p> : (
             <div className="space-y-2">
               {alerts.map((a, i) => <div key={i}><Badge tone={a.tone}>{a.text}</Badge></div>)}
@@ -248,10 +248,10 @@ export default function Dashboard() {
         ) : (
           <div className="overflow-x-auto">
             <BarChart width={720} height={220} data={monthTrend} margin={{ top: 8, right: 12, bottom: 8, left: 8 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-              <XAxis dataKey="date" stroke="#94a3b8" fontSize={10} tickFormatter={(v) => String(v).slice(8, 10)} />
-              <YAxis stroke="#94a3b8" fontSize={10} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
-              <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid #334155', color: '#e2e8f0', borderRadius: '10px', fontSize: '12px' }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-base-300)" />
+              <XAxis dataKey="date" stroke="var(--color-base-content)" fontSize={10} tickFormatter={(v) => String(v).slice(8, 10)} />
+              <YAxis stroke="var(--color-base-content)" fontSize={10} tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`} />
+              <Tooltip contentStyle={{ background: 'var(--color-base-100)', border: '1px solid var(--color-base-300)', color: 'var(--color-base-content)', borderRadius: '10px', fontSize: '12px' }} />
               <Bar dataKey="revenue" name="Chiffre d’affaires" fill="#38bdf8" radius={[4, 4, 0, 0]} isAnimationActive={false} />
               {monthTrend.every((point) => point.collected !== null) && <Bar dataKey="collected" name="Encaissé" fill="#34d399" radius={[4, 4, 0, 0]} isAnimationActive={false} />}
             </BarChart>

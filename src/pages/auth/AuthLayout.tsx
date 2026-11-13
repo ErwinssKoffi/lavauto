@@ -16,7 +16,7 @@ const POINTS = [
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   const { authKind } = useStore();
   return (
-    <div className="flex min-h-screen bg-white text-slate-900">
+    <div data-theme="washguard" className="flex min-h-screen bg-white text-slate-900">
       {/* Formulaire */}
       <div className="flex w-full flex-col lg:w-[54%] xl:w-1/2">
         <header className="flex h-16 items-center justify-between px-6 sm:px-10">

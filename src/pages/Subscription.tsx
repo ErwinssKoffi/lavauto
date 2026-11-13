@@ -79,7 +79,7 @@ export default function Subscription() {
       </Card>
 
       <Card className="lg:col-span-2">
-        <div className="mb-4 flex items-center gap-2"><FiFileText className="text-sky-400" /><h2 className="text-sm font-bold">Consommation par rapport aux limites</h2></div>
+        <div className="mb-4 flex items-center gap-2"><FiFileText className="text-primary" /><h2 className="text-sm font-bold">Consommation par rapport aux limites</h2></div>
         {limit ? <div className="space-y-5">
           <LimitRow icon={<FiCheckCircle />} label="Stations" value={stations} max={limit.stations} />
           <LimitRow icon={<FiCheckCircle />} label={connected ? 'Comptes actifs et invitations réservées (propriétaire inclus)' : 'Comptes actifs (propriétaire inclus)'} value={employees} max={limit.employees} />
@@ -98,7 +98,7 @@ export default function Subscription() {
         const pending = sub?.pendingPlanId === p.id;
         const paid = p.id === 'standard' || p.id === 'premium';
         const alreadyActive = isCurrent && sub?.status === 'active' && canWriteSubscription;
-        return <Card key={p.id} className={isCurrent ? 'border-sky-500' : ''}>
+        return <Card key={p.id} className={isCurrent ? 'border-primary' : ''}>
           <div className="flex items-center justify-between"><h3 className="text-lg font-extrabold">{p.name}</h3>{isCurrent && <Badge tone="accent">Formule effective</Badge>}</div>
           <p className="mt-2 text-2xl font-extrabold">{p.id === 'essai' ? 'Gratuit' : formatFCFA(p.priceMonthly)}<span className="text-base-content/60 text-xs font-medium"> {p.id === 'essai' ? '· 14 jours' : '/ mois'}</span></p>
           <div className="text-base-content/60 mt-4"><PlanDetails plan={p} /></div>
@@ -116,7 +116,7 @@ export default function Subscription() {
 
 function LimitRow({ icon, label, value, max }: { icon: React.ReactNode; label: string; value: number; max: number | null }) {
   return <div>
-    <div className="mb-2 flex items-center justify-between text-xs"><span className="flex items-center gap-2 font-medium"><span className="text-sky-400">{icon}</span>{label}</span><span className="text-base-content/60">{value.toLocaleString('fr-FR')} / {max === null ? 'limite indisponible' : max.toLocaleString('fr-FR')}</span></div>
+    <div className="mb-2 flex items-center justify-between text-xs"><span className="flex items-center gap-2 font-medium"><span className="text-primary">{icon}</span>{label}</span><span className="text-base-content/60">{value.toLocaleString('fr-FR')} / {max === null ? 'limite indisponible' : max.toLocaleString('fr-FR')}</span></div>
     {max !== null && <Progress value={value} max={max} tone={value >= max ? 'warn' : 'accent'} />}
   </div>;
 }

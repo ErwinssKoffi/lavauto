@@ -90,7 +90,7 @@
 | --- | --- |
 | `npm run typecheck` | ✅ 0 erreur |
 | `npm run lint` | ✅ 26 règles |
-| `npm run check` | ✅ 250 OK / 0 KO |
+| `npm run check` | ✅ 251 OK / 0 KO |
 | `npm run test:unit` | ✅ 288 tests / 34 fichiers |
 | `npm run build` | ✅ build Vite + PWA |
 
@@ -162,7 +162,7 @@ Trois ajustements restent **hors couche** (donc prioritaires sur la couche `util
 | --- | --- |
 | `npm run typecheck` | ✅ 0 erreur |
 | `npm run lint` | ✅ 26 règles |
-| `npm run check` | ✅ 250 OK / 0 KO |
+| `npm run check` | ✅ 251 OK / 0 KO |
 | `npm run test:unit` | ✅ 288 tests / 34 fichiers |
 | `npm run build` | ✅ Vite + PWA · CSS 192,3 kB / gzip 30,2 kB |
 
@@ -193,3 +193,22 @@ La bascule rapide soleil/lune reste volontairement limitée aux deux thèmes Was
 Le dépôt n'a jamais contenu de shadcn/ui, et n'en contient toujours pas : aucun `components.json`, aucun dossier `src/components/ui/`, aucune dépendance `shadcn`, `@radix-ui/*`, `class-variance-authority`, `tailwind-merge`, `lucide-react`, `tailwindcss-animate`, aucun helper `cn()`, aucun token `--*-foreground` ni attribut `data-slot`. Le seul paquet proche présent dans `node_modules` est `clsx`, dépendance transitive de `recharts` (`npm ls clsx`), jamais importée par l'application.
 
 `npm run check` porte un contrôle dédié, validé en réintroduisant volontairement `clsx` dans `package.json` (KO attendu, puis restauration).
+
+
+---
+
+## 12. Palette unifiée : 31 fichiers convertis
+
+Une fois les 37 thèmes sélectionnables, les classes de palette Tailwind codées en dur devenaient le principal défaut visuel : `bg-slate-950` restait noir sur un thème clair, `text-white` disparaissait sur `base-100` clair.
+
+Conversion appliquée à **31 fichiers** (≈ 310 occurrences) : `slate` → `base-100/200/300` et `base-content/60…80`, `sky`/`blue` → `primary`, `emerald` → `success`, `amber` → `warning`, `red` → `error`, `text-white` → `*-content` du fond porteur (ou `text-base-content`).
+
+| Zone | Traitement |
+| --- | --- |
+| `/app` (16 écrans), dialogs, `ui.tsx`, `DataTable`, `feedback`, `PasswordField`, `StockAlertBanner`, `PwaControls`, charts | tokens DaisyUI uniquement |
+| `pages/Landing.tsx` | conservée en sombre, racine épinglée `data-theme="washguard-dark"` |
+| `pages/auth/*` + `AuthLayout.tsx` | conservées telles quelles, racine épinglée `data-theme="washguard"` (formulaire clair, panneau photo sombre) |
+| Voiles de modale | `bg-black/60` conservé (convention) |
+| Graphiques (recharts) | chrome (axes, grille, infobulles) en `var(--color-base-*)` ; couleurs de série conservées en hexadécimal |
+
+Garde-fou : le contrôle « palette DaisyUI partout » refuse toute classe de palette Tailwind hors des deux zones épinglées (testé en injectant `bg-slate-900 text-amber-400` → KO, puis restauration).

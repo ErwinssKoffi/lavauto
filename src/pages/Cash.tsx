@@ -65,10 +65,10 @@ export default function Cash() {
 
       {open ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="État" value="Caisse ouverte" hint={`Depuis le ${formatDateTime(open.openedAt)}`} icon={<FiCheckCircle />} accent="bg-emerald-500/10 text-emerald-400" />
+          <StatCard label="État" value="Caisse ouverte" hint={`Depuis le ${formatDateTime(open.openedAt)}`} icon={<FiCheckCircle />} accent="bg-success/10 text-success" />
           <StatCard label="Fond de caisse" value={formatFCFA(open.openingFloat)} hint={`Ouverte par ${open.openedBy}`} icon={<FiDollarSign />} />
-          <StatCard label="Théorique en caisse" value={formatFCFA(theoretical)} hint="Fond + encaissements − décaissements" icon={<FiDollarSign />} accent="bg-sky-500/10 text-sky-400" />
-          <StatCard label="Mouvements" value={String(movements.filter((m) => m.cashSessionId === open.id).length)} hint="Journal des mouvements signé" icon={<FiDollarSign />} accent="bg-amber-500/10 text-amber-400" />
+          <StatCard label="Théorique en caisse" value={formatFCFA(theoretical)} hint="Fond + encaissements − décaissements" icon={<FiDollarSign />} accent="bg-primary/10 text-primary" />
+          <StatCard label="Mouvements" value={String(movements.filter((m) => m.cashSessionId === open.id).length)} hint="Journal des mouvements signé" icon={<FiDollarSign />} accent="bg-warning/10 text-warning" />
         </div>
       ) : (
         <Card className="mb-5"><EmptyState icon={<FiDollarSign />} title="Aucune caisse ouverte" description="Ouvrez une caisse avec un fond pour autoriser les encaissements en espèces. Les autres moyens de paiement restent enregistrables." action={activated ? <button className="btn btn-sm btn-primary" disabled={!canOperate} onClick={() => setOpenMode(true)}><FiPlus /> Ouvrir la caisse</button> : undefined} /></Card>
@@ -95,7 +95,7 @@ export default function Cash() {
                       <td>{c.closedAt ? formatDateTime(c.closedAt) : '—'}</td>
                       <td>{formatFCFA(theo)}</td>
                       <td>{countedValue === null ? '—' : formatFCFA(countedValue)}</td>
-                      <td>{ecart === null || ecart === undefined ? '—' : <span className={ecart === 0 ? 'text-emerald-400' : 'text-amber-400'}>{ecart > 0 ? '+' : ''}{formatFCFA(ecart)}</span>}</td>
+                      <td>{ecart === null || ecart === undefined ? '—' : <span className={ecart === 0 ? 'text-success' : 'text-warning'}>{ecart > 0 ? '+' : ''}{formatFCFA(ecart)}</span>}</td>
                       <td><Badge tone={c.status === 'ouverte' ? 'success' : 'neutral'}>{c.status === 'ouverte' ? 'Ouverte' : 'Clôturée'}</Badge></td>
                       <td>
                         {c.status === 'cloturee' && !open && <button className="link link-primary text-xs" disabled={!canOperate} onClick={() => { setReopenId(c.id); setReason(''); }}><FiRotateCcw className="inline" /> Réouvrir</button>}
@@ -219,11 +219,11 @@ export default function Cash() {
             </Card>
             <Card className="p-3!">
               <p className="text-base-content/60 text-[11px]">Théorique attendu</p>
-              <p className="mt-1 font-bold text-sky-400">{formatFCFA(theoretical)}</p>
+              <p className="mt-1 font-bold text-primary">{formatFCFA(theoretical)}</p>
             </Card>
             <Card className="p-3!">
               <p className="text-base-content/60 text-[11px]">Écart au comptage</p>
-              <p className={`mt-1 font-bold ${counted - theoretical === 0 ? 'text-emerald-400' : counted - theoretical > 0 ? 'text-sky-400' : 'text-red-400'}`}>
+              <p className={`mt-1 font-bold ${counted - theoretical === 0 ? 'text-success' : counted - theoretical > 0 ? 'text-primary' : 'text-error'}`}>
                 {counted - theoretical > 0 ? '+' : ''}{formatFCFA(counted - theoretical)}
               </p>
             </Card>
@@ -235,10 +235,10 @@ export default function Cash() {
             className="mb-4 rounded-xl border p-3 text-xs leading-relaxed"
             style={{
               background: counted - theoretical > 0 ? 'rgba(56, 189, 248, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-              borderColor: counted - theoretical > 0 ? 'rgba(56, 189, 248, 0.3)' : 'rgba(239, 68, 68, 0.3)',
+              borderColor: counted - theoretical > 0 ? 'var(--color-primary)' : 'var(--color-error)',
             }}
           >
-            <p className="font-bold mb-1" style={{ color: counted - theoretical > 0 ? '#38bdf8' : '#f87171' }}>
+            <p className="font-bold mb-1" style={{ color: counted - theoretical > 0 ? 'var(--color-primary)' : 'var(--color-error)' }}>
               {counted - theoretical > 0 ? 'Excédent de caisse détecté' : 'Déficit de caisse constaté'}
             </p>
             <p className="text-base-content/60">

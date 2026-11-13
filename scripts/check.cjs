@@ -545,6 +545,25 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
       read('src/lib/store.tsx').includes("localStorage.setItem('washguard.theme.name'") &&
       html.includes("localStorage.getItem('washguard.theme.name')");
   })());
+  check('palette DaisyUI partout : aucune couleur codée en dur hors zones à identité fixe', (() => {
+    const zoned = /(pages\/Landing\.tsx|pages\/auth\/|AuthLayout\.tsx)/;
+    const palette = /(?<![\w-])(text|bg|border|ring|from|via|to|fill|stroke|shadow)-(white|black|slate|zinc|gray|sky|blue|indigo|cyan|amber|emerald|green|red)(-[0-9]{2,3})?\/?[\w.[\]/-]*/g;
+    const repos = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = path.join(dir, entry.name);
+      return entry.isDirectory() ? repos(full) : [full];
+    });
+    const offenders = [];
+    for (const file of repos(path.join(ROOT, 'src'))) {
+      if (!/\.tsx$/.test(file) || zoned.test(file)) continue;
+      for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+        // Voiles de modale : noirs par convention, indépendants du thème.
+        const found = line.replace(/bg-black\/\d+/g, '').match(palette);
+        if (found) offenders.push(`${path.relative(ROOT, file)} → ${found.join(' ')}`);
+      }
+    }
+    if (offenders.length) console.log('     ' + offenders.slice(0, 4).join(' | '));
+    return offenders.length === 0;
+  })());
   check('plus aucune classe ni variable wg-* dans les sources React', (() => {
     const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
       const full = path.join(dir, entry.name);

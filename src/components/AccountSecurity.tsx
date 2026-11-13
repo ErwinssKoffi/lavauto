@@ -255,7 +255,7 @@ export function AccountSecurity({ open, onClose }: { open: boolean; onClose: () 
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="flex items-center gap-2 text-sm font-bold">
-                      <span className="text-sky-500">{deviceIcon(session.userAgent)}</span>
+                      <span className="text-primary">{deviceIcon(session.userAgent)}</span>
                       {session.userAgent}
                       {session.current && <Badge tone="success">Cet appareil</Badge>}
                     </p>
@@ -317,7 +317,7 @@ export function AccountSecurity({ open, onClose }: { open: boolean; onClose: () 
               const meta = EVENT_LABELS[event.event] ?? { label: event.event, tone: 'warn' as const };
               return (
                 <li key={`${event.at}-${index}`} className="flex items-start gap-3 rounded-xl border p-3">
-                  <span className={`mt-0.5 ${meta.tone === 'danger' ? 'text-red-400' : meta.tone === 'success' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  <span className={`mt-0.5 ${meta.tone === 'danger' ? 'text-error' : meta.tone === 'success' ? 'text-success' : 'text-warning'}`}>
                     {meta.tone === 'success' ? <FiCheckCircle aria-hidden="true" /> : meta.tone === 'danger' ? <FiAlertTriangle aria-hidden="true" /> : <FiActivity aria-hidden="true" />}
                   </span>
                   <div className="min-w-0">
