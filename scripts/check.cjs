@@ -486,6 +486,17 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     Boolean(pkg.dependencies.jspdf) && Boolean(pkg.dependencies.zod) && Boolean(pkg.devDependencies['pdfjs-dist']) &&
     String(pkg.dependencies.recharts).startsWith('^2.') &&
     String(pkg.dependencies['react-router-dom']).startsWith('^7.'));
+  check('plus aucune classe ni variable wg-* dans les sources React', (() => {
+    const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) return walk(full);
+      return /\.(tsx?|css)$/.test(entry.name) ? [full] : [];
+    });
+    return walk(path.join(ROOT, 'src')).every((file) => {
+      const src = fs.readFileSync(file, 'utf8');
+      return !/\bwg-[a-z0-9-]+/.test(src) && !/var\(--wg-/.test(src);
+    });
+  })());
   check('thème : DaisyUI configuré, thèmes clair/sombre, focus clavier et mouvement réduit',
     [':focus-visible','prefers-reduced-motion'].every((token) => cssSrc.includes(token)) &&
     ['washguard-dark', 'primary', 'base-100'].every((token) => tailwindSrc.includes(token)) &&

@@ -128,8 +128,8 @@ Responsive : sidebar desktop / drawer mobile, topbar qui tronque, tableaux `tabl
 | --- | --- |
 | `npm run typecheck` | ✅ 0 erreur (TS strict) |
 | `npm run lint` | ✅ 26 règles statiques |
-| `npm run check` | ✅ **242 contrôles OK / 0 KO** (dont le rendu des 15 écrans en JSDOM) |
+| `npm run check` | ✅ **243 contrôles OK / 0 KO** (dont le rendu des 15 écrans en JSDOM) |
 | `npm run test:unit` | ✅ 283 tests / 33 fichiers |
 | `npm run build` | ✅ build Vite + PWA (39 entrées pré-cachées) |
 
-Le contrôle « thème » de `scripts/check.cjs` vérifie désormais : `:focus-visible` et `prefers-reduced-motion` toujours présents, DaisyUI déclaré en plugin, `darkTheme: 'washguard-dark'`, les thèmes `washguard` / `washguard-dark` complets, et **l'absence** de toute classe `.wg-` résiduelle.
+Le contrôle « thème » de `scripts/check.cjs` vérifie désormais : `:focus-visible` et `prefers-reduced-motion` toujours présents, DaisyUI déclaré en plugin, `darkTheme: 'washguard-dark'`, les thèmes `washguard` / `washguard-dark` complets, et **l'absence** de toute classe `.wg-` ou variable `--wg-` résiduelle dans `src/` (garde-fou sur chaque fichier `.ts`/`.tsx`/`.css`).
