@@ -1,6 +1,6 @@
 # LAVAUTO — Sécurité
 
-**Date :** 12/11/2026 · Cette branche contient des protections locales non déployées. Les contrôles historiques ci-dessous ne constituent pas une certification de sécurité.
+**Date :** 12/11/2026 · Cette branche contient des protections non mises en production. Un aperçu Vercel automatique de la PR ne démontre pas leur fonctionnement sur les services réels. Les contrôles historiques ci-dessous ne constituent pas une certification de sécurité.
 
 ## 1. Authentification
 

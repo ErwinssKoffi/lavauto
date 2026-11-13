@@ -1,6 +1,6 @@
 # LAVAUTO — Tests
 
-**Date :** 12/11/2026 · Branche `arena/d6d6d8bb-lavauto`. Les migrations `051_station_logo.sql` puis `052_atomic_wash_creation.sql` ont été appliquées sur le projet Supabase `lavauto` via le connecteur et contrôlées structurellement. La recette métier avec Auth et Storage réels n’a pas été effectuée ; le frontend de cette branche n’a pas été déployé en production. Les migrations `053`–`057`, la nouvelle invitation, le dispatch, le webhook et l’ordonnanceur WhatsApp restent locaux ; aucun message réel n’a été envoyé.
+**Date :** 12/11/2026 · Branche `arena/d6d6d8bb-lavauto`. Les migrations `051_station_logo.sql` puis `052_atomic_wash_creation.sql` ont été appliquées sur le projet Supabase `lavauto` via le connecteur et contrôlées structurellement. La recette métier avec Auth et Storage réels n’a pas été effectuée ; le frontend de cette branche n’a pas été déployé en production. Vercel indique qu’un aperçu automatique a été créé à l’ouverture de la PR ; sa source de données et ses routes n’ont pas été vérifiées. Les migrations `053`–`057`, la nouvelle invitation, le dispatch, le webhook et l’ordonnanceur WhatsApp restent locaux ; aucun message réel n’a été envoyé.
 
 ## Application et contrôles distants du 12/11/2026
 

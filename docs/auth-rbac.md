@@ -2,7 +2,7 @@
 
 **Mise à jour locale :** 12/11/2026 · **Branche courante :** `arena/d6d6d8bb-lavauto` · **Projet historique :** `lavauto` (`cgxrqorwmmcyqescatzs`, `eu-central-1`).
 
-> Les sections P04 ci-dessous conservent des constats **historiques** (branche et comptages de l’époque). Les protections d’identité, d’abonnement et de révocation de `057`, la nouvelle Edge Function et le frontend de cette branche sont locaux et **non déployés**. Aucun test Auth/e-mail réel n’a été effectué pour ces changements ; toute recette ou mise en service nécessite une autorisation distincte. Le projet `BarberShop` (`fpapxbfsiiwgpvsefsec`) reste intact. Aucun secret ni clé `service_role` n’a été versionné.
+> Les sections P04 ci-dessous conservent des constats **historiques** (branche et comptages de l’époque). Les protections d’identité, d’abonnement et de révocation de `057` et la nouvelle Edge Function sont locales et **non déployées** ; le frontend n’est pas déployé en production. Un aperçu Vercel automatique de la PR ne constitue pas une recette. Aucun test Auth/e-mail réel n’a été effectué pour ces changements ; toute recette ou mise en service nécessite une autorisation distincte. Le projet `BarberShop` (`fpapxbfsiiwgpvsefsec`) reste intact. Aucun secret ni clé `service_role` n’a été versionné.
 
 ## Mise à jour locale : identité et invitations (`057`)
 

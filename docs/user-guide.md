@@ -1,6 +1,6 @@
 # LAVAUTO — Guide utilisateur
 
-**Date :** 12/11/2026 · P10 historique : **19 écrans `/app`**. Cette branche prépare de nouvelles fonctions, dont les abonnements, mais son frontend et les migrations `053`–`057` ne sont pas déployés sur `lavauto`. La recette réelle et toute mise en service nécessitent une autorisation distincte.
+**Date :** 12/11/2026 · P10 historique : **19 écrans `/app`**. Cette branche prépare de nouvelles fonctions, dont les abonnements, mais son frontend n’est pas déployé en production et les migrations `053`–`057` ne sont pas appliquées sur `lavauto`. Un aperçu Vercel automatique de la PR ne constitue pas une recette. La recette réelle et toute mise en service nécessitent une autorisation distincte.
 
 ## 1. Deux modes
 

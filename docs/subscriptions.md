@@ -1,6 +1,6 @@
 # Abonnements et droits — préparation locale
 
-> Ce document décrit le code de la branche, **pas les fonctionnalités actuellement déployées**. Sur `lavauto`, seules `051` et `052` ont été appliquées avec accord ; `053`–`057`, la nouvelle fonction d’invitation et le frontend de cette branche restent locaux. Toute application ou tout déploiement exige une autorisation distincte, une réconciliation de l’historique et une recette isolée. Voir [deployment.md](deployment.md).
+> Ce document décrit le code de la branche, **pas les fonctionnalités actuellement mises en production**. Sur `lavauto`, seules `051` et `052` ont été appliquées avec accord ; `053`–`057` et la nouvelle fonction d’invitation restent locales, et le frontend n’est pas déployé en production. Un aperçu Vercel automatique de la PR ne remplace pas une recette ; sa configuration n’a pas été vérifiée. Toute application des migrations ou mise en production exige une autorisation distincte, une réconciliation de l’historique et une recette isolée. Voir [deployment.md](deployment.md).
 
 ## Parcours et échéances
 
