@@ -4,6 +4,8 @@
 
 **Dépendance ajoutée :** `daisyui@4.12.24` (devDependency, compatible Tailwind 3). Aucun autre paquet UI (ni shadcn/ui, ni Radix, ni Headless UI) n'a été installé.
 
+Journal de migration et table de correspondance : [migration-daisyui.md](migration-daisyui.md).
+
 Références : [architecture-audit.md](architecture-audit.md) · [architecture-target.md](architecture-target.md) · [technical-debt.md](technical-debt.md) · [migration-roadmap.md](migration-roadmap.md).
 
 ---

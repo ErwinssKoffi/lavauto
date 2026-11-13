@@ -1,0 +1,103 @@
+# Migration DaisyUI — journal et table de correspondance
+
+**Objectif :** remplacer intégralement le design system maison `wg-*` par DaisyUI 4, sans casser les 16 écrans, leurs URL, leurs rôles ni leurs textes.
+**Référence de conception :** [design-system.md](design-system.md).
+
+---
+
+## 1. Pourquoi DaisyUI 4 et pas une autre solution
+
+| Option | Décision | Raison |
+| --- | --- | --- |
+| **DaisyUI 4.12.24** | ✅ retenue | 100 % CSS (aucun runtime JS), compatible Tailwind 3.4 déjà installé, thèmes par variables, composants `btn/card/input/table/modal/tabs/badge/alert/progress/kbd/skeleton` |
+| DaisyUI 5 | ❌ | exige Tailwind 4 : migration supplémentaire hors périmètre |
+| shadcn/ui + Radix | ❌ | implique `clsx`, `tailwind-merge`, `cva` et des primitives Radix : dette et surface de régression bien plus grandes |
+| Conserver `wg-*` | ❌ | le besoin exprimé est la sortie du système maison |
+
+## 2. Ordre de migration (aucune étape intermédiaire cassée)
+
+1. **Socle** — installation, thèmes `washguard` / `washguard-dark`, `data-theme` synchronisé, skin global (`body`, bordures, focus).
+2. **Primitives partagées** — `ui.tsx` réécrit **à API constante** (les 18 exports gardent leurs props), puis `feedback`, `DataTable`, `ConfirmDialog`.
+3. **Châssis** — `AppShell` (sidebar, topbar, menus, bandeaux), `CommandPalette`.
+4. **Composants métier** — `PriceInput`, `PwaControls`, `StationLogoEditor`, `StockAlertBanner`, `WhatsappPanels`, `AccountSecurity`, `WashReceipt`, `Breadcrumbs`, `Sparkline`, `Revenue7DaysLineChart`.
+5. **Écrans** — les 16 pages `/app`, les écrans d'authentification et la vitrine.
+6. **Nettoyage** — suppression des classes `.wg-*` et variables `--wg-*` de `src/index.css`, mise à jour du contrôle `scripts/check.cjs`, documentation, garde-fou anti-retour.
+
+## 3. Table de correspondance
+
+| Ancien (`wg-*`) | DaisyUI / Tailwind | Notes |
+| --- | --- | --- |
+| `wg-card` | `card bg-base-100 shadow-xl` + `p-5` | `p-5` explicite car `card-body` n'est pas utilisé |
+| `wg-card` en ligne | `card flex flex-row …` | `.card` est `flex-col` : `flex-row` requis sur les 6 usages horizontaux |
+| `wg-btn` | `btn btn-sm` | densité alignée sur 2,4 rem (voir §5) |
+| `wg-btn-primary` | `btn btn-sm btn-primary` | |
+| `wg-btn-ghost` | `btn btn-sm` | plus de fond gris : contour + hover DaisyUI |
+| `wg-btn-danger` | `btn btn-sm btn-error btn-outline` | pas de variante « soft » en v4 |
+| `wg-input` | `input input-bordered input-sm` | |
+| `wg-label` | `label` + `block` conservé | |
+| `wg-badge(-success/warn/danger/accent)` | `badge badge-sm` + `badge-success/warning/error/primary` | |
+| `wg-link` | `link link-primary` | |
+| `wg-muted` | `text-base-content/60` | |
+| `wg-th` / `wg-td` | `.table` sur `<table>`, cellules sans classe | en-têtes recapitalisés par `index.css` |
+| `wg-scroll-x` | `overflow-x-auto` + `min-w-[620px]` sur la table | |
+| `wg-kbd` | `kbd` | |
+| `wg-overlay` | `bg-black/60 backdrop-blur-sm` | |
+| `wg-skeleton` | `skeleton` | |
+| `wg-gradient` | `bg-gradient-to-br from-sky-600 via-sky-500 to-cyan-400` | |
+| `wg-fade-in` | `animate-fade-in` | keyframes dans `tailwind.config.js` |
+| `wg-scroll-thin` | `[scrollbar-width:thin]` | + barres globales dans `index.css` |
+| `wg-nav-item(-active/-soon)` | classes Tailwind composées dans `AppShell` | actif : `bg-primary text-primary-content` |
+| `wg-topbar` | `bg-base-100/90 backdrop-blur-xl` | |
+| `wg-elev-1/2` | `shadow-lg` / `shadow-xl` | |
+| `var(--wg-border)` | `border-base-300` (ou `borderColor.DEFAULT`) | |
+| `var(--wg-surface)` / `-2` | `bg-base-100` / `bg-base-200` | |
+| `var(--wg-text)` / `--wg-muted` | `text-base-content` / `text-base-content/60` | |
+| `Modal` maison | `<dialog class="modal modal-open">` + `modal-box` + `modal-backdrop` | z-index 999 natif, `z-[80]` si empilement |
+| `Tabs` maison | `tabs tabs-boxed` + `tab-active` | |
+| `Progress` maison | `<progress class="progress …">` | |
+
+## 4. Points de vigilance vérifiés
+
+- **`.card` est une colonne flex** : tout usage horizontal porte `flex flex-row` (App, AppShell, Commissions, Onboarding, Platform, StatCard).
+- **Doublons de classes** : les variantes (`wg-btn-primary`, `wg-badge-success`) ont été remplacées avant la classe de base, sinon `wg-btn` → `btn btn-sm` produisait `btn btn-sm-primary`.
+- **`Alert` sans `role`** : ajouter `role="status"` cassait un contrat testé et modifiait les annonces lecteur d'écran ; l'attribut a été retiré.
+- **`btn-square` évité** : `.btn-square` fige 3 rem de côté et entrerait en conflit avec la densité ; les boutons d'icônes utilisent `btn btn-sm !px-2.5`.
+- **`<table className="table min-w-[620px]">`** uniquement dans un conteneur `overflow-x-auto` ; la table du back-office en `max-h-44 overflow-y-auto` reste en `table w-full`.
+- **Reçu imprimable** : `.wash-receipt-*` reste en CSS autonome (hors thème), il ne doit pas hériter du sombre.
+
+## 5. Densité (parité visuelle)
+
+`src/index.css` aligne les variantes `-sm` de DaisyUI sur les hauteurs d'origine des contrôles de terrain :
+
+| Sélecteur | Valeur | Ancienne métrique |
+| --- | --- | --- |
+| `.btn.btn-sm` | `height`/`min-height` 2,4 rem | `wg-btn` ≈ 2,29 rem |
+| `.input.input-sm`, `.select.select-sm` | `height` 2,4 rem | `wg-input` ≈ 2,39 rem |
+| `.textarea.textarea-sm` | `min-height` 2,4 rem | idem |
+| `.table thead` | `uppercase`, `letter-spacing .06em` | `wg-th` |
+
+## 6. Garde-fous
+
+- `scripts/check.cjs` :
+  - « thème : DaisyUI configuré, thèmes clair/sombre, focus clavier et mouvement réduit » — plugin `daisyui`, `darkTheme: 'washguard-dark'`, thèmes complets, `:focus-visible`, `prefers-reduced-motion`, absence de `.wg-` dans `index.css` ;
+  - « plus aucune classe ni variable wg-\* dans les sources React » — parcourt `src/**/*.{ts,tsx,css}` (validé en réintroduisant volontairement une classe `wg-`).
+- `npm run check` monte les 15 écrans en JSDOM : toute classe manquante ne casse pas le rendu, mais toute erreur React ou tout texte contractuel modifié échoue.
+
+## 7. Validation finale
+
+| Commande | Résultat |
+| --- | --- |
+| `npm run typecheck` | ✅ 0 erreur |
+| `npm run lint` | ✅ 26 règles |
+| `npm run check` | ✅ 243 OK / 0 KO |
+| `npm run test:unit` | ✅ 283 tests / 33 fichiers |
+| `npm run build` | ✅ build Vite + PWA |
+
+## 8. Différences visuelles connues (assumées)
+
+- En-têtes de tableaux DaisyUI : fond `base-200` très léger, taille 0,75 rem (au lieu de 0,7 rem transparent) — capitales conservées via `index.css`.
+- `badge` : hauteur fixe 1,25 rem (ou 1 rem en `badge-sm`).
+- Boutons « ghost » : fond transparent au repos avec contour au survol, au lieu d'un fond gris permanent.
+- Cartes : ombre `shadow-xl` DaisyUI au lieu de l'ombre maison à deux niveaux.
+
+Ces écarts sont typographiques et restent dans le même contrat de couleurs, de densité et de hiérarchie visuelle.
