@@ -1,8 +1,8 @@
 import { readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
-  DAISY_THEMES, DEFAULT_THEME, THEME_OPTIONS, WASHGUARD_THEMES,
-  isKnownTheme, themeLabel, themeScheme,
+  DAISY_THEMES, DEFAULT_DARK_THEME, DEFAULT_LIGHT_THEME, DEFAULT_THEME, THEME_OPTIONS,
+  WASHGUARD_THEMES, isKnownTheme, themeLabel, themeScheme,
 } from '../../src/lib/themes';
 
 describe('catalogue de thèmes DaisyUI', () => {
@@ -34,6 +34,15 @@ describe('catalogue de thèmes DaisyUI', () => {
     expect(isKnownTheme(null)).toBe(false);
     expect(themeScheme('inconnu')).toBe('dark');
     expect(themeLabel('inconnu')).toBe('inconnu');
+  });
+
+  it('fournit une paire clair/sombre pour la bascule rapide', () => {
+    expect(DEFAULT_LIGHT_THEME).toBe('cupcake');
+    expect(DEFAULT_DARK_THEME).toBe('dim');
+    expect(DEFAULT_THEME).toBe(DEFAULT_LIGHT_THEME);
+    expect(themeScheme(DEFAULT_LIGHT_THEME)).toBe('light');
+    expect(themeScheme(DEFAULT_DARK_THEME)).toBe('dark');
+    expect(isKnownTheme(DEFAULT_DARK_THEME)).toBe(true);
   });
 
   it('conserve les libellés lisibles des thèmes WashGuard', () => {

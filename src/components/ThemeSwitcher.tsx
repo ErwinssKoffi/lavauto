@@ -165,7 +165,7 @@ export function ThemePicker() {
           )}
 
           <p className="mt-2 border-t border-base-300 px-2 pt-2 text-[10px] leading-relaxed text-base-content/60">
-            Le choix est enregistré dans ce navigateur. La bascule rapide (soleil / lune) revient aux thèmes WashGuard.
+            Le choix est enregistré dans ce navigateur. La bascule rapide (soleil / lune) alterne entre votre dernier thème clair et votre dernier thème sombre.
           </p>
         </div>
       )}

@@ -90,8 +90,8 @@
 | --- | --- |
 | `npm run typecheck` | ✅ 0 erreur |
 | `npm run lint` | ✅ 26 règles |
-| `npm run check` | ✅ 254 OK / 0 KO |
-| `npm run test:unit` | ✅ 291 tests / 35 fichiers |
+| `npm run check` | ✅ 259 OK / 0 KO |
+| `npm run test:unit` | ✅ 292 tests / 35 fichiers |
 | `npm run build` | ✅ build Vite + PWA |
 
 ## 8. Différences visuelles connues (assumées)
@@ -162,8 +162,8 @@ Trois ajustements restent **hors couche** (donc prioritaires sur la couche `util
 | --- | --- |
 | `npm run typecheck` | ✅ 0 erreur |
 | `npm run lint` | ✅ 26 règles |
-| `npm run check` | ✅ 254 OK / 0 KO |
-| `npm run test:unit` | ✅ 291 tests / 35 fichiers |
+| `npm run check` | ✅ 259 OK / 0 KO |
+| `npm run test:unit` | ✅ 292 tests / 35 fichiers |
 | `npm run build` | ✅ Vite + PWA · CSS 192,3 kB / gzip 30,2 kB |
 
 
@@ -257,8 +257,24 @@ Le thème par défaut est **cupcake** (thème intégré DaisyUI), appliqué part
 | `meta theme-color` | `#080f1d` | `#faf7f5` (puis mis à jour dynamiquement) |
 | Vitrine (`Landing`) | racine épinglée `data-theme="washguard-dark"`, ~150 lignes `slate`/`sky` | tokens DaisyUI, dégradés photo en `neutral` + `neutral-content` |
 | Auth (`AuthLayout` + `pages/auth/*`) | racine épinglée `data-theme="washguard"`, `bg-white text-slate-900` | `bg-base-100 text-base-content`, panneau photo `neutral/95 → neutral/50` |
-| Bascule rapide | `washguard` ↔ `washguard-dark` via `DEFAULT_THEME` | `washguard` ↔ `washguard-dark` explicite (ne repasse plus par `DEFAULT_THEME`) |
+| Bascule rapide | `washguard` ↔ `washguard-dark` via `DEFAULT_THEME` | **dernier thème clair ↔ dernier thème sombre** (`cupcake` ↔ `dim` par défaut), mémorisés dans `washguard.theme.light` / `.dark` |
 
 Le sélecteur conserve les 37 thèmes : un utilisateur qui préfère l'ancien look choisit `WashGuard sombre` dans le menu, et ce choix est persisté.
 
 Conséquences vérifiées : `:where(:root),[data-theme=cupcake]{…}`, repli `prefers-color-scheme` sur cupcake, 37 thèmes compilés, CSS 188,6 kB (29,0 kB gzip) — plus léger qu'avant, la vitrine n'ayant plus de variantes sombres codées en dur.
+
+
+---
+
+## 16. Bascule rapide clair / sombre (cupcake ↔ dim)
+
+L'icône soleil/lune de la topbar n'impose plus la palette bleu nuit de la marque : elle alterne entre les **deux derniers thèmes utilisés**, un clair et un sombre.
+
+| Élément | Comportement |
+| --- | --- |
+| Valeurs par défaut | `DEFAULT_LIGHT_THEME = 'cupcake'`, `DEFAULT_DARK_THEME = 'dim'` |
+| Mémoire | `washguard.theme.light` et `washguard.theme.dark`, relus au montage et validés par `isKnownTheme` + `themeScheme` |
+| Choix explicite | `setTheme('dracula')` mémorise `dracula` comme pendant sombre ; le soleil ramène au clair mémorisé, la lune revient à `dracula` |
+| Cohérence | la bascule ne change jamais de schéma sans changer de thème, et le thème courant reste persisté dans `washguard.theme.name` |
+
+Vérifié par cinq contrôles JSDOM (« bascule rapide ») : `cupcake → dim`, retour `dim → cupcake`, mémorisation de `dracula`, puis `dracula → cupcake → dracula`.

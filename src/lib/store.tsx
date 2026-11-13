@@ -8,7 +8,7 @@ import type {
 } from '../types';
 import { ApiError, PAY_METHOD_DB_KEY } from '../types';
 import { canTransitionWash, normalizeWashes, washEvent } from './washLifecycle';
-import { DEFAULT_THEME, isKnownTheme, themeScheme } from './themes';
+import { DEFAULT_DARK_THEME, DEFAULT_LIGHT_THEME, DEFAULT_THEME, isKnownTheme, themeScheme } from './themes';
 import { mapCatalogToState } from './catalog';
 import { theoreticalCash } from './metrics';
 import {
@@ -1115,17 +1115,53 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
   }, [adapter, serverSubscription, authReady, identity?.isPlatformAdmin, beginRequest]);
 
-  const setTheme = useCallback((name: string) => {
+  // Paire clair/sombre mémorisée : la bascule rapide alterne entre les derniers
+  // thèmes clair et sombre choisis (cupcake / dim par défaut), et non plus entre
+  // les deux thèmes de la marque.
+  const themePair = useRef<{ light: string; dark: string }>({
+    light: DEFAULT_LIGHT_THEME,
+    dark: DEFAULT_DARK_THEME,
+  });
+
+  const rememberTheme = useCallback((name: string) => {
     if (!isKnownTheme(name)) return;
-    setThemeName(name);
+    const scheme = themeScheme(name);
+    themePair.current = { ...themePair.current, [scheme]: name };
+    try {
+      localStorage.setItem(`washguard.theme.${scheme}`, name);
+    } catch { /* préférence facultative */ }
   }, []);
 
-  // Bascule rapide : uniquement entre les deux thèmes WashGuard, quelle que
-  // soit la palette exotique éventuellement sélectionnée.
+  // Amorce la paire clair/sombre depuis le stockage, et enregistre le thème
+  // courant : la bascule est correcte dès le premier clic, même après
+  // rechargement (le thème initial est déjà lu dans `useState`).
+  useEffect(() => {
+    const stored = (key: string, fallback: string, scheme: 'light' | 'dark') => {
+      try {
+        const value = localStorage.getItem(key);
+        return isKnownTheme(value) && themeScheme(value) === scheme ? value : fallback;
+      } catch { return fallback; }
+    };
+    themePair.current = {
+      light: stored('washguard.theme.light', DEFAULT_LIGHT_THEME, 'light'),
+      dark: stored('washguard.theme.dark', DEFAULT_DARK_THEME, 'dark'),
+    };
+    rememberTheme(themeName);
+  }, [rememberTheme, themeName]);
+
+  const setTheme = useCallback((name: string) => {
+    if (!isKnownTheme(name)) return;
+    rememberTheme(name);
+    setThemeName(name);
+  }, [rememberTheme]);
+
+  // Bascule rapide clair/sombre : elle revient au dernier thème clair (ou
+  // sombre) utilisé, avec cupcake / dim comme valeurs par défaut.
   const toggleTheme = useCallback(() => {
-    // Bascule rapide clair/sombre : elle reste sur la paire de la marque, quel
-    // que soit le thème choisi par ailleurs (cupcake par défaut).
-    setThemeName((current) => (themeScheme(current) === 'dark' ? 'washguard' : 'washguard-dark'));
+    setThemeName((current) => {
+      const target = themeScheme(current) === 'dark' ? themePair.current.light : themePair.current.dark;
+      return isKnownTheme(target) ? target : DEFAULT_THEME;
+    });
   }, []);
 
   // Persistance + application au document. `data-theme` est la source de vérité

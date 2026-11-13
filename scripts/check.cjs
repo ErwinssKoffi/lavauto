@@ -541,7 +541,8 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     return names.length === installed.length + 2 &&
       installed.every((name) => names.includes(name)) &&
       names.includes('washguard') && names.includes('washguard-dark') &&
-      themesSrc.includes("export const DEFAULT_THEME = 'cupcake'") &&
+      themesSrc.includes("export const DEFAULT_LIGHT_THEME = 'cupcake'") &&
+      themesSrc.includes('export const DEFAULT_DARK_THEME = \'dim\'') &&
       shellSrc.includes('<ThemePicker />') &&
       read('src/lib/store.tsx').includes("localStorage.setItem('washguard.theme.name'") &&
       html.includes("localStorage.getItem('washguard.theme.name')");
@@ -690,6 +691,42 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
       check('sélecteur de thème : retour immédiat au thème WashGuard clair',
         w.document.documentElement.getAttribute('data-theme') === 'washguard' &&
         !w.document.documentElement.classList.contains('dark'));
+    }
+    dom.window.close();
+  }
+  {
+    const { dom, w } = makeDom('/app/tableau-de-bord', base());
+    await mount(acode, w);
+    const click = (el) => el.dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true, view: w }));
+    const toggle = () => w.document.querySelector('button[aria-label="Basculer clair / sombre"]');
+    const themeNow = () => w.document.documentElement.getAttribute('data-theme');
+    check('bascule rapide : bouton présent', Boolean(toggle()));
+    if (toggle()) {
+      click(toggle());
+      await wait(140);
+      check('bascule rapide : cupcake → dim (pendant sombre pastel)',
+        themeNow() === 'dim' && w.document.documentElement.classList.contains('dark') &&
+        w.localStorage.getItem('washguard.theme.name') === 'dim' &&
+        w.localStorage.getItem('washguard.theme.dark') === 'dim',
+        String(themeNow()));
+      click(toggle());
+      await wait(140);
+      check('bascule rapide : retour au thème clair mémorisé (cupcake)',
+        themeNow() === 'cupcake' && !w.document.documentElement.classList.contains('dark') &&
+        w.localStorage.getItem('washguard.theme.light') === 'cupcake',
+        String(themeNow()));
+      // Un thème sombre choisi dans le menu devient le pendant de la bascule.
+      click(w.document.querySelector('button[aria-label="Choisir un thème"]'));
+      await wait(120);
+      const dracula = [...w.document.querySelectorAll('button[data-theme]')].find((r) => r.getAttribute('data-theme') === 'dracula');
+      if (dracula) click(dracula);
+      await wait(140);
+      click(toggle());
+      await wait(140);
+      check('bascule rapide : retour au thème clair (cupcake) depuis dracula', themeNow() === 'cupcake', String(themeNow()));
+      click(toggle());
+      await wait(140);
+      check('bascule rapide : mémorise le dernier thème sombre choisi (dracula)', themeNow() === 'dracula', String(themeNow()));
     }
     dom.window.close();
   }

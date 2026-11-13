@@ -60,7 +60,15 @@ export const DAISY_THEMES: ThemeOption[] = [
 
 export const THEME_OPTIONS: ThemeOption[] = [...WASHGUARD_THEMES, ...DAISY_THEMES];
 
-export const DEFAULT_THEME = 'cupcake';
+/**
+ * Thème appliqué au premier lancement : `cupcake`.
+ * `DEFAULT_DARK_THEME` est le pendant sombre de la bascule rapide soleil/lune
+ * (l'esthétique pastel est conservée en mode sombre, plutôt que de revenir à la
+ * palette bleu nuit de la marque).
+ */
+export const DEFAULT_LIGHT_THEME = 'cupcake';
+export const DEFAULT_DARK_THEME = 'dim';
+export const DEFAULT_THEME = DEFAULT_LIGHT_THEME;
 
 const BY_NAME = new Map(THEME_OPTIONS.map((t) => [t.name, t]));
 
