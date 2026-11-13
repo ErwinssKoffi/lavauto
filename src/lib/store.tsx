@@ -8,7 +8,7 @@ import type {
 } from '../types';
 import { ApiError, PAY_METHOD_DB_KEY } from '../types';
 import { canTransitionWash, normalizeWashes, washEvent } from './washLifecycle';
-import { DEFAULT_DARK_THEME, DEFAULT_LIGHT_THEME, DEFAULT_THEME, isKnownTheme, themeScheme } from './themes';
+import { DEFAULT_DARK_THEME, DEFAULT_LIGHT_THEME, DEFAULT_THEME, THEME_PREFERENCE_VERSION, isKnownTheme, themeScheme } from './themes';
 import { mapCatalogToState } from './catalog';
 import { theoreticalCash } from './metrics';
 import {
@@ -578,7 +578,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [themeName, setThemeName] = useState<string>(() => {
     try {
       const savedName = localStorage.getItem('washguard.theme.name');
-      return isKnownTheme(savedName) ? savedName : DEFAULT_THEME;
+      // Une préférence enregistrée par une génération antérieure (avant le
+      // passage à cupcake) est ignorée une seule fois.
+      const versioned = localStorage.getItem('washguard.theme.v') === THEME_PREFERENCE_VERSION;
+      return versioned && isKnownTheme(savedName) ? savedName : DEFAULT_THEME;
     } catch { return DEFAULT_THEME; }
   });
   const theme = themeScheme(themeName);
@@ -1174,6 +1177,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.setItem('washguard.theme.name', themeName);
       localStorage.setItem('washguard.theme', scheme);
+      localStorage.setItem('washguard.theme.v', THEME_PREFERENCE_VERSION);
     } catch { /* préférence facultative */ }
     // La barre du navigateur mobile (et l'écran de démarrage PWA) suivent le
     // thème actif : on recopie `base-100` dans la balise `theme-color`.

@@ -90,7 +90,7 @@
 | --- | --- |
 | `npm run typecheck` | ✅ 0 erreur |
 | `npm run lint` | ✅ 26 règles |
-| `npm run check` | ✅ 259 OK / 0 KO |
+| `npm run check` | ✅ 263 OK / 0 KO |
 | `npm run test:unit` | ✅ 292 tests / 35 fichiers |
 | `npm run build` | ✅ build Vite + PWA |
 
@@ -162,7 +162,7 @@ Trois ajustements restent **hors couche** (donc prioritaires sur la couche `util
 | --- | --- |
 | `npm run typecheck` | ✅ 0 erreur |
 | `npm run lint` | ✅ 26 règles |
-| `npm run check` | ✅ 259 OK / 0 KO |
+| `npm run check` | ✅ 263 OK / 0 KO |
 | `npm run test:unit` | ✅ 292 tests / 35 fichiers |
 | `npm run build` | ✅ Vite + PWA · CSS 192,3 kB / gzip 30,2 kB |
 
@@ -278,3 +278,20 @@ L'icône soleil/lune de la topbar n'impose plus la palette bleu nuit de la marqu
 | Cohérence | la bascule ne change jamais de schéma sans changer de thème, et le thème courant reste persisté dans `washguard.theme.name` |
 
 Vérifié par cinq contrôles JSDOM (« bascule rapide ») : `cupcake → dim`, retour `dim → cupcake`, mémorisation de `dracula`, puis `dracula → cupcake → dracula`.
+
+
+---
+
+## 17. Migration des préférences : `washguard.theme.v`
+
+Un navigateur qui avait déjà choisi un thème (ou l'ancien réglage `dark`) aurait conservé sa préférence et n'aurait **jamais** vu cupcake. La préférence est donc versionnée :
+
+| Clé | Rôle |
+| --- | --- |
+| `washguard.theme.v` | version du format (`'2'` = génération cupcake), écrite à chaque application de thème |
+| `washguard.theme.name` | thème exact, **lu seulement** si la version correspond |
+| `washguard.theme.light` / `.dark` | paire de la bascule rapide |
+
+Au premier chargement de cette génération, toute préférence sans version est ignorée : l'application démarre sur cupcake, réécrit `washguard.theme.name` et `washguard.theme.v`, puis respecte à nouveau les choix de l'utilisateur. La constante `THEME_PREFERENCE_VERSION` (dans `src/lib/themes.ts`) et la valeur du script inline de `index.html` sont comparées par `npm run check`.
+
+Trois contrôles JSDOM couvrent le cas : ancienne préférence (`washguard.theme.name = washguard-dark`, sans version) → cupcake ; réécriture de la version ; préférence versionnée (`nord`) → respectée.

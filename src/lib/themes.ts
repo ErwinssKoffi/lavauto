@@ -70,6 +70,17 @@ export const DEFAULT_LIGHT_THEME = 'cupcake';
 export const DEFAULT_DARK_THEME = 'dim';
 export const DEFAULT_THEME = DEFAULT_LIGHT_THEME;
 
+/**
+ * Version du format de préférence enregistrée.
+ *
+ * Incrémenter invalide les thèmes mémorisés par les versions précédentes : au
+ * premier chargement de cette génération, l'application repart donc sur
+ * `DEFAULT_THEME` (cupcake), puis les choix de l'utilisateur sont de nouveau
+ * respectés. La même valeur est vérifiée dans le script inline de `index.html`
+ * et par `npm run check`.
+ */
+export const THEME_PREFERENCE_VERSION = '2';
+
 const BY_NAME = new Map(THEME_OPTIONS.map((t) => [t.name, t]));
 
 export function isKnownTheme(name: string | null | undefined): name is string {

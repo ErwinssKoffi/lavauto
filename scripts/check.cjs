@@ -420,6 +420,13 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     fs.existsSync(path.join(ROOT, 'src/pages/auth/ForgotPassword.tsx')) &&
     fs.existsSync(path.join(ROOT, 'src/pages/auth/ResetPassword.tsx')));
   check('langue fr + devise FCFA', html.includes('lang="fr"') && read('src/lib/format.ts').includes('FCFA'));
+  check('préférence de thème versionnée : les anciens choix ne bloquent plus cupcake', (() => {
+    const version = (read('src/lib/themes.ts').match(/THEME_PREFERENCE_VERSION = '([^']+)'/) || [])[1];
+    return Boolean(version) &&
+      read('src/lib/store.tsx').includes("localStorage.getItem('washguard.theme.v') === THEME_PREFERENCE_VERSION") &&
+      read('src/lib/store.tsx').includes("localStorage.setItem('washguard.theme.v', THEME_PREFERENCE_VERSION)") &&
+      html.includes(`localStorage.getItem('washguard.theme.v') === '${version}'`);
+  })());
   check('thème cupcake par défaut, appliqué avant le premier rendu', html.includes('data-theme="cupcake"') && html.includes("'cupcake'") && !html.includes('data-theme="washguard-dark"') && read('src/index.css').includes('@plugin "daisyui/theme"') && read('src/main.tsx').includes("washguard.theme"));
   check('photo unique pour les écrans auth', read('src/pages/auth/AuthLayout.tsx').includes('/images/lav-auto.jpeg') && fs.existsSync(path.join(ROOT,'public/images/lav-auto.jpeg')));
   check('client Supabase prêt, non branché', read('src/lib/supabase.ts').includes('isSupabaseConfigured') && fs.existsSync(path.join(ROOT,'.env.example')));
@@ -692,6 +699,32 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
         w.document.documentElement.getAttribute('data-theme') === 'washguard' &&
         !w.document.documentElement.classList.contains('dark'));
     }
+    dom.window.close();
+  }
+  {
+    // Préférence enregistrée par une génération antérieure (sans version) :
+    // elle doit être ignorée pour que cupcake s'applique enfin partout.
+    const { dom, w } = makeDom('/app/tableau-de-bord', base());
+    w.localStorage.setItem('washguard.theme.name', 'washguard-dark');
+    await mount(acode, w);
+    check('ancienne préférence de thème ignorée au profit de cupcake',
+      w.document.documentElement.getAttribute('data-theme') === 'cupcake',
+      String(w.document.documentElement.getAttribute('data-theme')));
+    check('préférence de thème réécrite à la version courante',
+      w.localStorage.getItem('washguard.theme.v') === '2' &&
+      w.localStorage.getItem('washguard.theme.name') === 'cupcake',
+      String(w.localStorage.getItem('washguard.theme.name')));
+    dom.window.close();
+  }
+  {
+    // Préférence versionnée : le choix explicite de l'utilisateur est respecté.
+    const { dom, w } = makeDom('/app/tableau-de-bord', base());
+    w.localStorage.setItem('washguard.theme.v', '2');
+    w.localStorage.setItem('washguard.theme.name', 'nord');
+    await mount(acode, w);
+    check('préférence de thème versionnée respectée (nord)',
+      w.document.documentElement.getAttribute('data-theme') === 'nord',
+      String(w.document.documentElement.getAttribute('data-theme')));
     dom.window.close();
   }
   {

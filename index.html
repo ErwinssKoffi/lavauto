@@ -22,7 +22,10 @@
         try {
           var name = localStorage.getItem('washguard.theme.name');
           var scheme = localStorage.getItem('washguard.theme');
-          var known = typeof name === 'string' && /^[a-z0-9-]+$/.test(name);
+          // Version de préférence (voir THEME_PREFERENCE_VERSION) : les thèmes
+          // mémorisés avant le passage à cupcake sont ignorés une seule fois.
+          var versioned = localStorage.getItem('washguard.theme.v') === '2';
+          var known = versioned && typeof name === 'string' && /^[a-z0-9-]+$/.test(name);
           document.documentElement.setAttribute('data-theme', known ? name : 'cupcake');
           // La classe `dark` est conservée pour compatibilité (scrollbars, tiers).
           document.documentElement.classList.toggle('dark', scheme === 'dark');
