@@ -87,8 +87,29 @@ async function initSchema(db: PGlite): Promise<void> {
       token_hash TEXT UNIQUE NOT NULL,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       expires_at TIMESTAMPTZ NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      user_agent TEXT NOT NULL DEFAULT '',
+      ip_address TEXT NOT NULL DEFAULT '',
+      remember_me BOOLEAN NOT NULL DEFAULT TRUE
+    );
+
+    -- Journal d'authentification : succès, refus, déconnexions, changements de
+    -- mot de passe. Jamais de mot de passe ni de jeton en clair.
+    CREATE TABLE IF NOT EXISTS auth_events (
+      id TEXT PRIMARY KEY,
+      user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      email TEXT NOT NULL DEFAULT '',
+      event TEXT NOT NULL,
+      detail TEXT NOT NULL DEFAULT '',
+      ip_address TEXT NOT NULL DEFAULT '',
+      user_agent TEXT NOT NULL DEFAULT '',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    CREATE INDEX IF NOT EXISTS ix_auth_events_user_created ON auth_events (user_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS ix_sessions_user ON sessions (user_id);
+    CREATE INDEX IF NOT EXISTS ix_sessions_expires ON sessions (expires_at);
 
     CREATE TABLE IF NOT EXISTS action_tokens (
       id TEXT PRIMARY KEY,
@@ -167,6 +188,15 @@ async function initSchema(db: PGlite): Promise<void> {
       user_id TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `);
+
+  // Compatibilité ascendante : une base créée avant l'ajout des colonnes de
+  // session reste lisible (aucune donnée détruite, aucun backfill inventé).
+  await db.exec(`
+    ALTER TABLE sessions ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+    ALTER TABLE sessions ADD COLUMN IF NOT EXISTS user_agent TEXT NOT NULL DEFAULT '';
+    ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ip_address TEXT NOT NULL DEFAULT '';
+    ALTER TABLE sessions ADD COLUMN IF NOT EXISTS remember_me BOOLEAN NOT NULL DEFAULT TRUE;
   `);
 
   // Seed default plans catalog only (pricing reference, zero fake tenant/operational data)

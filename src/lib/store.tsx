@@ -73,7 +73,9 @@ import {
   type DataAdapter, type DataSource, type PlanLimitPayload, type PlanPayload, type StationSetupSnapshot,
 } from '../services/adapters/DataAdapter';
 import { getAuthPort } from '../services/auth/getAuthPort';
-import type { AuthPort, AuthResult, AuthChange } from '../services/auth/AuthPort';
+import type {
+  AuthActivityEntry, AuthPort, AuthResult, AuthChange, ResetTokenInspection, SecuritySession,
+} from '../services/auth/AuthPort';
 import {
   mapIdentityToAppState, type AuthIdentity, type Invitation, type InvitePayload,
   type SignUpPayload, type UpdateUserPayload,
@@ -353,6 +355,14 @@ interface Ctx {
   signOut: () => Promise<void>;
   requestPasswordReset: (email: string) => Promise<{ resetUrl?: string; demoMode?: boolean } | void>;
   updatePassword: (password: string, token?: string) => Promise<void>;
+  verifyResetToken: (token: string) => Promise<ResetTokenInspection>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<{ revoked: number }>;
+  listSessions: () => Promise<SecuritySession[]>;
+  revokeSession: (sessionId: string) => Promise<{ signedOut: boolean }>;
+  revokeOtherSessions: () => Promise<number>;
+  listAuthActivity: (limit?: number) => Promise<AuthActivityEntry[]>;
+  confirmEmail: (token: string) => Promise<void>;
+  resendConfirmation: (email: string) => Promise<{ confirmUrl?: string; linkExposed?: boolean }>;
   inviteUser: (p: InvitePayload) => Promise<{ id: string; message?: string; inviteUrl?: string }>;
   revokeInvitation: (id: string) => Promise<void>;
   updateUser: (p: UpdateUserPayload) => Promise<void>;
@@ -1755,6 +1765,23 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     await authPort.updatePassword(password, token);
     setAuthRecovery(false);
   }, [authPort]);
+
+  const verifyResetToken = useCallback((token: string) => authPort.verifyResetToken(token), [authPort]);
+
+  const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
+    const result = await authPort.changePassword(currentPassword, newPassword);
+    notify('success', result.revoked > 0
+      ? `Mot de passe mis à jour. ${result.revoked} autre(s) session(s) fermée(s).`
+      : 'Mot de passe mis à jour.');
+    return result;
+  }, [authPort, notify]);
+
+  const listSessions = useCallback(() => authPort.listSessions(), [authPort]);
+  const revokeSession = useCallback((sessionId: string) => authPort.revokeSession(sessionId), [authPort]);
+  const revokeOtherSessions = useCallback(() => authPort.revokeOtherSessions(), [authPort]);
+  const listAuthActivity = useCallback((limit?: number) => authPort.listAuthActivity(limit), [authPort]);
+  const confirmEmail = useCallback((token: string) => authPort.confirmEmail(token), [authPort]);
+  const resendConfirmation = useCallback((email: string) => authPort.resendConfirmation(email), [authPort]);
 
   const refreshEmployeeData = useCallback(async (): Promise<void> => {
     const generation = authGenerationRef.current;
@@ -3208,6 +3235,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       (u.stationIds?.length ? u.stationIds.includes(state.station?.id ?? '') : !u.stationId || u.stationId === state.station?.id)),
     stationMetrics, stationMetricsError, refreshStationMetrics,
     signUp, signIn, signOut, requestPasswordReset, updatePassword,
+    verifyResetToken, changePassword, listSessions, revokeSession, revokeOtherSessions,
+    listAuthActivity, confirmEmail, resendConfirmation,
     inviteUser: inviteWithQuota, revokeInvitation: scopedWrite(revokeInvitation), updateUser: updateUserWithQuota, refreshUsers, refreshInvitations,
     employeeReadWarning, unconfirmedInvitation, unconfirmedAccountUpdate, unconfirmedRevocation, revocationRecoveryLoading, revocationRecoveryError, refreshEmployeeData,
     setupStatus, setupError, refreshSetup,

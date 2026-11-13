@@ -2,7 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { AppUser } from '../../types';
 import { ApiError } from '../../types';
 import type {
-  AuthChange, AuthEvent, AuthPort, AuthResult, AuthSubscription,
+  AuthActivityEntry, AuthChange, AuthEvent, AuthPort, AuthResult, AuthSubscription,
+  ResetTokenInspection, SecuritySession,
 } from './AuthPort';
 import {
   mapCompanyUsers, mapInvitations, mapMyContext, uiRoleToDb,
@@ -94,6 +95,8 @@ export interface AuthSupabaseClient {
     signOut(options?: { scope?: 'global' | 'local' | 'others' }): Promise<{ error: SupaError }>;
     resetPasswordForEmail(email: string, options?: { redirectTo?: string }): Promise<{ error: SupaError }>;
     updateUser(attributes: { password: string }): Promise<{ error: SupaError }>;
+    /** Facultatif : absent de certains doubles de test. */
+    resend?(options: { type: 'signup'; email: string }): Promise<{ error: SupaError }>;
   };
   rpc(name: string, args?: Record<string, unknown>): Promise<{ data: unknown; error: SupaError }>;
   functions: {
@@ -403,6 +406,65 @@ export class SupabaseAuthAdapter implements AuthPort {
       }
       throw new ApiError('update_unconfirmed', accountUpdateUnconfirmed);
     }
+  }
+
+  /**
+   * Changement de mot de passe du compte connecté : Supabase Auth vérifie la
+   * session, l'ancien mot de passe n'est pas redemandé par le fournisseur.
+   */
+  async changePassword(_currentPassword: string, newPassword: string): Promise<{ revoked: number }> {
+    const client = asClient(this.client);
+    const { error } = await client.auth.updateUser({ password: newPassword });
+    if (error) throw toApiError(error, 'password_update_failed');
+    let revoked = 0;
+    try {
+      const others = await client.auth.signOut({ scope: 'others' });
+      if (!others.error) revoked = -1;
+    } catch {
+      // La déconnexion des autres appareils reste facultative : ne pas laisser
+      // croire qu'elle a réussi.
+      revoked = 0;
+    }
+    return { revoked };
+  }
+
+  /** `supabase-js` n'expose pas la liste des sessions : l'UI l'annonce. */
+  async listSessions(): Promise<SecuritySession[]> {
+    return [];
+  }
+
+  async revokeSession(_sessionId: string): Promise<{ signedOut: boolean }> {
+    throw new ApiError('not_supported', 'La révocation d’une session précise n’est pas exposée par Supabase Auth.');
+  }
+
+  async revokeOtherSessions(): Promise<number> {
+    const client = asClient(this.client);
+    const { error } = await client.auth.signOut({ scope: 'others' });
+    if (error) throw toApiError(error, 'signout_failed');
+    return -1;
+  }
+
+  async verifyResetToken(_token: string): Promise<ResetTokenInspection> {
+    // Le lien est vérifié par Supabase Auth lui-même à l'ouverture.
+    return { valid: false, expiresAt: null };
+  }
+
+  async listAuthActivity(_limit = 20): Promise<AuthActivityEntry[]> {
+    return [];
+  }
+
+  async confirmEmail(_token: string): Promise<void> {
+    throw new ApiError('not_supported', 'La confirmation est gérée par le lien envoyé par Supabase Auth.');
+  }
+
+  async resendConfirmation(email: string): Promise<{ confirmUrl?: string; linkExposed?: boolean }> {
+    const client = asClient(this.client);
+    if (typeof client.auth.resend !== 'function') {
+      throw new ApiError('not_supported', 'Le renvoi de confirmation n’est pas disponible avec ce client.');
+    }
+    const { error } = await client.auth.resend({ type: 'signup', email });
+    if (error) throw toApiError(error, 'confirmation_failed');
+    return { linkExposed: false };
   }
 
   async refreshUsers(): Promise<AppUser[]> {

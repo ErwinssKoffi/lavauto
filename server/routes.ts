@@ -4,17 +4,28 @@ import { getDb, getDatabaseStatus } from './db';
 import {
   attachIdentity,
   clearSessionCookie,
+  clientIp,
+  consumeActionToken,
+  describeUserAgent,
   createActionToken,
   createSessionForUser,
   hashPassword,
-  hashToken,
+  inspectActionToken,
+  listUserSessions,
+  recordAuthEvent,
+  requestMeta,
   requireAuth,
   requirePermission,
+  revokeUserSession,
+  revokeUserSessions,
   roleToDbKey,
   setSessionCookie,
   verifyPassword,
   type AuthedRequest,
+  type AuthEventName,
 } from './auth';
+import { consume as consumeRateLimit, POLICIES, rateLimitMessage, reset as resetRateLimit } from './rateLimit';
+import { emailIssue, passwordIssue, phoneIssue } from '../src/lib/passwordPolicy';
 import {
   ANALYTICS_RULES,
   emptyProfitability,
@@ -147,14 +158,12 @@ import {
 } from '../src/types';
 
 /**
- * Le renvoi du lien de réinitialisation dans la réponse HTTP est une commodité
- * de DÉMONSTRATION (aucun e-mail n'est envoyé par ce serveur). Il est désactivé
- * par défaut et interdit en production : sans lui, un appelant anonyme ne peut
- * plus réinitialiser le mot de passe d'un tiers et prendre le contrôle du compte.
+ * Les liens d'authentification ne sont renvoyés dans la réponse HTTP qu'en
+ * dehors de la production, ou sur activation explicite. Un vrai expéditeur
+ * d'e-mail reste requis pour un déploiement réel.
  */
-function demoResetEnabled(): boolean {
-  return process.env.WASHGUARD_DEMO_RESET === '1' && process.env.NODE_ENV !== 'production';
-}
+const authLinksExposed = process.env.NODE_ENV !== 'production'
+  || process.env.WASHGUARD_EXPOSE_AUTH_LINKS === '1';
 
 // ─── Per-company async serialization mutex ───────────────────────────────────
 const companyLocks = new Map<string, Promise<unknown>>();
@@ -795,7 +804,7 @@ export function createApiRouter(): express.Router {
       service: 'washguard-api',
       time: new Date().toISOString(),
       database: status,
-      demoReset: demoResetEnabled(),
+      authLinksExposed,
     });
   }));
 
@@ -805,6 +814,50 @@ export function createApiRouter(): express.Router {
   }));
 
   // ─── Auth endpoints ────────────────────────────────────────────────────────
+  // Règles communes : la validation est faite ici, jamais uniquement dans le
+  // navigateur ; les compteurs protègent la connexion ; chaque tentative est
+  // journalisée sans secret ; aucun message ne révèle l'existence d'un compte.
+  const emailConfirmationRequired = process.env.WASHGUARD_REQUIRE_EMAIL_CONFIRMATION === '1';
+  const PLANS_AT_SIGNUP = new Set(['essai', 'standard', 'premium']);
+
+  const enforceLimit = (
+    req: Request,
+    res: Response,
+    scope: 'signin' | 'signup' | 'reset' | 'token',
+    serverKey: string,
+    policy: { limit: number; windowMs: number },
+    email = '',
+  ): void => {
+    const result = consumeRateLimit(serverKey, policy);
+    if (result.allowed) return;
+    res.setHeader('Retry-After', String(result.retryAfterSeconds));
+    void recordAuthEvent({
+      email,
+      event: 'rate_limited',
+      detail: `${scope} · ${serverKey.split(':')[0]}`,
+      ...requestMeta(req),
+    });
+    throw new HttpError(429, 'rate_limited', rateLimitMessage(scope, result.retryAfterSeconds));
+  };
+
+  const audit = (req: Request, event: AuthEventName, entry: { userId?: string | null; email?: string; detail?: string } = {}) =>
+    recordAuthEvent({ ...entry, event, ...requestMeta(req) });
+
+  const publicBaseUrl = (req: Request): string => {
+    const configured = process.env.WASHGUARD_PUBLIC_URL?.trim().replace(/\/$/, '');
+    if (configured) return configured;
+    const forwardedProto = String(req.headers['x-forwarded-proto'] ?? '').split(',')[0]?.trim();
+    const forwardedHost = String(req.headers['x-forwarded-host'] ?? '').split(',')[0]?.trim();
+    const proto = forwardedProto || req.protocol || 'http';
+    const host = forwardedHost || req.get('host') || 'localhost:3000';
+    return `${proto}://${host}`;
+  };
+
+  const sessionPayload = (created: { expiresAt: string; rememberMe: boolean }) => ({
+    expiresAt: created.expiresAt,
+    rememberMe: created.rememberMe,
+  });
+
   router.post('/auth/signup', wrap(async (req, res) => {
     const body = req.body as Record<string, unknown>;
     const companyName = String(body.companyName ?? '').trim();
@@ -814,22 +867,32 @@ export function createApiRouter(): express.Router {
     const ownerName = String(body.ownerName ?? '').trim();
     const email = String(body.email ?? '').trim().toLowerCase();
     const password = String(body.password ?? '');
-    const requestedPlanId = String(body.requestedPlanId ?? 'essai').trim();
+    const requestedPlanIdRaw = String(body.requestedPlanId ?? 'essai').trim();
+    const requestedPlanId = PLANS_AT_SIGNUP.has(requestedPlanIdRaw) ? requestedPlanIdRaw : 'essai';
 
-    if (companyName.length < 2 || stationName.length < 2 || ownerName.length < 2) {
-      throw new HttpError(400, 'invalid_form', 'Renseignez le nom de l’entreprise, de la station et votre nom.');
+    enforceLimit(req, res, 'signup', `signup:ip:${clientIp(req)}`, POLICIES.signUpPerIp, email);
+
+    if (companyName.length < 2 || companyName.length > 120 || stationName.length < 2 || stationName.length > 120) {
+      throw new HttpError(400, 'invalid_form', 'Renseignez le nom de l’entreprise et de la station (2 à 120 caractères).');
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      throw new HttpError(400, 'invalid_email', 'Adresse e-mail invalide.');
+    if (ownerName.length < 2 || ownerName.length > 120) {
+      throw new HttpError(400, 'invalid_form', 'Renseignez votre nom complet (2 à 120 caractères).');
     }
-    if (password.length < 8) {
-      throw new HttpError(400, 'weak_password', 'Le mot de passe doit contenir au moins 8 caractères.');
-    }
+    const emailProblem = emailIssue(email);
+    if (emailProblem) throw new HttpError(400, 'invalid_email', emailProblem);
+    const phoneProblem = phoneIssue(phone);
+    if (phoneProblem) throw new HttpError(400, 'invalid_phone', phoneProblem);
+    const passwordProblem = passwordIssue(password, email);
+    if (passwordProblem) throw new HttpError(400, 'weak_password', passwordProblem);
 
     const db = await getDb();
-    const dup = await db.query<{ id: string }>('SELECT id FROM users WHERE email = $1', [email]);
+    const dup = await db.query<{ id: string; email_confirmed: boolean }>(
+      'SELECT id, email_confirmed FROM users WHERE email = $1',
+      [email],
+    );
     if (dup.rows.length > 0) {
-      throw new HttpError(409, 'email_in_use', 'Un compte utilise déjà cette adresse e-mail.');
+      await audit(req, 'signup', { email, detail: 'refusé : e-mail déjà utilisé' });
+      throw new HttpError(409, 'email_in_use', 'Un compte utilise déjà cette adresse e-mail. Connectez-vous ou réinitialisez votre mot de passe.');
     }
 
     const companyId = crypto.randomUUID();
@@ -849,8 +912,8 @@ export function createApiRouter(): express.Router {
     );
     await db.query(
       `INSERT INTO users (id, company_id, name, email, phone, password_hash, role, active, email_confirmed)
-       VALUES ($1, $2, $3, $4, $5, $6, 'proprietaire', TRUE, TRUE)`,
-      [userId, companyId, ownerName, email, phone, hashPassword(password)],
+       VALUES ($1, $2, $3, $4, $5, $6, 'proprietaire', TRUE, $7)`,
+      [userId, companyId, ownerName, email, phone, hashPassword(password), !emailConfirmationRequired],
     );
     await db.query(
       `INSERT INTO user_stations (user_id, station_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
@@ -859,9 +922,9 @@ export function createApiRouter(): express.Router {
     await db.query(
       `INSERT INTO subscriptions (id, company_id, plan_id, status, started_at, trial_ends_at, pending_plan_id)
        VALUES ($1, $2, 'essai', 'essai', NOW(), $3::timestamptz, $4)`,
-      [crypto.randomUUID(), companyId, trialEndsAt, requestedPlanId && requestedPlanId !== 'essai' ? requestedPlanId : null],
+      [crypto.randomUUID(), companyId, trialEndsAt, requestedPlanId !== 'essai' ? requestedPlanId : null],
     );
-    if (requestedPlanId && requestedPlanId !== 'essai') {
+    if (requestedPlanId !== 'essai') {
       await db.query(
         `INSERT INTO subscription_requests (id, company_id, from_plan_id, to_plan_id, status)
          VALUES ($1, $2, 'essai', $3, 'pending')`,
@@ -874,14 +937,31 @@ export function createApiRouter(): express.Router {
     };
     await saveTenantDoc(companyId, doc);
 
-    const token = await createSessionForUser(userId);
-    setSessionCookie(res, token, true);
+    await audit(req, 'signup', { userId, email, detail: `${companyName} · formule ${requestedPlanId}` });
+
+    if (emailConfirmationRequired) {
+      const confirmToken = await createActionToken(userId, 'confirm_email', 48);
+      await audit(req, 'email_confirmation_requested', { userId, email });
+      res.status(201).json({
+        identity: null,
+        confirmationRequired: true,
+        message: 'Compte créé. Confirmez votre adresse e-mail pour ouvrir votre session.',
+        confirmUrl: authLinksExposed
+          ? `${publicBaseUrl(req)}/confirmer-email?token=${encodeURIComponent(confirmToken)}`
+          : undefined,
+      });
+      return;
+    }
+
+    const session = await createSessionForUser(userId, { ...requestMeta(req), rememberMe: true });
+    setSessionCookie(res, session.token, session.rememberMe, session.expiresAt);
     const { buildIdentityForUser } = await import('./auth');
     const identity = await buildIdentityForUser(userId);
     res.status(201).json({
       identity,
+      session: sessionPayload(session),
       confirmationRequired: false,
-      message: requestedPlanId && requestedPlanId !== 'essai'
+      message: requestedPlanId !== 'essai'
         ? 'Compte créé avec essai de 14 jours. Votre demande de formule est enregistrée.'
         : 'Compte créé et essai de 14 jours activé.',
     });
@@ -892,6 +972,13 @@ export function createApiRouter(): express.Router {
     const email = String(body.email ?? '').trim().toLowerCase();
     const password = String(body.password ?? '');
     const rememberMe = body.rememberMe !== false;
+    const ip = clientIp(req);
+
+    if (!email || !password) {
+      throw new HttpError(400, 'invalid_form', 'Renseignez votre adresse e-mail et votre mot de passe.');
+    }
+    enforceLimit(req, res, 'signin', `signin:ip:${ip}`, POLICIES.signInPerIp, email);
+    enforceLimit(req, res, 'signin', `signin:email:${email}`, POLICIES.signInPerAccount, email);
 
     const db = await getDb();
     const uRes = await db.query<{
@@ -899,109 +986,284 @@ export function createApiRouter(): express.Router {
     }>(`SELECT id, password_hash, active, email_confirmed FROM users WHERE email = $1`, [email]);
     const user = uRes.rows[0];
     if (!user || !verifyPassword(password, user.password_hash)) {
+      // Le compteur par compte n'est jamais remis à zéro par un échec : seuls
+      // une connexion réussie ou l'expiration de la fenêtre le font.
+      await audit(req, 'signin_failed', { userId: user?.id ?? null, email, detail: user ? 'mot de passe incorrect' : 'compte inconnu' });
       throw new HttpError(401, 'invalid_credentials', 'Adresse e-mail ou mot de passe incorrect.');
     }
     if (!user.active) {
+      await audit(req, 'signin_failed', { userId: user.id, email, detail: 'compte désactivé' });
       throw new HttpError(403, 'account_disabled', 'Ce compte est désactivé par l’administrateur.');
     }
+    if (emailConfirmationRequired && !user.email_confirmed) {
+      await audit(req, 'signin_failed', { userId: user.id, email, detail: 'e-mail non confirmé' });
+      throw new HttpError(403, 'email_unconfirmed', 'Confirmez votre adresse e-mail avant de vous connecter.');
+    }
 
-    const token = await createSessionForUser(user.id);
-    setSessionCookie(res, token, rememberMe);
     const { buildIdentityForUser } = await import('./auth');
+    const preIdentity = await buildIdentityForUser(user.id);
+    if (preIdentity?.company?.suspended) {
+      await audit(req, 'signin_failed', { userId: user.id, email, detail: 'entreprise suspendue' });
+      throw new HttpError(403, 'company_suspended', 'Cette entreprise est suspendue. Contactez le support WashGuard.');
+    }
+
+    resetRateLimit(`signin:email:${email}`);
+    resetRateLimit(`signin:ip:${ip}`);
+    const session = await createSessionForUser(user.id, { ...requestMeta(req), rememberMe });
+    setSessionCookie(res, session.token, session.rememberMe, session.expiresAt);
+    await audit(req, 'signin_success', { userId: user.id, email, detail: describeUserAgent(String(req.headers['user-agent'] ?? '')) });
+
     const identity = await buildIdentityForUser(user.id);
-    res.json({ identity });
+    res.json({ identity, session: sessionPayload(session) });
   }));
 
   router.post('/auth/signout', wrap(async (req, res) => {
     if (req.sessionTokenHash) {
       const db = await getDb();
       await db.query('DELETE FROM sessions WHERE token_hash = $1', [req.sessionTokenHash]);
+      if (req.identity) await audit(req, 'signout', { userId: req.identity.userId, email: req.identity.email });
     }
     clearSessionCookie(res);
     res.json({ ok: true });
   }));
 
   router.get('/auth/me', wrap(async (req, res) => {
-    res.json({ identity: req.identity ?? null });
+    res.json({
+      identity: req.identity ?? null,
+      session: req.identity
+        ? { expiresAt: req.sessionExpiresAt ?? null }
+        : null,
+      /** Jeton fourni mais expiré : l'UI peut afficher « session expirée ». */
+      expired: Boolean(req.sessionExpired),
+    });
   }));
 
+  // ─── Sessions actives ─────────────────────────────────────────────────────
+  router.get('/auth/sessions', requireAuth, wrap(async (req, res) => {
+    const id = req.identity!;
+    const sessions = await listUserSessions(id.userId, req.sessionTokenHash);
+    res.json({ sessions });
+  }));
+
+  router.post('/auth/sessions/revoke-others', requireAuth, wrap(async (req, res) => {
+    const id = req.identity!;
+    const revoked = await revokeUserSessions(id.userId, req.sessionTokenHash);
+    await audit(req, 'sessions_revoked', {
+      userId: id.userId, email: id.email, detail: `${revoked} session(s) révoquée(s)`,
+    });
+    res.json({ ok: true, revoked });
+  }));
+
+  router.post('/auth/sessions/:sessionId/revoke', requireAuth, wrap(async (req, res) => {
+    const id = req.identity!;
+    const sessionId = String(req.params.sessionId ?? '');
+    if (!sessionId) throw new HttpError(400, 'invalid_form', 'Session introuvable.');
+    const sessions = await listUserSessions(id.userId, req.sessionTokenHash);
+    const target = sessions.find((entry) => entry.id === sessionId);
+    if (!target) throw new HttpError(404, 'session_not_found', 'Cette session n’existe plus.');
+    const removed = await revokeUserSession(id.userId, sessionId);
+    if (!removed) throw new HttpError(404, 'session_not_found', 'Cette session n’existe plus.');
+    await audit(req, 'session_revoked', { userId: id.userId, email: id.email, detail: target.userAgent });
+    if (target.current) clearSessionCookie(res);
+    res.json({ ok: true, signedOut: target.current });
+  }));
+
+  // ─── Mot de passe : changement par un utilisateur connecté ────────────────
+  router.post('/auth/change-password', requireAuth, wrap(async (req, res) => {
+    const id = req.identity!;
+    const body = req.body as Record<string, unknown>;
+    const currentPassword = String(body.currentPassword ?? '');
+    const newPassword = String(body.newPassword ?? '');
+
+    const problem = passwordIssue(newPassword, id.email);
+    if (problem) throw new HttpError(400, 'weak_password', problem);
+    if (currentPassword && currentPassword === newPassword) {
+      throw new HttpError(400, 'same_password', 'Le nouveau mot de passe doit être différent de l’actuel.');
+    }
+
+    const db = await getDb();
+    const uRes = await db.query<{ password_hash: string }>('SELECT password_hash FROM users WHERE id = $1', [id.userId]);
+    const row = uRes.rows[0];
+    if (!row) throw new HttpError(404, 'user_not_found', 'Compte introuvable.');
+    if (!verifyPassword(currentPassword, row.password_hash)) {
+      await audit(req, 'password_changed', { userId: id.userId, email: id.email, detail: 'refusé : mot de passe actuel incorrect' });
+      throw new HttpError(401, 'invalid_credentials', 'Mot de passe actuel incorrect.');
+    }
+
+    await db.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hashPassword(newPassword), id.userId]);
+    // Les autres postes sont déconnectés ; la session courante reste valide.
+    const revoked = await revokeUserSessions(id.userId, req.sessionTokenHash);
+    await db.query('UPDATE action_tokens SET used_at = NOW() WHERE user_id = $1 AND used_at IS NULL', [id.userId]);
+    // Un mot de passe changé ne doit pas rester bloqué par les échecs passés.
+    resetRateLimit(`signin:email:${id.email.trim().toLowerCase()}`);
+    await audit(req, 'password_changed', {
+      userId: id.userId, email: id.email, detail: `${revoked} autre(s) session(s) fermée(s)`,
+    });
+    res.json({ ok: true, revoked });
+  }));
+
+  // ─── Mot de passe oublié ──────────────────────────────────────────────────
   router.post('/auth/forgot-password', wrap(async (req, res) => {
     const email = String((req.body as Record<string, unknown>).email ?? '').trim().toLowerCase();
+    const ip = clientIp(req);
+    const problem = emailIssue(email);
+    if (problem) throw new HttpError(400, 'invalid_email', problem);
+
+    enforceLimit(req, res, 'reset', `reset:ip:${ip}`, POLICIES.passwordResetPerIp, email);
+    enforceLimit(req, res, 'reset', `reset:email:${email}`, POLICIES.passwordResetPerAccount, email);
+
     const db = await getDb();
-    const uRes = await db.query<{ id: string; active: boolean }>(
-      `SELECT id, active FROM users WHERE email = $1`,
+    const uRes = await db.query<{ id: string; active: boolean; email_confirmed: boolean }>(
+      `SELECT id, active, email_confirmed FROM users WHERE email = $1`,
       [email],
     );
     const user = uRes.rows[0];
+    // Réponse identique dans tous les cas : aucune énumération de comptes.
     if (!user || !user.active) {
-      res.json({ ok: true });
+      await audit(req, 'password_reset_requested', { email, detail: 'aucun compte actif correspondant' });
+      res.json({ ok: true, linkExposed: false });
       return;
     }
-    const rawToken = await createActionToken(user.id, 'reset_password', 24);
-    // Le jeton n'est renvoyé au client QUE si la démonstration locale le permet
-    // explicitement (`WASHGUARD_DEMO_RESET=1`) et jamais en production. Sinon,
-    // n'importe quel appelant non authentifié pourrait réinitialiser le mot de
-    // passe d'autrui et prendre le contrôle du compte.
-    if (!demoResetEnabled()) {
-      res.json({ ok: true });
-      return;
-    }
+    const rawToken = await createActionToken(user.id, 'reset_password', 1);
+    await audit(req, 'password_reset_requested', { userId: user.id, email });
     res.json({
       ok: true,
-      demoMode: true,
-      resetUrl: `/reinitialiser-mot-de-passe?token=${encodeURIComponent(rawToken)}`,
+      linkExposed: authLinksExposed,
+      expiresInMinutes: 60,
+      resetUrl: authLinksExposed
+        ? `${publicBaseUrl(req)}/reinitialiser-mot-de-passe?token=${encodeURIComponent(rawToken)}`
+        : undefined,
     });
+  }));
+
+  /** Vérifie un lien SANS le consommer : l'UI évite un formulaire inutile. */
+  router.get('/auth/reset-password/verify', wrap(async (req, res) => {
+    const token = String(req.query.token ?? '').trim();
+    enforceLimit(req, res, 'token', `token:ip:${clientIp(req)}`, POLICIES.tokenPerIp);
+    if (!token) {
+      res.json({ valid: false });
+      return;
+    }
+    const found = await inspectActionToken(token, 'reset_password');
+    res.json({ valid: Boolean(found), expiresAt: found?.expiresAt ?? null });
   }));
 
   router.post('/auth/reset-password', wrap(async (req, res) => {
     const body = req.body as Record<string, unknown>;
     const password = String(body.password ?? '');
     const rawToken = typeof body.token === 'string' ? body.token.trim() : '';
+
+    enforceLimit(req, res, 'token', `token:ip:${clientIp(req)}`, POLICIES.tokenPerIp);
     if (password.length < 8) {
       throw new HttpError(400, 'weak_password', 'Le mot de passe doit contenir au moins 8 caractères.');
     }
     const db = await getDb();
     let userId: string | null = null;
+    let viaToken = false;
     if (rawToken) {
-      const tHash = hashToken(rawToken);
-      const tRes = await db.query<{ id: string; user_id: string }>(
-        `SELECT id, user_id FROM action_tokens
-         WHERE token_hash = $1 AND used_at IS NULL AND expires_at > NOW()`,
-        [tHash],
-      );
-      const tRow = tRes.rows[0];
-      if (!tRow) {
-        throw new HttpError(400, 'invalid_token', 'Lien de réinitialisation invalide ou expiré.');
+      const consumed = await consumeActionToken(rawToken, 'reset_password');
+      if (!consumed) {
+        await audit(req, 'password_reset_completed', { detail: 'jeton invalide ou expiré' });
+        throw new HttpError(400, 'invalid_token', 'Lien de réinitialisation invalide ou expiré. Demandez-en un nouveau.');
       }
-      userId = tRow.user_id;
-      await db.query('UPDATE action_tokens SET used_at = NOW() WHERE id = $1', [tRow.id]);
-      const uEmail = await db.query<{ email: string }>('SELECT email FROM users WHERE id = $1', [userId]);
-      if (uEmail.rows[0]) {
-        await db.query(
-          `UPDATE invitations SET accepted_at = COALESCE(accepted_at, NOW())
-           WHERE LOWER(email) = LOWER($1) AND revoked_at IS NULL`,
-          [uEmail.rows[0].email],
-        );
-      }
+      userId = consumed.userId;
+      viaToken = true;
     } else if (req.identity) {
       userId = req.identity.userId;
     } else {
       throw new HttpError(401, 'unauthenticated', 'Jeton de réinitialisation ou session requis.');
     }
 
+    const uEmail = await db.query<{ email: string }>('SELECT email FROM users WHERE id = $1', [userId]);
+    const targetEmail = uEmail.rows[0]?.email ?? '';
+    const problem = passwordIssue(password, targetEmail);
+    if (problem) throw new HttpError(400, 'weak_password', problem);
+
     await db.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hashPassword(password), userId]);
-    // Un changement de mot de passe doit invalider les sessions déjà ouvertes,
-    // y compris celle de l'attaquant qui aurait volé un cookie. Les jetons de
-    // réinitialisation encore valides sont consommés dans la même foulée.
-    await db.query('DELETE FROM sessions WHERE user_id = $1', [userId]);
-    await db.query(
-      'UPDATE action_tokens SET used_at = COALESCE(used_at, NOW()) WHERE user_id = $1 AND kind = $2',
-      [userId, 'reset_password'],
+    if (targetEmail) {
+      await db.query(
+        `UPDATE invitations SET accepted_at = COALESCE(accepted_at, NOW())
+         WHERE LOWER(email) = LOWER($1) AND revoked_at IS NULL`,
+        [targetEmail],
+      );
+    }
+    // Un mot de passe réinitialisé ferme toutes les sessions : un jeton volé
+    // ne doit pas laisser un accès ouvert. Hors jeton, la session courante
+    // peut rester ouverte.
+    const revoked = await revokeUserSessions(userId, viaToken ? undefined : req.sessionTokenHash);
+    await db.query('UPDATE action_tokens SET used_at = NOW() WHERE user_id = $1 AND used_at IS NULL', [userId]);
+    if (targetEmail) resetRateLimit(`signin:email:${targetEmail.trim().toLowerCase()}`);
+    await audit(req, 'password_reset_completed', { userId, email: targetEmail, detail: viaToken ? 'par lien' : 'par session' });
+    if (viaToken) clearSessionCookie(res);
+    res.json({ ok: true, revoked, reauthenticate: viaToken });
+  }));
+
+  // ─── Confirmation d'e-mail ────────────────────────────────────────────────
+  router.post('/auth/confirm-email', wrap(async (req, res) => {
+    const token = String((req.body as Record<string, unknown>).token ?? '').trim();
+    enforceLimit(req, res, 'token', `token:ip:${clientIp(req)}`, POLICIES.tokenPerIp);
+    if (!token) throw new HttpError(400, 'invalid_token', 'Lien de confirmation manquant.');
+    const db = await getDb();
+    const consumed = await consumeActionToken(token, 'confirm_email');
+    if (!consumed) {
+      throw new HttpError(400, 'invalid_token', 'Lien de confirmation invalide ou expiré. Demandez-en un nouveau.');
+    }
+    const uRes = await db.query<{ email: string }>('SELECT email FROM users WHERE id = $1', [consumed.userId]);
+    await db.query('UPDATE users SET email_confirmed = TRUE WHERE id = $1', [consumed.userId]);
+    await audit(req, 'email_confirmed', {
+      userId: consumed.userId, email: uRes.rows[0]?.email ?? '',
+    });
+    res.json({ ok: true });
+  }));
+
+  router.post('/auth/resend-confirmation', wrap(async (req, res) => {
+    const email = String((req.body as Record<string, unknown>).email ?? '').trim().toLowerCase();
+    const problem = emailIssue(email);
+    if (problem) throw new HttpError(400, 'invalid_email', problem);
+    enforceLimit(req, res, 'reset', `resend:ip:${clientIp(req)}`, POLICIES.passwordResetPerIp, email);
+    const db = await getDb();
+    const uRes = await db.query<{ id: string; active: boolean; email_confirmed: boolean }>(
+      'SELECT id, active, email_confirmed FROM users WHERE email = $1',
+      [email],
     );
-    // La session courante (si le changement vient d'un compte connecté) est
-    // fermée aussi : le frontend re-authentifie proprement.
-    clearSessionCookie(res);
-    res.json({ ok: true, sessionsRevoked: true });
+    const user = uRes.rows[0];
+    // Réponse neutre : ne révèle ni l'existence ni l'état du compte.
+    if (!user || !user.active || user.email_confirmed) {
+      res.json({ ok: true, linkExposed: false });
+      return;
+    }
+    const token = await createActionToken(user.id, 'confirm_email', 48);
+    await audit(req, 'email_confirmation_requested', { userId: user.id, email });
+    res.json({
+      ok: true,
+      linkExposed: authLinksExposed,
+      confirmUrl: authLinksExposed
+        ? `${publicBaseUrl(req)}/confirmer-email?token=${encodeURIComponent(token)}`
+        : undefined,
+    });
+  }));
+
+  // ─── Journal d'authentification personnel ─────────────────────────────────
+  router.get('/auth/activity', requireAuth, wrap(async (req, res) => {
+    const id = req.identity!;
+    const db = await getDb();
+    const limit = Math.min(50, Math.max(1, Number(req.query.limit ?? 20) || 20));
+    const rows = await db.query<{
+      event: string; detail: string; created_at: string; ip_address: string; user_agent: string;
+    }>(
+      `SELECT event, detail, created_at::text AS created_at, ip_address, user_agent
+       FROM auth_events WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2`,
+      [id.userId, limit],
+    );
+    res.json({
+      events: rows.rows.map((row) => ({
+        event: row.event,
+        detail: row.detail,
+        at: row.created_at,
+        ipAddress: row.ip_address,
+        device: describeUserAgent(row.user_agent),
+      })),
+    });
   }));
 
   // ─── Employees & Invitations ───────────────────────────────────────────────
