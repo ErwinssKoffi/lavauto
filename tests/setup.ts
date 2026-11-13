@@ -13,3 +13,27 @@ if (typeof window !== 'undefined' && !navigator.locks) {
     },
   });
 }
+
+// JSDOM ne fournit pas non plus ResizeObserver, dont ResponsiveContainer
+// (Recharts) a besoin. Sans lui, le montage du tableau de bord lève une
+// ReferenceError. Le stub annonce une taille fixe, comme scripts/check.cjs.
+if (typeof window !== 'undefined' && !('ResizeObserver' in window)) {
+  class TestResizeObserver {
+    private readonly callback: ResizeObserverCallback;
+    constructor(callback: ResizeObserverCallback) {
+      this.callback = callback;
+    }
+    observe(target: Element): void {
+      const entry = {
+        target,
+        contentRect: { width: 800, height: 400 },
+      } as unknown as ResizeObserverEntry;
+      this.callback([entry], this as unknown as ResizeObserver);
+    }
+    unobserve(): void {}
+    disconnect(): void {}
+  }
+  Object.assign(globalThis, { ResizeObserver: TestResizeObserver });
+  Object.assign(window, { ResizeObserver: TestResizeObserver });
+}
+

@@ -26,3 +26,8 @@ yarn-error.log*
 
 # TypeScript
 *.tsbuildinfo
+
+# Base PGlite locale du serveur (server/db.ts). Jamais versionnée : un cluster
+# partiel dans le dépôt fait échouer PGlite au démarrage, ce qui bascule le
+# serveur en mémoire et fait perdre les comptes au redémarrage.
+/.washguard/

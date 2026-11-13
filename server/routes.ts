@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import express, { type Request, type Response } from 'express';
-import { getDb } from './db';
+import { getDb, getDatabaseStatus } from './db';
 import {
   attachIdentity,
   clearSessionCookie,
@@ -156,6 +156,14 @@ import {
   type WashQualityResult,
   type WashStatus,
 } from '../src/types';
+
+/**
+ * Les liens d'authentification ne sont renvoyés dans la réponse HTTP qu'en
+ * dehors de la production, ou sur activation explicite. Un vrai expéditeur
+ * d'e-mail reste requis pour un déploiement réel.
+ */
+const authLinksExposed = process.env.NODE_ENV !== 'production'
+  || process.env.WASHGUARD_EXPOSE_AUTH_LINKS === '1';
 
 // ─── Per-company async serialization mutex ───────────────────────────────────
 const companyLocks = new Map<string, Promise<unknown>>();
@@ -786,8 +794,18 @@ export function createApiRouter(): express.Router {
   router.use(attachIdentity);
 
   router.get('/health', wrap(async (_req, res) => {
+    // Initialise la base (et donc l'état réel) avant d'exposer le diagnostic.
     await getDb();
-    res.json({ ok: true, service: 'washguard-api', time: new Date().toISOString() });
+    const status = getDatabaseStatus();
+    // Un repli mémoire non signalé ferait perdre les données au redémarrage :
+    // l'état est donc exposé, et le code HTTP le reflète pour les sondes.
+    res.status(status.mode === 'memory' ? 503 : 200).json({
+      ok: status.mode !== 'memory',
+      service: 'washguard-api',
+      time: new Date().toISOString(),
+      database: status,
+      authLinksExposed,
+    });
   }));
 
   router.get('/plans', wrap(async (_req, res) => {
@@ -799,8 +817,6 @@ export function createApiRouter(): express.Router {
   // Règles communes : la validation est faite ici, jamais uniquement dans le
   // navigateur ; les compteurs protègent la connexion ; chaque tentative est
   // journalisée sans secret ; aucun message ne révèle l'existence d'un compte.
-  const authLinksExposed = process.env.NODE_ENV !== 'production'
-    || process.env.WASHGUARD_EXPOSE_AUTH_LINKS === '1';
   const emailConfirmationRequired = process.env.WASHGUARD_REQUIRE_EMAIL_CONFIRMATION === '1';
   const PLANS_AT_SIGNUP = new Set(['essai', 'standard', 'premium']);
 

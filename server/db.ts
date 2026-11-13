@@ -248,6 +248,24 @@ async function initSchema(db: PGlite): Promise<void> {
   }
 }
 
+export interface DatabaseStatus {
+  /** `disk` : les données survivent au redémarrage. `memory` : tout est perdu. */
+  mode: 'disk' | 'memory';
+  dataDir: string;
+  /** Message d'erreur à l'origine du repli mémoire, le cas échéant. */
+  reason: string | null;
+}
+
+let databaseStatus: DatabaseStatus = {
+  mode: 'memory',
+  dataDir: '',
+  reason: 'base non initialisée',
+};
+
+export function getDatabaseStatus(): DatabaseStatus {
+  return databaseStatus;
+}
+
 export async function getDb(): Promise<PGlite> {
   if (!dbPromise) {
     dbPromise = (async () => {
@@ -259,9 +277,20 @@ export async function getDb(): Promise<PGlite> {
       try {
         fs.mkdirSync(dataDir, { recursive: true });
         db = await PGlite.create(dataDir);
+        databaseStatus = { mode: 'disk', dataDir, reason: null };
       } catch (err) {
-        console.warn('[WashGuard DB] Fallback memory:// PGlite:', err instanceof Error ? err.message : err);
+        const reason = err instanceof Error ? err.message : String(err);
+        // Le repli mémoire est CONSERVÉ (le serveur doit pouvoir démarrer pour
+        // les tests et la démo), mais il n'est plus silencieux : l'état est
+        // exposé par /api/health et le démarrage crie l'avertissement.
+        console.error(
+          `\n[WashGuard DB] ⚠  REPLI EN MÉMOIRE : ${reason}\n` +
+          `[WashGuard DB] ⚠  Répertoire demandé : ${dataDir}\n` +
+          `[WashGuard DB] ⚠  Les comptes et les données seront PERDUS au redémarrage.\n` +
+          `[WashGuard DB] ⚠  Supprimez ce répertoire (ou définissez WASHGUARD_PGDATA) pour repartir sur une base saine.\n`,
+        );
         db = await PGlite.create('memory://');
+        databaseStatus = { mode: 'memory', dataDir, reason };
       }
       await initSchema(db);
       return db;

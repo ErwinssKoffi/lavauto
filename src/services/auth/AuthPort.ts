@@ -70,7 +70,8 @@ export interface AuthPort {
   signIn(email: string, password: string, rememberMe?: boolean): Promise<AuthResult>;
   signUp(payload: SignUpPayload): Promise<AuthResult>;
   signOut(): Promise<void>;
-  requestPasswordReset(email: string): Promise<{ resetUrl?: string } | void>;
+  /** `demoMode` n'est vrai que si le serveur a réellement renvoyé un lien de démonstration. */
+  requestPasswordReset(email: string): Promise<{ resetUrl?: string; demoMode?: boolean } | void>;
   updatePassword(password: string, token?: string): Promise<void>;
   /** Vérifie un lien de réinitialisation sans le consommer. */
   verifyResetToken(token: string): Promise<ResetTokenInspection>;

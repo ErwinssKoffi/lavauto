@@ -97,11 +97,15 @@ export class ApiAuthAdapter implements AuthPort {
     }
   }
 
-  async requestPasswordReset(email: string): Promise<{ resetUrl?: string } | void> {
-    return apiFetch<{ ok: boolean; resetUrl?: string }>('/api/auth/forgot-password', {
-      method: 'POST',
-      body: JSON.stringify({ email }),
-    });
+  async requestPasswordReset(email: string): Promise<{ resetUrl?: string; demoMode?: boolean } | void> {
+    const res = await apiFetch<{ ok: boolean; resetUrl?: string; demoMode?: boolean }>(
+      '/api/auth/forgot-password',
+      { method: 'POST', body: JSON.stringify({ email }) },
+    );
+    // Le serveur ne renvoie un lien QUE si WASHGUARD_DEMO_RESET=1 hors production.
+    // `demoMode` rend cet état explicite pour l'interface.
+    if (res?.resetUrl) return { resetUrl: res.resetUrl, demoMode: true };
+    return { demoMode: false };
   }
 
   async updatePassword(password: string, token?: string): Promise<void> {
