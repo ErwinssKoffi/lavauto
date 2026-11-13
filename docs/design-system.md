@@ -34,7 +34,7 @@ Deux thèmes personnalisés remplacent les anciens tokens CSS, déclarés avec l
 | WashGuard clair | `washguard` | palette historique claire (`base-100 #ffffff`, texte `#0f172a`) |
 | WashGuard sombre | `washguard-dark` | palette historique sombre (`base-100 #101b2d`, texte `#e9f0fb`) — **thème par défaut** (`default: true`) |
 
-`@plugin "daisyui" { themes: false; }` désactive les 35 thèmes intégrés : seuls les deux thèmes WashGuard sont embarqués.
+`@plugin "daisyui" { themes: all; }` : les 37 thèmes (35 intégrés + les 2 WashGuard) sont disponibles et peuvent être appliqués localement via `data-theme` sur n'importe quel élément. Coût mesuré : **+43,5 kB de CSS brut (+6,9 kB gzip)**. `washguard-dark` reste le thème de l'application : `<html>` porte `data-theme="washguard-dark"` en dur dans `index.html`, avant tout script.
 
 | Variable DaisyUI 5 | Rôle | Ancien token |
 | --- | --- | --- |
@@ -119,7 +119,7 @@ Responsive : sidebar desktop / drawer mobile, topbar qui tronque, tableaux `tabl
 | Exclu | Raison |
 | --- | --- |
 | shadcn/ui, Radix, Headless UI | DaisyUI couvre 100 % des besoins actuels sans runtime JS supplémentaire |
-| Thèmes DaisyUI intégrés (`themes: all`) | inutile ici : deux thèmes WashGuard suffisent et le CSS reste plus léger |
+| Sélecteur de thème dans l'interface | `themes: all` rend les 35 thèmes disponibles, mais l'app expose volontairement un simple basculement clair/sombre WashGuard |
 | Remplacement de `react-icons` | aucune dépendance UI à remplacer, les icônes ne sont pas concernées |
 | Modification de `src/lib/store.tsx` (métier), `metrics.ts`, `format.ts`, `types.ts`, `plans.ts` | seule la synchronisation `data-theme` a été ajoutée au thème |
 | Découpage de `ui.tsx` | API publique gelée sur consigne explicite (TD-22) |
@@ -135,6 +135,6 @@ Responsive : sidebar desktop / drawer mobile, topbar qui tronque, tableaux `tabl
 | `npm run lint` | ✅ 26 règles statiques |
 | `npm run check` | ✅ **243 contrôles OK / 0 KO** (dont le rendu des 15 écrans en JSDOM) |
 | `npm run test:unit` | ✅ 283 tests / 33 fichiers |
-| `npm run build` | ✅ build Vite + PWA (39 entrées pré-cachées) · CSS 148,7 kB / gzip 23,3 kB |
+| `npm run build` | ✅ build Vite + PWA (39 entrées pré-cachées) · CSS 192,3 kB / gzip 30,2 kB |
 
 Le contrôle « thème » de `scripts/check.cjs` vérifie désormais : `:focus-visible` et `prefers-reduced-motion` toujours présents, `@import "tailwindcss"`, les plugins `daisyui` et `daisyui/theme` (exactement deux thèmes), les variables `--color-*`, `@theme` et `--animate-fade-in`, et **l'absence** de toute classe `.wg-` ou variable `--wg-` résiduelle dans `src/` (garde-fou sur chaque fichier `.ts`/`.tsx`/`.css`).

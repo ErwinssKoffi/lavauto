@@ -122,7 +122,9 @@ Décidée après la première migration (DaisyUI 4 / Tailwind 3), pour utiliser 
 
 ### 9.2 Thèmes
 
-`@plugin "daisyui" { themes: false; }` puis deux blocs `@plugin "daisyui/theme"` (`washguard`, `washguard-dark` avec `default: true`). Les tokens deviennent `--color-*`, `--radius-*`, `--size-field`, `--border`, `--depth`, `--noise`. Aucun thème intégré n'est embarqué.
+`@plugin "daisyui" { themes: all; }` (les 35 thèmes intégrés sont embarqués) puis deux blocs `@plugin "daisyui/theme"` (`washguard`, `washguard-dark`). Les tokens deviennent `--color-*`, `--radius-*`, `--size-field`, `--border`, `--depth`, `--noise`.
+
+Avec `themes: all`, `light` reprend le sélecteur `:where(:root)` : le repli sans attribut est donc le thème clair intégré. Ce n'est pas un problème ici, `<html data-theme="washguard-dark">` étant écrit en dur dans `index.html` (avant tout script) puis maintenu par `store.tsx`. Coût mesuré : CSS 148,7 → 192,3 kB (23,3 → 30,2 kB gzip).
 
 ### 9.3 Ruptures de classes corrigées
 
@@ -145,7 +147,7 @@ Trois ajustements restent **hors couche** (donc prioritaires sur la couche `util
 
 ### 9.5 Sources et poids du CSS
 
-`@import "tailwindcss" source(none)` + `@source "../index.html"` + `@source "./**/*.{ts,tsx}"` : la documentation et les tests ne produisent plus de classes. Résultat : **148,7 kB** de CSS (23,3 kB gzip), contre 125 kB en Tailwind 3 (le runtime de base de Tailwind 4 est plus complet).
+`@import "tailwindcss" source(none)` + `@source "../index.html"` + `@source "./**/*.{ts,tsx}"` : la documentation et les tests ne produisent plus de classes. Résultat : **192,3 kB** de CSS (30,2 kB gzip) avec les 37 thèmes, contre 148,7 kB (23,3 kB gzip) avec deux thèmes et 125 kB en Tailwind 3.
 
 ### 9.6 Validation après montée de version
 
@@ -155,4 +157,4 @@ Trois ajustements restent **hors couche** (donc prioritaires sur la couche `util
 | `npm run lint` | ✅ 26 règles |
 | `npm run check` | ✅ 243 OK / 0 KO |
 | `npm run test:unit` | ✅ 283 tests / 33 fichiers |
-| `npm run build` | ✅ Vite + PWA |
+| `npm run build` | ✅ Vite + PWA · CSS 192,3 kB / gzip 30,2 kB |
