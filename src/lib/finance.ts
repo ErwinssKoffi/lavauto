@@ -52,6 +52,13 @@ function number(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+/** Un coût masqué ou absent n'est pas un coût nul. */
+function nullableNumber(value: unknown): number | null {
+  if (typeof value !== 'number' && (typeof value !== 'string' || !value.trim())) return null;
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function bool(value: unknown): boolean {
   return value === true;
 }
@@ -187,11 +194,16 @@ function inRange(isoValue: string, start: Date, end: Date): boolean {
   return Number.isFinite(t) && t >= start.getTime() && t <= end.getTime();
 }
 
+/** Le calcul local dispose des mouvements ; sa projection peut ensuite être masquée. */
+type LocalProfitabilityReport = ProfitabilityReport & {
+  purchases: number; consumptions: number; fixedCosts: number; operatingExpenses: number;
+};
+
 /**
- * Rapport de rentabilité LOCAL, miroir exact de `my_profitability()`.
+ * Rapport de rentabilité LOCAL, miroir de `my_profitability()` avant filtrage.
  * Aucun « bénéfice net » sans attestation : P07 fournit les coûts de consommation.
  */
-export function buildProfitability(state: AppState, start: Date, end: Date): ProfitabilityReport {
+export function buildProfitability(state: AppState, start: Date, end: Date): LocalProfitabilityReport {
   const washes = (state.washes ?? []).filter(
     (w) => w.status !== 'cancelled' && inRange(w.createdAt, start, end)
   );
@@ -307,19 +319,29 @@ export function mapProfitability(value: unknown): ProfitabilityReport {
     periodStart: text(r.periodStart), periodEnd: text(r.periodEnd),
     revenue: number(r.revenue), collected: number(r.collected),
     receivables: number(r.receivables), expenses: number(r.expenses),
-    purchases: number(r.purchases), consumptions: number(r.consumptions),
-    commissions: number(r.commissions), fixedCosts: number(r.fixedCosts),
+    purchases: nullableNumber(r.purchases), consumptions: nullableNumber(r.consumptions),
+    commissions: number(r.commissions), fixedCosts: nullableNumber(r.fixedCosts),
     partialBalance: number(r.partialBalance),
-    grossMargin: r.grossMargin === null || r.grossMargin === undefined ? null : number(r.grossMargin),
-    result: r.result === null || r.result === undefined ? null : number(r.result),
+    grossMargin: nullableNumber(r.grossMargin),
+    result: nullableNumber(r.result),
     costsMissing: bool(r.costsMissing),
     label: text(r.label),
     missing: strArray(r.missing),
     definitions,
-    operatingExpenses: number(r.operatingExpenses),
+    operatingExpenses: nullableNumber(r.operatingExpenses),
     certified: bool(r.certified),
     certifiedAt: nullableText(r.certifiedAt),
     attestation: nullableText(r.attestation),
+  };
+}
+
+/** Présentation de secours pour la démo locale ou pendant la vérification des droits. */
+export function redactStockProfitability(report: ProfitabilityReport): ProfitabilityReport {
+  return {
+    ...report, purchases: null, consumptions: null, operatingExpenses: null, fixedCosts: null,
+    grossMargin: null, result: null, costsMissing: true, certified: false, certifiedAt: null, attestation: null,
+    label: 'Coûts de stock et certification non disponibles dans cette formule',
+    missing: ['Module stock et certification non inclus'],
   };
 }
 

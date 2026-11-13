@@ -5,7 +5,7 @@
 // d'empreinte non réversible. Ce n'est PAS une sécurité de production ;
 // le mode `supabase` n'utilise jamais ce fichier.
 
-const DEMO_PASSWORDS_KEY = 'washguard.demo-passwords.v1';
+import { DEMO_PASSWORDS_KEY } from './demoStorage';
 const SALT = 'washguard-demo-v1';
 
 function fingerprint(email: string, password: string): string {
@@ -20,27 +20,30 @@ function fingerprint(email: string, password: string): string {
   return `${a.toString(16).padStart(8, '0')}${b.toString(16).padStart(8, '0')}`;
 }
 
-function read(): Record<string, string> {
-  if (typeof localStorage === 'undefined') return {};
+function read(strict = false): Record<string, string> {
   try {
+    if (typeof localStorage === 'undefined') throw new Error('stockage indisponible');
     const raw = localStorage.getItem(DEMO_PASSWORDS_KEY);
-    const parsed = raw ? JSON.parse(raw) as unknown : null;
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? parsed as Record<string, string>
-      : {};
+    if (raw === null) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)
+      || Object.values(parsed).some((value) => typeof value !== 'string')) throw new Error('empreintes illisibles');
+    return parsed as Record<string, string>;
   } catch {
+    if (strict) throw new Error('Stockage des accès de démonstration illisible ou indisponible. Sauvegardez les données avant récupération.');
     return {};
   }
 }
 
-function write(map: Record<string, string>): void {
-  if (typeof localStorage === 'undefined') return;
-  try { localStorage.setItem(DEMO_PASSWORDS_KEY, JSON.stringify(map)); } catch { /* quota plein */ }
-}
-
 export function setDemoPassword(email: string, password: string): void {
   const key = email.trim().toLowerCase();
-  write({ ...read(), [key]: fingerprint(key, password) });
+  // Une ancienne liste illisible ne doit pas être écrasée par une inscription.
+  const next = { ...read(true), [key]: fingerprint(key, password) };
+  const raw = JSON.stringify(next);
+  try {
+    localStorage.setItem(DEMO_PASSWORDS_KEY, raw);
+    if (localStorage.getItem(DEMO_PASSWORDS_KEY) !== raw) throw new Error('écriture non confirmée');
+  } catch { throw new Error('Impossible de conserver les accès de démonstration dans ce navigateur.'); }
 }
 
 export function verifyDemoPassword(email: string, password: string): boolean {

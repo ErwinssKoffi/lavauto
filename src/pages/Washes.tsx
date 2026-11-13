@@ -31,13 +31,13 @@ const NEXT_LABELS: Partial<Record<WashStatus, string>> = {
 
 export default function Washes() {
   const {
-    state, dataSource, createWash, pendingWash, pendingWashError, retryPendingWash,
+    state, dataSource, canWriteSubscription, createWash, pendingWash, pendingWashError, retryPendingWash,
     setWashStatus, addPayment, cancelPayment,
     assignWash, recordQualityCheck, createWashPost, vehicleHistory, refreshWashes,
   } = useStore();
   const { can } = usePermissions();
   const safe = useSafeAction();
-  const allow = (permission: string) => dataSource === 'local' || can(permission);
+  const allow = (permission: string) => canWriteSubscription && (dataSource === 'local' || can(permission));
   const [createOpen, setCreateOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -47,8 +47,7 @@ export default function Washes() {
   const activated = Boolean(state.station?.activated);
   const stationId = state.station?.id ?? '';
   const posts = state.washPosts.filter((p) => p.active && (!stationId || !p.stationId || p.stationId === stationId));
-  const methods: PayMethod[] = state.station?.paymentMethods.length
-    ? state.station.paymentMethods : ['especes', 'wave', 'orange_money', 'mtn_momo', 'carte', 'virement'];
+  const methods: PayMethod[] = state.station?.paymentMethods ?? [];
 
   const washes = useMemo(() => state.washes.filter((w) => {
     const q = search.trim().toLowerCase();
@@ -77,7 +76,7 @@ export default function Washes() {
       />
       {!activated && <div className="mb-5"><LockedPanel /></div>}
       {pendingWash && (
-        <div className="mb-5"><Alert kind="warn">Une création n’a pas reçu de confirmation. Vérifiez-la avec la même clé avant de créer une autre fiche dans cet onglet.</Alert></div>
+        <div className="mb-5"><Alert kind="warn">Une création n’a pas reçu de confirmation. Vérifiez-la avec la même clé avant de créer une autre fiche dans cet onglet. {!canWriteSubscription && 'La reprise est suspendue en lecture seule : consultez l’historique et conservez la tentative jusqu’à validation.'}</Alert></div>
       )}
       {pendingWashError && <div className="mb-5"><Alert kind="danger">{pendingWashError}</Alert></div>}
 
@@ -106,8 +105,8 @@ export default function Washes() {
           </div>
         )}
         <div className="grid gap-2 sm:grid-cols-[1fr_120px_auto]">
-          <Input value={postName} onChange={(e) => setPostName(e.target.value)} placeholder="Nom du poste (ex. Piste 1)" />
-          <Input type="number" min="1" value={postCapacity} onChange={(e) => setPostCapacity(readNumber(e.target.value))} />
+          <Input disabled={!activated || !allow('washes.assign')} value={postName} onChange={(e) => setPostName(e.target.value)} placeholder="Nom du poste (ex. Piste 1)" />
+          <Input type="number" min="1" disabled={!activated || !allow('washes.assign')} value={postCapacity} onChange={(e) => setPostCapacity(readNumber(e.target.value))} />
           <button className="wg-btn wg-btn-ghost" disabled={!activated || !allow('washes.assign')}
             onClick={() => safe(async () => { await createWashPost(postName, postCapacity, stationId); setPostName(''); setPostCapacity(1); })}>
             <FiPlus /> Ajouter un poste
@@ -188,7 +187,7 @@ function CreateWashModal({ methods, onClose, onSubmit, onRetry }: {
   onSubmit: (p: Parameters<ReturnType<typeof useStore>['createWash']>[0]) => void | Promise<void>;
   onRetry: () => Promise<void>;
 }) {
-  const { state, pendingWash, assignableUsers } = useStore();
+  const { state, pendingWash, assignableUsers, canWriteSubscription } = useStore();
   const stationId = state.station?.id ?? '';
   const cats = state.vehicleCategories.filter((c) => c.active);
   const svcs = state.services.filter((s) => s.active);
@@ -223,7 +222,7 @@ function CreateWashModal({ methods, onClose, onSubmit, onRetry }: {
     const { payload } = pendingWash;
     return (
       <Modal open onClose={close} title="Nouvelle fiche de lavage">
-        <Alert kind="warn">Résultat incertain : la fiche et son éventuel paiement ont peut-être été enregistrés. Ne créez pas une nouvelle fiche pour cette opération.</Alert>
+        <Alert kind="warn">Résultat incertain : la fiche et son éventuel paiement ont peut-être été enregistrés. Ne créez pas une nouvelle fiche pour cette opération. {!canWriteSubscription && 'La reprise est suspendue en lecture seule ; consultez l’historique et conservez la tentative.'}</Alert>
         <div className="mt-4 space-y-1 text-sm">
           <p>Plaque : <strong>{payload.plate || 'Non renseignée'}</strong></p>
           <p>Encaissement initial : <strong>{payload.payment ? `${formatFCFA(payload.payment.amount)} · ${PAY_METHOD_LABELS[payload.payment.method]}` : 'Aucun'}</strong></p>
@@ -231,7 +230,7 @@ function CreateWashModal({ methods, onClose, onSubmit, onRetry }: {
         </div>
         <div className="mt-5 flex justify-end gap-2">
           <button className="wg-btn wg-btn-ghost" disabled={busy} onClick={close}>Fermer</button>
-          <button className="wg-btn wg-btn-primary" disabled={busy} onClick={() => { void run(onRetry); }}>
+          <button className="wg-btn wg-btn-primary" disabled={busy || !canWriteSubscription} onClick={() => { void run(onRetry); }}>
             {busy ? 'Vérification…' : 'Vérifier / réessayer la même opération'}
           </button>
         </div>
@@ -255,6 +254,7 @@ function CreateWashModal({ methods, onClose, onSubmit, onRetry }: {
     if (discount > maxDiscount) return setError(`Remise maximale autorisée : ${maxDiscount === Infinity ? 'illimitée' : `${maxDiscount} FCFA`}.`);
     if (!Number.isSafeInteger(payAmount) || payAmount < 0) return setError('Le montant encaissé doit être un entier positif ou nul.');
     if (payAmount > total) return setError('L’encaissement dépasse le total de la fiche.');
+    if (payAmount > 0 && !methods.includes(payMethod)) return setError('Configurez un moyen de paiement accepté avant d’encaisser.');
     void run(() => onSubmit({
       categoryId, plate, employeeId: employeeIds[0], employeeIds, postId: postId || null,
       clientId: clientId || null, clientName, items, discount,
@@ -264,7 +264,7 @@ function CreateWashModal({ methods, onClose, onSubmit, onRetry }: {
 
   return (
     <Modal open onClose={close} title="Nouvelle fiche de lavage" wide>
-      <fieldset disabled={busy} className="min-w-0">
+      <fieldset disabled={busy || !canWriteSubscription} className="min-w-0">
       <div className="grid gap-5 lg:grid-cols-2">
         <div className="space-y-3">
           <Select label="Catégorie de véhicule *" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
@@ -327,7 +327,8 @@ function CreateWashModal({ methods, onClose, onSubmit, onRetry }: {
         <p className="mb-3 flex items-center gap-2 text-sm font-bold"><FiCreditCard /> Encaissement à la création (facultatif)</p>
         <div className="grid gap-3 sm:grid-cols-2">
           <Input label="Montant encaissé (FCFA)" type="number" min="0" max={Number.isFinite(total) && total >= 0 ? total : undefined} value={payAmount} onChange={(e) => setPayAmount(readNumber(e.target.value))} hint="0 = encaissement plus tard, total ou partiel." />
-          <Select label="Moyen de paiement" value={payMethod} onChange={(e) => setPayMethod(e.target.value as PayMethod)}>
+          <Select label="Moyen de paiement" value={methods.includes(payMethod) ? payMethod : ''} onChange={(e) => setPayMethod(e.target.value as PayMethod)}>
+            {!methods.includes(payMethod) && <option value="">{methods.length === 0 ? 'Aucun moyen configuré' : 'Choisir un moyen'}</option>}
             {methods.map((m) => <option key={m} value={m}>{PAY_METHOD_LABELS[m]}</option>)}
           </Select>
         </div>
@@ -339,7 +340,7 @@ function CreateWashModal({ methods, onClose, onSubmit, onRetry }: {
       {error && <div className="mt-3"><Alert kind="danger">{error}</Alert></div>}
       <div className="mt-5 flex justify-end gap-2">
         <button className="wg-btn wg-btn-ghost" disabled={busy} onClick={close}><FiX /> Annuler</button>
-        <button className="wg-btn wg-btn-primary" disabled={busy} onClick={submit}><FiCheckCircle /> {busy ? 'Enregistrement…' : 'Enregistrer la fiche'}</button>
+        <button className="wg-btn wg-btn-primary" disabled={busy || !canWriteSubscription} onClick={submit}><FiCheckCircle /> {busy ? 'Enregistrement…' : 'Enregistrer la fiche'}</button>
       </div>
     </Modal>
   );
@@ -356,10 +357,10 @@ function WashDetail({ washId, methods, onClose, onStatus, onAssign, onQuality, o
   onRefund: (paymentId: string, reason: string) => void | Promise<void>;
   onVehicleHistory: (plate: string) => Promise<Wash[]>;
 }) {
-  const { state, dataSource, identity, assignableUsers } = useStore();
+  const { state, dataSource, identity, assignableUsers, canWriteSubscription } = useStore();
   const { can } = usePermissions();
   const safe = useSafeAction();
-  const allow = (permission: string) => dataSource === 'local' || can(permission);
+  const allow = (permission: string) => canWriteSubscription && (dataSource === 'local' || can(permission));
   const w = state.washes.find((x) => x.id === washId)!;
   const [receipt, setReceipt] = useState<WashReceipt | null>(null);
   const [amount, setAmount] = useState(Math.max(0, w.total - w.paid));
@@ -391,8 +392,9 @@ function WashDetail({ washId, methods, onClose, onStatus, onAssign, onQuality, o
   const next = nextWashStatuses(w.status);
 
   const pay = () => {
-    if (payBusyRef.current || paymentAttempt.error) return;
+    if (!allow('payments.create') || payBusyRef.current || paymentAttempt.error) return;
     const previous = paymentAttempt.pending;
+    if (!previous && !methods.includes(method)) return safe(() => { throw new Error('Configurez un moyen de paiement accepté avant d’encaisser.'); });
     const key = previous?.key ?? idempotencyKey('pay');
     payBusyRef.current = true;
     setPayBusy(true);
@@ -482,10 +484,10 @@ function WashDetail({ washId, methods, onClose, onStatus, onAssign, onQuality, o
           {refundId && (
             <div className="mt-3 rounded-xl border border-red-500/30 p-3">
               <p className="mb-2 text-xs font-bold">Remboursement : le paiement reste tracé, la créance est recalculée</p>
-              <Input label="Motif *" value={refundReason} onChange={(e) => setRefundReason(e.target.value)} placeholder="Ex. client remboursé" />
+              <Input label="Motif *" disabled={!allow('payments.cancel')} value={refundReason} onChange={(e) => setRefundReason(e.target.value)} placeholder="Ex. client remboursé" />
               <div className="mt-3 flex gap-2">
                 <button className="wg-btn wg-btn-ghost" onClick={() => setRefundId(null)}>Revenir</button>
-                <button className="wg-btn wg-btn-danger" onClick={() => safe(async () => {
+                <button className="wg-btn wg-btn-danger" disabled={!allow('payments.cancel')} onClick={() => safe(async () => {
                   await onRefund(refundId, refundReason); setRefundId(null);
                 })}>Confirmer l’annulation</button>
               </div>
@@ -498,11 +500,11 @@ function WashDetail({ washId, methods, onClose, onStatus, onAssign, onQuality, o
         <div className="mt-4 rounded-xl border p-4" style={{ borderColor: 'var(--wg-border)' }}>
           <p className="mb-3 flex items-center gap-2 text-sm font-bold"><FiDollarSign /> Encaisser le reste</p>
           {paymentAttempt.error && <div className="mb-3"><Alert kind="danger">{paymentAttempt.error}</Alert></div>}
-          {paymentAttempt.pending && <div className="mb-3"><Alert kind="warn">Résultat incertain ou lecture non confirmée : vérifiez cet encaissement avec sa clé d’origine avant d’en créer un autre. La tentative est conservée dans cet onglet.</Alert></div>}
+          {paymentAttempt.pending && <div className="mb-3"><Alert kind="warn">Résultat incertain ou lecture non confirmée : vérifiez cet encaissement avec sa clé d’origine avant d’en créer un autre. La tentative est conservée dans cet onglet. {!canWriteSubscription && 'La reprise est suspendue en lecture seule ; consultez l’historique et conservez la tentative.'}</Alert></div>}
           <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-            <Input label="Montant à encaisser (FCFA)" type="number" min="1" max={w.total - w.paid} disabled={payBusy || Boolean(paymentAttempt.pending)} value={paymentAttempt.pending?.amount ?? amount} onChange={(e) => setAmount(readNumber(e.target.value))} />
-            <Select label="Moyen de paiement" disabled={payBusy || Boolean(paymentAttempt.pending)} value={paymentAttempt.pending?.method ?? method} onChange={(e) => setMethod(e.target.value as PayMethod)}>{methods.map((m) => <option key={m} value={m}>{PAY_METHOD_LABELS[m]}</option>)}</Select>
-            <button className="wg-btn wg-btn-primary" disabled={payBusy || Boolean(paymentAttempt.error)} onClick={pay}>{payBusy ? 'Vérification…' : paymentAttempt.pending ? 'Vérifier le paiement' : 'Encaisser'}</button>
+            <Input label="Montant à encaisser (FCFA)" type="number" min="1" max={w.total - w.paid} disabled={!allow('payments.create') || payBusy || Boolean(paymentAttempt.pending)} value={paymentAttempt.pending?.amount ?? amount} onChange={(e) => setAmount(readNumber(e.target.value))} />
+            <Select label="Moyen de paiement" disabled={!allow('payments.create') || payBusy || Boolean(paymentAttempt.pending)} value={paymentAttempt.pending?.method ?? (methods.includes(method) ? method : '')} onChange={(e) => setMethod(e.target.value as PayMethod)}>{!paymentAttempt.pending && !methods.includes(method) && <option value="">{methods.length === 0 ? 'Aucun moyen configuré' : 'Choisir un moyen'}</option>}{paymentAttempt.pending && !methods.includes(paymentAttempt.pending.method) && <option value={paymentAttempt.pending.method}>{PAY_METHOD_LABELS[paymentAttempt.pending.method]} (tentative initiale)</option>}{methods.map((m) => <option key={m} value={m}>{PAY_METHOD_LABELS[m]}</option>)}</Select>
+            <button className="wg-btn wg-btn-primary" disabled={!allow('payments.create') || payBusy || Boolean(paymentAttempt.error)} onClick={pay}>{payBusy ? 'Vérification…' : paymentAttempt.pending ? 'Vérifier le paiement' : 'Encaisser'}</button>
           </div>
         </div>
       )}
@@ -532,16 +534,16 @@ function WashDetail({ washId, methods, onClose, onStatus, onAssign, onQuality, o
           <div className="max-h-[140px] space-y-1 overflow-y-auto">
             {employees.map((u) => (
               <label key={u.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs" style={{ background: 'var(--wg-surface-2)' }}>
-                <input type="checkbox" className="accent-sky-500" checked={selected.includes(u.id)}
+                <input type="checkbox" className="accent-sky-500" disabled={!allow('washes.assign')} checked={selected.includes(u.id)}
                   onChange={(e) => setSelected((ids) => e.target.checked ? [...ids, u.id] : ids.filter((id) => id !== u.id))} />
                 <span className="flex-1 truncate">{u.name}</span>
               </label>
             ))}
           </div>
-          <div className="mt-2"><Select label="Poste" value={postId} onChange={(e) => setPostId(e.target.value)}><option value="">Aucun poste</option>{posts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></div>
+          <div className="mt-2"><Select label="Poste" disabled={!allow('washes.assign')} value={postId} onChange={(e) => setPostId(e.target.value)}><option value="">Aucun poste</option>{posts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></div>
           <div className="mt-3 flex gap-2">
             <button className="wg-btn wg-btn-ghost" onClick={() => setAssignMode(false)}>Revenir</button>
-            <button className="wg-btn wg-btn-primary" disabled={selected.length === 0}
+            <button className="wg-btn wg-btn-primary" disabled={!allow('washes.assign') || selected.length === 0}
               onClick={() => safe(async () => { await onAssign(selected, postId || null); setAssignMode(false); })}>Valider l’affectation</button>
           </div>
         </div>
@@ -550,7 +552,7 @@ function WashDetail({ washId, methods, onClose, onStatus, onAssign, onQuality, o
       {w.status === 'quality_check' && (
         <div className="mt-4 rounded-xl border border-sky-500/30 p-4">
           <p className="mb-2 text-sm font-bold">Contrôle qualité obligatoire</p>
-          <Input label="Notes (facultatives, obligatoires en cas de refus)" value={qualityNotes} onChange={(e) => setQualityNotes(e.target.value)} />
+          <Input label="Notes (facultatives, obligatoires en cas de refus)" disabled={!allow('washes.quality')} value={qualityNotes} onChange={(e) => setQualityNotes(e.target.value)} />
           <div className="mt-3 flex flex-wrap gap-2">
             <button className="wg-btn wg-btn-primary" disabled={!allow('washes.quality')}
               onClick={() => safe(async () => { await onQuality('approved', qualityNotes); })}><FiCheckCircle /> Valider → Prêt</button>
@@ -564,10 +566,10 @@ function WashDetail({ washId, methods, onClose, onStatus, onAssign, onQuality, o
       {cancelMode && (
         <div className="mt-4 rounded-xl border border-red-500/30 p-4">
           <p className="mb-2 text-sm font-bold">Annuler la fiche</p>
-          <Input label="Motif de l’annulation *" value={reason} onChange={(e) => setReason(e.target.value)} />
+          <Input label="Motif de l’annulation *" disabled={!allow('washes.update_status')} value={reason} onChange={(e) => setReason(e.target.value)} />
           <div className="mt-3 flex gap-2">
             <button className="wg-btn wg-btn-ghost" onClick={() => setCancelMode(false)}>Revenir</button>
-            <button className="wg-btn wg-btn-danger" disabled={!reason.trim()}
+            <button className="wg-btn wg-btn-danger" disabled={!allow('washes.update_status') || !reason.trim()}
               onClick={() => { onStatus('cancelled', reason.trim()); setCancelMode(false); onClose(); }}>Confirmer l’annulation</button>
           </div>
         </div>
@@ -585,7 +587,7 @@ function WashDetail({ washId, methods, onClose, onStatus, onAssign, onQuality, o
           <button className="wg-btn wg-btn-ghost" onClick={() => { setSelected(w.assignedUserIds); setPostId(w.postId ?? ''); setAssignMode(true); }}><FiUsers /> Affecter</button>
         )}
         {w.status !== 'cancelled' && w.status !== 'delivered' && (
-          <button className="wg-btn wg-btn-danger" onClick={() => setCancelMode(true)}>Annuler</button>
+          <button className="wg-btn wg-btn-danger" disabled={!allow('washes.update_status')} onClick={() => setCancelMode(true)}>Annuler</button>
         )}
         <button className="wg-btn wg-btn-ghost ml-auto" onClick={onClose}>Fermer</button>
       </div>

@@ -8,19 +8,27 @@ import {
 import { useStore, DEFAULT_DAYS } from '../lib/store';
 import type { OnboardingStep } from '../lib/store';
 import { PAY_METHOD_LABELS, type DayHours, type PayMethod } from '../types';
-import { formatFCFA } from '../lib/format';
+import { formatDate, formatFCFA } from '../lib/format';
 import { StationLogoEditor } from '../components/StationLogoEditor';
+import { PriceInput } from '../components/PriceInput';
+import { PlanDetails } from '../components/PlanDetails';
 import {
   Alert, Badge, Card, Input, PageHeader, Progress, SectionTitle, Select, useSafeAction,
 } from '../components/ui';
 
 const CATEGORY_SUGGESTIONS = ['Berline', '4×4 / SUV', 'Moto', 'Utilitaire', 'Minibus'];
 const SERVICE_SUGGESTIONS = ['Lavage extérieur', 'Lavage intérieur', 'Lavage complet', 'Nettoyage des sièges', 'Lavage moteur'];
-const METHODS: PayMethod[] = ['especes', 'mobile_money', 'carte', 'virement'];
+const METHODS: PayMethod[] = ['especes', 'mobile_money', 'wave', 'orange_money', 'mtn_momo', 'carte', 'virement'];
 
-function SaveButton({ onClick, label = 'Enregistrer' }: { onClick: () => void; label?: string }) {
+function SaveButton({ onClick, label = 'Enregistrer' }: { onClick: () => void | Promise<void>; label?: string }) {
   const safe = useSafeAction();
-  return <button className="wg-btn wg-btn-primary mt-4" onClick={() => safe(onClick)}><FiSave /> {label}</button>;
+  const [busy, setBusy] = useState(false);
+  const pending = useRef(false);
+  return <button className="wg-btn wg-btn-primary mt-4" disabled={busy} onClick={() => {
+    if (pending.current) return;
+    pending.current = true; setBusy(true);
+    void safe(onClick).finally(() => { pending.current = false; setBusy(false); });
+  }}><FiSave /> {busy ? 'Enregistrement…' : label}</button>;
 }
 
 function CompanyForm() {
@@ -34,7 +42,7 @@ function CompanyForm() {
         <Input label="Ville *" value={d.city} onChange={(e) => setD({ ...d, city: e.target.value })} />
         <Input label="Téléphone *" value={d.phone} onChange={(e) => setD({ ...d, phone: e.target.value })} />
       </div>
-      <SaveButton onClick={() => { updateCompany(d); notify('success', 'Identité de l’entreprise enregistrée.'); }} />
+      <SaveButton onClick={async () => { await updateCompany(d); notify('success', 'Identité de l’entreprise enregistrée.'); }} />
     </div>
   );
 }
@@ -52,7 +60,7 @@ function StationForm() {
         <Input label="Ville *" value={d.city} onChange={(e) => setD({ ...d, city: e.target.value })} />
         <Input label="Téléphone" value={d.phone} onChange={(e) => setD({ ...d, phone: e.target.value })} />
       </div>
-      <SaveButton onClick={() => { updateStation(d); notify('success', 'Identité de la station enregistrée.'); }} />
+      <SaveButton onClick={async () => { await updateStation(d); notify('success', 'Identité de la station enregistrée.'); }} />
     </div>
   );
 }
@@ -78,7 +86,7 @@ function HoursForm() {
         ))}
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
-        <button className="wg-btn wg-btn-primary" onClick={() => { setHours(hours); notify('success', 'Horaires enregistrés.'); }}><FiSave /> Enregistrer les horaires</button>
+        <SaveButton label="Enregistrer les horaires" onClick={async () => { await setHours(hours); notify('success', 'Horaires enregistrés.'); }} />
         <button className="wg-btn wg-btn-ghost" onClick={() => setLocal(DEFAULT_DAYS.map((h) => ({ ...h, closed: h.day === 'Dimanche' })))}><FiClock /> Semaine type (lundi–samedi)</button>
       </div>
     </div>
@@ -87,8 +95,9 @@ function HoursForm() {
 
 function CategoriesForm() {
   const { state, addCategory, toggleCategory, removeCategory } = useStore();
+  const safe = useSafeAction();
   const [name, setName] = useState('');
-  const add = (v: string) => { if (!v.trim()) return; addCategory(v); setName(''); };
+  const add = (v: string) => { if (!v.trim()) return; void safe(async () => { await addCategory(v); setName(''); }); };
   return (
     <div>
       <p className="wg-muted mb-4 text-sm">Les types de véhicules que vous lavez. Les libellés proposés ne sont que des raccourcis de saisie : rien n’est ajouté sans votre action.</p>
@@ -106,8 +115,8 @@ function CategoriesForm() {
             <FiTruck className="text-sky-400" />
             <span className="flex-1 font-medium">{c.name}</span>
             <Badge tone={c.active ? 'success' : 'neutral'}>{c.active ? 'Active' : 'Désactivée'}</Badge>
-            <button className="wg-btn wg-btn-ghost !px-2 !py-1 text-xs" onClick={() => toggleCategory(c.id)}>{c.active ? 'Désactiver' : 'Activer'}</button>
-            <button className="wg-muted hover:text-red-400" onClick={() => removeCategory(c.id)} aria-label="Supprimer"><FiTrash2 size={15} /></button>
+            <button className="wg-btn wg-btn-ghost !px-2 !py-1 text-xs" onClick={() => { void safe(() => toggleCategory(c.id)); }}>{c.active ? 'Désactiver' : 'Activer'}</button>
+            <button className="wg-muted hover:text-red-400" onClick={() => { void safe(() => removeCategory(c.id)); }} aria-label="Supprimer"><FiTrash2 size={15} /></button>
           </div>
         ))}
       </div>
@@ -121,9 +130,10 @@ function EmptyLine({ text }: { text: string }) {
 
 function ServicesForm() {
   const { state, addService, updateService, removeService } = useStore();
+  const safe = useSafeAction();
   const [name, setName] = useState('');
   const [desc, setDesc] = useState('');
-  const add = (n: string) => { if (!n.trim()) return; addService(n, desc); setName(''); setDesc(''); };
+  const add = (n: string) => { if (!n.trim()) return; void safe(async () => { await addService(n, desc); setName(''); setDesc(''); }); };
   return (
     <div>
       <p className="wg-muted mb-4 text-sm">Le catalogue est propre à votre station. Les prix se saisissent à l’étape suivante — aucun montant n’est suggéré.</p>
@@ -141,8 +151,8 @@ function ServicesForm() {
           <div key={v.id} className="flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm" style={{ borderColor: 'var(--wg-border)' }}>
             <div className="min-w-0 flex-1"><p className="font-medium">{v.name}</p>{v.description && <p className="wg-muted truncate text-xs">{v.description}</p>}</div>
             <Badge tone={v.active ? 'success' : 'neutral'}>{v.active ? 'Active' : 'Désactivée'}</Badge>
-            <button className="wg-btn wg-btn-ghost !px-2 !py-1 text-xs" onClick={() => updateService(v.id, { active: !v.active })}>{v.active ? 'Désactiver' : 'Activer'}</button>
-            <button className="wg-muted hover:text-red-400" onClick={() => removeService(v.id)} aria-label="Supprimer"><FiTrash2 size={15} /></button>
+            <button className="wg-btn wg-btn-ghost !px-2 !py-1 text-xs" onClick={() => { void safe(() => updateService(v.id, { active: !v.active })); }}>{v.active ? 'Désactiver' : 'Activer'}</button>
+            <button className="wg-muted hover:text-red-400" onClick={() => { void safe(() => removeService(v.id)); }} aria-label="Supprimer"><FiTrash2 size={15} /></button>
           </div>
         ))}
       </div>
@@ -151,7 +161,7 @@ function ServicesForm() {
 }
 
 function PricesForm() {
-  const { state, setPrice, notify } = useStore();
+  const { state, notify } = useStore();
   const cats = state.vehicleCategories.filter((c) => c.active);
   const svcs = state.services.filter((s) => s.active);
   const total = cats.length * svcs.length;
@@ -174,8 +184,7 @@ function PricesForm() {
                     <td className="wg-td font-medium">{s.name}</td>
                     {cats.map((c) => (
                       <td key={c.id} className="wg-td">
-                        <input type="number" min="0" step="500" placeholder="—" className="wg-input !w-32" value={s.prices[c.id] || ''}
-                          onChange={(e) => { try { setPrice(s.id, c.id, readNumber(e.target.value)); } catch (error) { notify('error', error instanceof Error ? error.message : 'Prix invalide.'); } }} />
+                        <PriceInput serviceId={s.id} categoryId={c.id} value={s.prices[c.id]} label={`Prix ${s.name} pour ${c.name}`} />
                       </td>
                     ))}
                   </tr>
@@ -183,7 +192,7 @@ function PricesForm() {
               </tbody>
             </table>
           </div>
-          <p className="wg-muted mt-3 text-xs">Les montants sont enregistrés à chaque saisie.</p>
+          <p className="wg-muted mt-3 text-xs">Le tarif est enregistré lorsque vous quittez la case ou appuyez sur Entrée.</p>
           {filled === total && <button className="wg-btn wg-btn-primary mt-4" onClick={() => notify('success', 'Grille tarifaire constatée complète.')}><FiCheck /> Vérifier la grille</button>}
         </>
       )}
@@ -207,7 +216,7 @@ function PaymentsForm() {
           </label>
         ))}
       </div>
-      <SaveButton onClick={() => { updateStation({ paymentMethods: selected }); notify('success', 'Moyens de paiement enregistrés.'); }} />
+      <SaveButton onClick={async () => { await updateStation({ paymentMethods: selected }); notify('success', 'Moyens de paiement enregistrés.'); }} />
     </div>
   );
 }
@@ -237,10 +246,11 @@ function LogoForm() {
 }
 
 function CashRulesForm() {
-  const { state, updateStation, notify } = useStore();
+  const { state, updateStation, notify, isLocalStockDemo } = useStore();
   const st = state.station;
   const [requires, setRequires] = useState(st?.cashRequiresOpen ?? true);
   const [max, setMax] = useState(st?.maxCashierDiscount ?? 0);
+  if (!isLocalStockDemo) return <Alert kind="warn">En mode connecté, une caisse ouverte est requise pour les espèces. Le plafond de remise du caissier n’est pas encore contrôlé par le serveur et n’est pas configurable ici.</Alert>;
   return (
     <div>
       <p className="wg-muted mb-4 text-sm">Facultatif : des règles par défaut sont déjà appliquées. Elles restent modifiables dans Paramètres.</p>
@@ -249,7 +259,7 @@ function CashRulesForm() {
         <input type="checkbox" className="h-5 w-5 accent-sky-500" checked={requires} onChange={(e) => setRequires(e.target.checked)} />
       </label>
       <div className="mt-3"><Input label="Remise maximale du caissier (FCFA)" type="number" min="0" value={max} onChange={(e) => setMax(readNumber(e.target.value))} /></div>
-      <SaveButton onClick={() => { updateStation({ cashRequiresOpen: requires, maxCashierDiscount: max }); notify('success', 'Règles de caisse enregistrées.'); }} />
+      <SaveButton onClick={async () => { await updateStation({ cashRequiresOpen: requires, maxCashierDiscount: max }); notify('success', 'Règles de caisse enregistrées.'); }} />
     </div>
   );
 }
@@ -261,7 +271,7 @@ function CommissionForm() {
     <div>
       <p className="wg-muted mb-4 text-sm">Barème appliqué aux lavages <strong>terminés</strong> de la période. Une exception peut être posée sur un compte depuis Employés.</p>
       <Input label="Barème de la station (%)" type="number" min="0" max="100" value={rate} onChange={(e) => setRate(readNumber(e.target.value))} hint="0 % tant que vous n’avez pas choisi : aucune commission n’est calculée." />
-      <SaveButton onClick={() => { updateStation({ commissionRate: rate }); notify('success', 'Barème enregistré.'); }} />
+      <SaveButton onClick={async () => { await updateStation({ commissionRate: rate }); notify('success', 'Barème enregistré.'); }} />
     </div>
   );
 }
@@ -273,13 +283,13 @@ function TargetForm() {
     <div>
       <p className="wg-muted mb-4 text-sm">Objectif de chiffre d’affaires du mois, suivi sur le tableau de bord.</p>
       <Input label="Objectif du mois (FCFA)" type="number" min="0" step="10000" value={target} onChange={(e) => setTarget(readNumber(e.target.value))} hint={target > 0 ? `Soit ${formatFCFA(target)}.` : 'Aucun objectif fixé.'} />
-      <SaveButton onClick={() => { updateStation({ monthlyTarget: target }); notify('success', 'Objectif enregistré.'); }} />
+      <SaveButton onClick={async () => { await updateStation({ monthlyTarget: target }); notify('success', 'Objectif enregistré.'); }} />
     </div>
   );
 }
 
 function ActivationForm() {
-  const { state, activateStation, missing, notify } = useStore();
+  const { state, activateStation, missing, notify, canWriteSubscription } = useStore();
   const safe = useSafeAction();
   const navigate = useNavigate();
   const done = state.station?.activated;
@@ -290,7 +300,7 @@ function ActivationForm() {
         <div className="text-center">
           <FiCheckCircle className="mx-auto text-5xl text-emerald-400" />
           <h3 className="mt-4 text-lg font-bold">Station activée</h3>
-          <p className="wg-muted mx-auto mt-2 max-w-md text-sm">L’exploitation est ouverte : fiches, encaissements, caisse et dépenses sont disponibles.</p>
+          <p className="wg-muted mx-auto mt-2 max-w-md text-sm">{canWriteSubscription ? 'L’exploitation est ouverte : fiches, encaissements, caisse et dépenses sont disponibles.' : 'La station reste activée, mais l’abonnement est en lecture seule : les données restent consultables.'}</p>
           <p className="wg-muted mt-1 text-xs">Activée le {state.station?.activatedAt ? new Date(state.station.activatedAt).toLocaleDateString('fr-FR') : '—'}</p>
           <Link to="/app/tableau-de-bord" className="wg-btn wg-btn-primary mt-5">Aller au tableau de bord <FiArrowRight /></Link>
         </div>
@@ -307,8 +317,8 @@ function ActivationForm() {
               <p key={s.id} className="wg-muted text-xs">· {s.name} — grille enregistrée</p>
             ))}
           </div>
-          <button className="wg-btn wg-btn-primary mt-6 !px-6 !py-3" disabled={blockers.length > 0}
-            onClick={() => safe(() => { activateStation(); setTimeout(() => navigate('/app/tableau-de-bord'), 900); })}>
+          <button className="wg-btn wg-btn-primary mt-6 !px-6 !py-3" disabled={!canWriteSubscription || blockers.length > 0}
+            onClick={() => { void safe(async () => { await activateStation(); setTimeout(() => navigate('/app/tableau-de-bord'), 900); }); }}>
             <FiLock /> Activer la station
           </button>
           {blockers.length > 0 && <p className="wg-muted mt-2 text-xs">Le bouton se débloquera automatiquement quand les données seront enregistrées.</p>}
@@ -338,7 +348,8 @@ function StepContent({ id }: { id: string }) {
 }
 
 export default function Onboarding() {
-  const { state, onboarding, missing } = useStore();
+  const { state, onboarding, missing, plans, plansError, subscriptionAccess, subscriptionStatus,
+    canWriteSubscription, authKind, identity } = useStore();
   const [activeId, setActiveId] = useState<string>(() => onboarding.find((s) => s.required && !s.done)?.id ?? 'activation');
   const required = onboarding.filter((s) => s.required);
   const doneRequired = required.filter((s) => s.done).length;
@@ -367,6 +378,26 @@ export default function Onboarding() {
         subtitle="Parcours d’ouverture en treize étapes. Chaque étape est constatée sur les données réellement enregistrées — aucun bouton ne déclare une étape « faite »."
         actions={<Badge tone={state.station?.activated ? 'success' : 'warn'}>{state.station?.activated ? 'Station active' : 'Exploitation fermée'}</Badge>}
       />
+
+      <Card className="mb-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div><h2 className="text-sm font-bold">Votre formule pendant la mise en route</h2>
+            {subscriptionStatus === 'loading' ? <p className="wg-muted mt-1 text-xs">Vérification de l’abonnement…</p> : subscriptionAccess ? <p className="wg-muted mt-1 text-xs">
+              {subscriptionAccess.planName} · {canWriteSubscription ? 'opérations autorisées' : 'lecture seule'}
+              {subscriptionAccess.status === 'trial' && subscriptionAccess.trialEndsAt ? ` · fin de l’essai : ${formatDate(subscriptionAccess.trialEndsAt)}` : ''}
+              {subscriptionAccess.pendingPlanId ? ` · ${authKind === 'local' ? 'choix local' : 'demande en attente'} : ${plans.find((p) => p.id === subscriptionAccess.pendingPlanId)?.name ?? subscriptionAccess.pendingPlanId}` : ''}
+            </p> : <p className="wg-muted mt-1 text-xs">Abonnement indisponible : les écritures ordinaires restent bloquées jusqu’à sa vérification.</p>}
+          </div>
+          {identity?.permissions.includes('subscription.manage') && <Link to="/app/abonnement" className="wg-link text-xs">Gérer l’abonnement →</Link>}
+        </div>
+        <p className="wg-muted mt-3 text-xs">Essai de 14 jours avec tous les modules ; Standard et Premium nécessitent une demande et une validation administrateur. Une validation anticipée met fin immédiatement à l’essai. Aucun paiement automatique. Après expiration, les données restent consultables.</p>
+        {plansError ? <p className="mt-3 text-xs text-amber-400">Formules indisponibles : {plansError}</p> :
+          <details className="mt-3 text-xs"><summary className="cursor-pointer font-bold text-sky-400">Comparer tarifs, limites et modules</summary>
+            <div className="mt-3 grid gap-3 lg:grid-cols-3">{plans.filter((p) => ['essai', 'standard', 'premium'].includes(p.id)).map((p) => <div key={p.id} className="rounded-xl border p-3" style={{ borderColor: 'var(--wg-border)' }}>
+              <p className="mb-2 font-bold">{p.name} · {p.id === 'essai' ? 'Gratuit / 14 jours' : `${formatFCFA(p.priceMonthly)} / mois`}</p><PlanDetails plan={p} compact />
+            </div>)}</div><p className="wg-muted mt-2">Comptes actifs : propriétaire inclus. Tarifs indicatifs à valider commercialement.</p>
+          </details>}
+      </Card>
 
       <Card className="mb-6">
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-bold">
@@ -415,7 +446,9 @@ export default function Onboarding() {
             </div>
             <span className="wg-muted text-[11px]">{onboarding.findIndex((s) => s.id === active.id) + 1} / 13</span>
           </div>
-          <StepContent id={active.id} />
+          {active.id === 'logo' ? <StepContent id={active.id} /> : <fieldset disabled={!canWriteSubscription} className="min-w-0">
+            <StepContent id={active.id} />
+          </fieldset>}
           {!active.done && <p className="wg-muted mt-5 border-t pt-3 text-[11px]" style={{ borderColor: 'var(--wg-border)' }}><FiAlertCircle className="mr-1 inline" />{active.hint}</p>}
         </Card>
       </div>

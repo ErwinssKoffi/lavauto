@@ -1,5 +1,5 @@
 import type {
-  AppState, AppUser, Client, PayMethod, Plan, ProfitabilityReport, Wash, WashPost,
+  AppState, AppUser, Client, Company, PayMethod, Plan, ProfitabilityReport, Station, Wash, WashPost,
   WashQualityResult, WashStatus,
 } from '../../types';
 import { isSupabaseConfigured, supabase } from '../../lib/supabase';
@@ -21,6 +21,7 @@ import type {
 import type {
   AnalyticsSnapshot, PlatformSnapshot, SubscriptionUsageSnapshot,
 } from '../../lib/analytics';
+import type { SubscriptionAccess, SubscriptionRequest } from '../../lib/subscription';
 import { LocalDataAdapter } from './LocalDataAdapter';
 import { SupabaseDataAdapter, type SupabaseReader } from './SupabaseDataAdapter';
 
@@ -93,6 +94,27 @@ export interface CatalogSnapshot {
   categories: CatalogCategory[];
   services: CatalogService[];
   prices: CatalogPrice[];
+}
+
+/** Lecture cohérente du paramétrage et du catalogue d'une seule station. */
+export interface StationSetupSnapshot {
+  company: Company;
+  station: Station;
+  catalog: CatalogSnapshot;
+}
+export type CompanySetupPatch = Partial<Pick<Company, 'name' | 'city' | 'phone'>>;
+export type StationSetupPatch = Partial<Pick<Station,
+  'name' | 'address' | 'city' | 'phone' | 'hours' | 'paymentMethods' | 'commissionRate' | 'monthlyTarget'>>;
+
+/** Commandes réservées aux RPC vérifiant les permissions et la station côté serveur. */
+export interface SetupCommands {
+  read(stationId: string): Promise<StationSetupSnapshot>;
+  saveCompany(stationId: string, patch: CompanySetupPatch): Promise<void>;
+  saveStation(stationId: string, patch: StationSetupPatch): Promise<void>;
+  saveCategory(stationId: string, id: string | null, name: string, active: boolean, remove?: boolean): Promise<string>;
+  saveService(stationId: string, id: string | null, name: string, description: string, active: boolean, remove?: boolean): Promise<string>;
+  savePrice(stationId: string, serviceId: string, categoryId: string, price: number): Promise<void>;
+  activate(stationId: string): Promise<void>;
 }
 
 /** Payload de création : aucun tenant, prix relus et figés par le serveur. */
@@ -226,9 +248,21 @@ export interface AnalyticsCommands {
   setCompanySuspended(p: CompanySuspensionPayload): Promise<void>;
 }
 
+/** L'entreprise est déduite du JWT ; seule la décision admin porte un ID de demande. */
+export interface SubscriptionCommands {
+  read(companyId: string): Promise<SubscriptionAccess>;
+  request(planId: string): Promise<string>;
+  listRequests(): Promise<SubscriptionRequest[]>;
+  decide(requestId: string, approve: boolean): Promise<void>;
+}
+
 /** Interface commune : deux implémentations, mêmes types de domaine. */
 export interface DataAdapter {
   readonly source: DataSource;
+  /** Mise en route connectée : null en démonstration locale. */
+  readonly setupCommands: SetupCommands | null;
+  /** État et demandes d’abonnement vérifiés par le serveur, null en démonstration. */
+  readonly subscriptionCommands: SubscriptionCommands | null;
   /** Formules actives + limites : table `plans` / `plan_limits`. */
   listPlans(): Promise<Plan[]>;
   /** Contexte du tenant, déduit du JWT côté serveur, sans identifiant client. */

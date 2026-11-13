@@ -5,7 +5,7 @@
 // Les réponses n'exposent jamais d'identifiant brut de tenant aux écrans.
 import type { AppState, Plan, ProfitabilityReport } from '../types';
 import {
-  buildProfitability, mapProfitability,
+  buildProfitability, mapProfitability, redactStockProfitability,
 } from './finance';
 import { withStockDefaults } from './stock';
 import { getPlans, planById } from './plans';
@@ -21,7 +21,7 @@ export interface AnalyticsStation {
   collected: number;
   receivables: number;
   expenses: number;
-  consumptions: number;
+  consumptions: number | null;
   partialBalance: number;
   washCount: number;
   /** Aucun résultat net par station sans attestation de période certifiée. */
@@ -81,6 +81,19 @@ export interface AnalyticsSnapshot {
   rules: AnalyticsRules;
 }
 
+/** Occultation non destructive lorsque la consolidation est incluse sans stock. */
+export function redactStockAnalytics(board: AnalyticsSnapshot): AnalyticsSnapshot {
+  return {
+    ...board,
+    period: redactStockProfitability(board.period),
+    compare: board.compare ? redactStockProfitability(board.compare) : null,
+    stations: board.stations.map((station) => ({
+      ...station, consumptions: null, grossMargin: null, result: null, certified: false,
+    })),
+    stats: { ...board.stats, certified: false },
+  };
+}
+
 export interface SubscriptionUsageSnapshot {
   periodStart: string;
   usage: { stations: number; employees: number; washes: number };
@@ -107,6 +120,8 @@ export interface PlatformCompanyView {
   planName: string | null;
   subscriptionStatus: string | null;
   subscriptionStartedAt: string | null;
+  /** Motif de lecture seule calculé par le serveur, y compris l’échéance. */
+  subscriptionReason: string | null;
   stationCount: number;
   employeeCount: number;
   washesMonth: number;
@@ -241,9 +256,14 @@ function isoDay(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-/** Premier jour du mois courant, sans décalage de fuseau. */
+/** Premier jour du mois courant pour les rapports à la date locale. */
 export function monthStartISO(date = new Date()): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`;
+}
+
+/** Les quotas sont calculés sur le mois calendaire UTC côté serveur. */
+export function quotaMonthStartISO(date = new Date()): string {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-01`;
 }
 
 /** Période précédente de MÊME longueur, pour comparer des définitions égales. */
@@ -393,7 +413,7 @@ function stationFromRow(row: Row): AnalyticsStation {
   return {
     rank: num(row.rank), stationId: str(row.stationId), name: str(row.name), city: str(row.city),
     revenue: num(row.revenue), collected: num(row.collected), receivables: num(row.receivables),
-    expenses: num(row.expenses), consumptions: num(row.consumptions),
+    expenses: num(row.expenses), consumptions: nullableNum(row.consumptions),
     partialBalance: num(row.partialBalance), washCount: num(row.washCount),
     grossMargin: nullableNum(row.grossMargin), result: nullableNum(row.result),
     certified: bool(row.certified),
@@ -444,7 +464,7 @@ export function mapAnalyticsBoard(value: unknown): AnalyticsSnapshot {
   };
 }
 
-export function emptySubscriptionUsage(periodStart = monthStartISO()): SubscriptionUsageSnapshot {
+export function emptySubscriptionUsage(periodStart = quotaMonthStartISO()): SubscriptionUsageSnapshot {
   return {
     periodStart,
     usage: { stations: 0, employees: 0, washes: 0 },
@@ -454,12 +474,12 @@ export function emptySubscriptionUsage(periodStart = monthStartISO()): Subscript
   };
 }
 
-export function subscriptionUsageFromState(state: AppState, periodStart = monthStartISO()): SubscriptionUsageSnapshot {
-  const monthEnd = isoDay(new Date(new Date(`${periodStart}T00:00:00Z`).setUTCMonth(
-    new Date(`${periodStart}T00:00:00Z`).getUTCMonth() + 1,
-  ) - 86_400_000));
+export function subscriptionUsageFromState(state: AppState, periodStart = quotaMonthStartISO()): SubscriptionUsageSnapshot {
+  const start = new Date(`${periodStart}T00:00:00Z`);
+  const end = new Date(start);
+  end.setUTCMonth(end.getUTCMonth() + 1);
   const washes = state.washes.filter((w) => w.status !== 'cancelled'
-    && localDate(w.createdAt) >= periodStart && localDate(w.createdAt) <= monthEnd);
+    && Date.parse(w.createdAt) >= start.getTime() && Date.parse(w.createdAt) < end.getTime());
   const plan = planById(state.subscription?.planId);
   return {
     periodStart,
@@ -534,6 +554,7 @@ export function platformBoardFromState(state: AppState, plans: Plan[] = getPlans
       washesPerMonth: plan.limits.washesPerMonth,
     } : { stations: null, employees: null, washesPerMonth: null };
     const quotaExceeded = (limits.stations !== null && c.stations > limits.stations)
+      || (limits.employees !== null && (c.employeeCount ?? 0) > limits.employees)
       || (limits.washesPerMonth !== null && (c.washesMonth ?? 0) > limits.washesPerMonth);
     return {
       companyId: c.id, name: c.name, city: c.city, phone: c.phone,
@@ -543,6 +564,7 @@ export function platformBoardFromState(state: AppState, plans: Plan[] = getPlans
       planName: c.planName,
       subscriptionStatus: c.status,
       subscriptionStartedAt: c.createdAt,
+      subscriptionReason: null,
       stationCount: c.stations,
       employeeCount: c.employeeCount ?? 0,
       washesMonth: c.washesMonth ?? 0,
@@ -603,6 +625,7 @@ function companyFromRow(row: Row): PlatformCompanyView {
     planId: nullableStr(row.planId), planName: nullableStr(row.planName),
     subscriptionStatus: nullableStr(row.subscriptionStatus),
     subscriptionStartedAt: nullableStr(row.subscriptionStartedAt),
+    subscriptionReason: nullableStr(row.subscriptionReason),
     stationCount: num(row.stationCount), employeeCount: num(row.employeeCount),
     washesMonth: num(row.washesMonth), monthlyRevenue: num(row.monthlyRevenue),
     companyCreatedAt: str(row.companyCreatedAt),

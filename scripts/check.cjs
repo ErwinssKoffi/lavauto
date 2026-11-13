@@ -47,7 +47,7 @@ const base = () => ({
   washPosts:[{id:'p1',stationId:'st1',name:'Piste 1',capacity:2,active:true}],
   cashSessions:[{id:'ca1',stationId:'st1',openedBy:'Erwin Koffi',openedAt:now,openingFloat:10000,closedAt:null,countedAmount:null,closedBy:null,status:'ouverte',reopenReason:null,reopenedAt:null}],
   expenses:[{id:'e1',stationId:'st1',amount:1500,category:'Fournitures',reason:'Shampoing',supplier:'Fournisseur',date:now.slice(0,10),method:'especes',cashSessionId:'ca1',status:'enregistree',cancelReason:null,createdBy:'Erwin Koffi',createdAt:now}],
-  subscription:{id:'sub1',companyId:'co1',planId:'essai',status:'essai',startedAt:now,trialEndsAt:now,pendingPlanId:null},
+  subscription:{id:'sub1',companyId:'co1',planId:'essai',status:'essai',startedAt:now,trialEndsAt:new Date(Date.now()+14*86400000).toISOString(),pendingPlanId:null},
   auditLogs:[{id:'l1',at:now,actor:'Erwin Koffi',action:'Station activée',detail:'Ouverture'}],
   platformCompanies:[{id:'co1',name:'Clean Auto SARL',city:'Abidjan',phone:'',planName:'Essai',status:'essai',stations:1,monthlyRevenue:0,createdAt:now}],
   session:{userId:'u1',email:'erwin@cleanauto.ci',name:'Erwin Koffi',role:'proprietaire',companyId:'co1',stationId:'st1'},
@@ -74,16 +74,18 @@ const DEFINE = {
     VITE_SUPABASE_STORAGE_BUCKET: 'station-assets',
   }),
 };
+const entitlementRows = (enabled) => ['stock','loyalty','fleets','consolidation','audit']
+  .map((feature_key) => ({ feature_key, enabled }));
 const PLAN_ROWS = [
   { id:'essai', name:'Essai', price_monthly_minor:0, currency_code:'XOF', trial_days:14, sort_order:1,
     features:['14 jours pour ouvrir votre station','1 station, 3 comptes employés','100 lavages pour démarrer'],
-    plan_limits:[{key:'stations',value_int:1},{key:'employees',value_int:3},{key:'washes_per_month',value_int:100}] },
+    plan_limits:[{key:'stations',value_int:1},{key:'employees',value_int:3},{key:'washes_per_month',value_int:100}], plan_entitlements:entitlementRows(true) },
   { id:'standard', name:'Standard', price_monthly_minor:16000, currency_code:'XOF', trial_days:0, sort_order:2,
     features:['1 station, 10 comptes employés','1 000 lavages par mois','Rapports et exports CSV'],
-    plan_limits:[{key:'stations',value_int:1},{key:'employees',value_int:10},{key:'washes_per_month',value_int:1000}] },
+    plan_limits:[{key:'stations',value_int:1},{key:'employees',value_int:10},{key:'washes_per_month',value_int:1000}], plan_entitlements:entitlementRows(false) },
   { id:'premium', name:'Premium', price_monthly_minor:35000, currency_code:'XOF', trial_days:0, sort_order:3,
     features:['Jusqu’à 5 stations','50 comptes employés','Support prioritaire'],
-    plan_limits:[{key:'stations',value_int:5},{key:'employees',value_int:50},{key:'washes_per_month',value_int:100000}] },
+    plan_limits:[{key:'stations',value_int:5},{key:'employees',value_int:50},{key:'washes_per_month',value_int:100000}], plan_entitlements:entitlementRows(true) },
 ];
 if (MODE === 'supabase') {
   globalThis.fetch = async (input) => {
@@ -127,6 +129,10 @@ function makeDom(url, state) {
   w.__WG_TEST_SESSION__ = { session: state?.session ?? null };
   w.localStorage.setItem('washguard.theme','dark');
   w.matchMedia = () => ({matches:false,addListener(){},removeListener(){},addEventListener(){},removeEventListener(){}});
+  let lockQueue = Promise.resolve();
+  Object.defineProperty(w.navigator, 'locks', { configurable:true, value:{ request:(_name,_options,action) => {
+    const pending = lockQueue.then(action); lockQueue = pending.catch(() => {}); return pending;
+  } } });
   // Recharts utilise ResizeObserver, absent de JSDOM : donner une taille
   // déterministe au conteneur plutôt que faire planter l'arbre React.
   w.ResizeObserver = class {
@@ -168,7 +174,8 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
   // ── 1. Logique pure ───────────────────────────────────────────────────────
   console.log('\n[1] Logique métier / formatage');
   const logic = await build({ contents:`
-    export { computeOnboarding, missingRequired, load, persist, DEFAULT_DAYS, emptyState } from './src/lib/store.tsx';
+    export { computeOnboarding, missingRequired, load, DEFAULT_DAYS, emptyState } from './src/lib/store.tsx';
+    export { serializeDemoState, writeDemoState } from './src/lib/demoStorage.ts';
     export { formatFCFA, formatDate, todayISO, downloadCSV } from './src/lib/format.ts';
     export { buildReport, buildCommissions, theoreticalCash, periodRange } from './src/lib/metrics.ts';
     export { PLANS, planById } from './src/lib/plans.ts';
@@ -194,7 +201,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     check('session non forgeable : localStorage ne restaure jamais la session', scrubbed.session === null);
     w.__WG_TEST_SESSION__ = { session: { ...base().session, role: 'proprietaire' } };
     const injected = L.load();
-    L.persist(injected);
+    L.writeDemoState(L.serializeDemoState(injected));
     const persisted = w.localStorage.getItem('washguard.state.v1') || '';
     check('harnais JSDOM : session en mémoire, jamais écrite dans l’état persisté',
       injected.session?.role === 'proprietaire' && !persisted.includes('\"session\"'));
@@ -241,8 +248,12 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     import { StoreProvider, useStore } from './src/lib/store.tsx';
     function H(){
       const s = useStore();
+      const ran = React.useRef(false);
       React.useEffect(()=>{
-        const out=[]; const mode=window.__mode||'guard';
+        const mode=window.__mode||'guard';
+        if (ran.current || (mode==='guard' && s.plans.length===0)) return;
+        ran.current = true;
+        const out=[];
         const call=(label,fn)=>{try{fn();out.push(label+':OK');}catch(e){out.push(label+':'+e.code+':'+(e.missing||[]).length);}};
         if(mode==='guard'){
           const w=(p)=>s.createWash({categoryId:'c1',plate:'',employeeId:'u1',clientId:null,clientName:'',items:[{serviceId:'s1',qty:1}],discount:0,payment:p});
@@ -263,7 +274,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
           call('reopen',()=>s.reopenCash('ca1','Erreur de comptage'));
         }
         document.body.dataset.results=JSON.stringify(out);
-      },[]);
+      },[s.plans]);
       return null;
     }
     createRoot(document.getElementById('root')).render(React.createElement(StoreProvider,null,React.createElement(H)));
@@ -279,6 +290,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
   for (const [label, state, expected] of guardScenarios) {
     const { dom, w } = makeDom('/', state); w.__mode='guard';
     const errs = await mount(hcode, w);
+    await waitUntil(() => Boolean(w.document.body.dataset.results));
     const got = JSON.parse(w.document.body.dataset.results || '[]');
     check(label, expected.every((e,i)=>got[i]===e) && errs.length===0, got.join(' | ')+' err='+errs.length);
     dom.window.close();
@@ -420,7 +432,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
       fs.existsSync(path.join(ROOT,'docs/landing.md'));
   })());
   check('vitrine : tarifs depuis plans, aucun prix local en repli',
-    landing.includes('plans.map((plan)') && landing.includes('formatFCFA(plan.priceMonthly)') &&
+    landing.includes('.map((plan)') && landing.includes('formatFCFA(plan.priceMonthly)') &&
     landing.includes('plansError') && landing.includes('Formules et tarifs indisponibles') &&
     landing.includes('Aucun prix local') && !/priceMonthly:\s*\d/.test(landing));
   check('landing ixartz : 9 illustrations et licence MIT copiées',
@@ -460,7 +472,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     Object.keys(pkg.dependencies).length === 8 && Object.keys(pkg.devDependencies).length >= 13 &&
     Boolean(pkg.dependencies.jspdf) && Boolean(pkg.dependencies.zod) && Boolean(pkg.devDependencies['pdfjs-dist']) &&
     String(pkg.dependencies.recharts).startsWith('^2.') &&
-    String(pkg.dependencies['react-router-dom']).startsWith('^6.'));
+    String(pkg.dependencies['react-router-dom']).startsWith('^7.'));
   check('tokens : focus clavier, mouvement réduit, élévation, squelette',
     [':focus-visible','prefers-reduced-motion','--wg-elev-2','wg-nav-item-active','wg-skeleton'].every((token) => cssSrc.includes(token)));
   check('états réels branchés : chargement, erreur, confirmation, tableau',
@@ -537,14 +549,18 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     w.confirm = () => { confirmCalls++; return true; };
     const errs = await mount(acode, w);
     const button = [...w.document.querySelectorAll('button')].find((b) => b.textContent.includes('Réinitialiser la démonstration'));
-    button.dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true, view: w }));
-    await wait(120);
-    const dialog = w.document.querySelector('[role="dialog"][aria-modal="true"]');
-    check('confirmation accessible : plus de window.confirm', Boolean(dialog) && confirmCalls === 0 && dialog.textContent.includes('Tout effacer'));
-    w.document.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    await wait(120);
-    check('confirmation : Échap ferme sans effacer les données',
-      !w.document.querySelector('[role="dialog"][aria-modal="true"]') && Boolean(w.localStorage.getItem('washguard.state.v1')) && errs.length === 0);
+    if (MODE === 'local') {
+      button?.dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true, view: w }));
+      await wait(120);
+      const dialog = w.document.querySelector('[role="dialog"][aria-modal="true"]');
+      check('confirmation accessible : plus de window.confirm', Boolean(dialog) && confirmCalls === 0 && dialog.textContent.includes('Tout effacer'));
+      w.document.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      await wait(120);
+      check('confirmation : Échap ferme sans effacer les données',
+        !w.document.querySelector('[role="dialog"][aria-modal="true"]') && Boolean(w.localStorage.getItem('washguard.state.v1')) && errs.length === 0);
+    } else {
+      check('configuration mixte : réinitialisation locale indisponible', !button && confirmCalls === 0 && errs.length === 0);
+    }
     dom.window.close();
   }
   {
@@ -573,8 +589,8 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
   const s009 = read('supabase/migrations/009_rls.sql');
   const s010 = read('supabase/migrations/010_functions_triggers.sql');
 
-  check('54 migrations locales numérotées 001 → 055, correctif 048 absent',
-    sqlFiles.length === 54 && sqlFiles[0].startsWith('001_') && sqlFiles[19].startsWith('020_') &&
+  check('56 migrations locales numérotées 001 → 057, correctif 048 absent',
+    sqlFiles.length === 56 && sqlFiles[0].startsWith('001_') && sqlFiles[19].startsWith('020_') &&
     sqlFiles[20].startsWith('021_') && sqlFiles[21].startsWith('022_') && sqlFiles[22].startsWith('023_') &&
     sqlFiles[23].startsWith('024_') && sqlFiles[24].startsWith('025_') && sqlFiles[25].startsWith('026_') &&
     sqlFiles[26].startsWith('027_') && sqlFiles[27].startsWith('028_') && sqlFiles[28].startsWith('029_') &&
@@ -589,7 +605,8 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     sqlFiles[45].startsWith('046_') && sqlFiles[46].startsWith('047_') &&
     sqlFiles[47].startsWith('049_') && sqlFiles[48].startsWith('050_') && sqlFiles[49].startsWith('051_') &&
     sqlFiles[50].startsWith('052_') && sqlFiles[51].startsWith('053_') &&
-    sqlFiles[52].startsWith('054_') && sqlFiles[53].startsWith('055_') && !sqlFiles.some((f) => f.startsWith('048_')));
+    sqlFiles[52].startsWith('054_') && sqlFiles[53].startsWith('055_') && sqlFiles[54].startsWith('056_') &&
+    sqlFiles[55].startsWith('057_') && !sqlFiles.some((f) => f.startsWith('048_')));
   check('053 WhatsApp : consentement distinct, file séparée, journal immuable et worker privé', (() => {
     const wa = read('supabase/migrations/053_whatsapp_wash_notifications.sql');
     return wa.includes('whatsapp_consent_granted boolean NOT NULL DEFAULT false') &&
@@ -823,6 +840,8 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
   const s016 = read('supabase/migrations/016_owner_guard.sql');
   const s017 = read('supabase/migrations/017_granular_user_permissions.sql');
   const edge = read('supabase/functions/invite-user/index.ts');
+  const invitationFlow = read('supabase/functions/_shared/invitation.ts');
+  const subscriptionSql = read('supabase/migrations/057_subscription_entitlements.sql');
   const authDoc = read('docs/auth-rbac.md');
 
   check('bootstrap Auth : company_id dérivé du JWT, jamais du navigateur',
@@ -848,8 +867,9 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
     !s015.includes('.eq(') && authDoc.includes('onAuthStateChange'));
   check('Edge Function : JWT, permission serveur, secret hors dépôt',
     edge.includes("Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')") &&
-    edge.includes("has_permission") && edge.includes('employees.invite') &&
-    edge.includes('inviteUserByEmail') && !frontendSrc.includes('SUPABASE_SERVICE_ROLE_KEY'));
+    invitationFlow.includes('auth.getUser(') && invitationFlow.includes("rpc('reserve_user_invitation'") &&
+    invitationFlow.includes('inviteUserByEmail') && subscriptionSql.includes("has_permission('employees.invite')") &&
+    subscriptionSql.includes('public.assert_subscription_limit') && !frontendSrc.includes('SUPABASE_SERVICE_ROLE_KEY'));
   check('aucun mot de passe importé ni stocké dans AppState',
     !/passwords\s*:/.test(read('src/types.ts')) && !/passwords\s*:/.test(read('src/lib/store.tsx')) &&
     !read('src/pages/Employees.tsx').includes('Mot de passe provisoire') &&
@@ -927,7 +947,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
         return { data: null, error: null };
       },
       functions: {
-        async invoke(name, options) { calls.invite = { name, body: options.body }; return { data: { invitationId: 'inv-1' }, error: null }; },
+        async invoke(name, options) { calls.invite = { name, body: options.body }; return { data: { ok: true, userId: 'u-invited', invitationId: 'inv-1' }, error: null }; },
       },
     };
     return { client, calls, emit: (event, token='token-1') => handlers.forEach((h) => h(event, { access_token: token })) };
@@ -1181,7 +1201,10 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
       const persisted = () => JSON.parse(localStorage.getItem('washguard.state.v1') || '{}');
       function H() {
         const s = useStore();
+        const ran = React.useRef(false);
         React.useEffect(() => {
+          if (ran.current || s.plans.length === 0) return;
+          ran.current = true;
           (async () => {
             const out = {};
             try {
@@ -1226,14 +1249,14 @@ const read = (p) => fs.readFileSync(path.join(ROOT,p),'utf8');
             } catch (e) { out.error = (e.code || 'ERR') + ':' + e.message; }
             document.body.dataset.results = JSON.stringify(out);
           })();
-        }, []);
+        }, [s.plans]);
         return null;
       }
       createRoot(document.getElementById('root')).render(React.createElement(StoreProvider,null,React.createElement(H)));
     `, resolveDir: ROOT, sourcefile: 'lifecycle.tsx', loader: 'tsx' });
     const { dom, w } = makeDom('/', base());
     const errs = await mount(harness.outputFiles[0].text, w);
-    await wait(400);
+    await waitUntil(() => Boolean(w.document.body.dataset.results));
     const out = JSON.parse(w.document.body.dataset.results || '{}');
     check('cycle local complet : ready ≠ delivered, qualité validée, annulation motivée',
       !out.error && out.created.status === 'assigned' && out.created.assigned === 2 &&

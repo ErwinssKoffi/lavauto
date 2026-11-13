@@ -17,7 +17,7 @@ import {
 
 export default function Cash() {
   const {
-    state, dataSource, authReady, identity, openCash, closeCash, reopenCash,
+    state, dataSource, authReady, identity, canWriteSubscription, openCash, closeCash, reopenCash,
     reconcileChannel, refreshFinance,
   } = useStore();
   const safe = useSafeAction();
@@ -31,6 +31,7 @@ export default function Cash() {
   const [end, setEnd] = useState(todayISO());
   const [countedByMethod, setCountedByMethod] = useState<Record<string, number | ''>>({});
   const activated = Boolean(state.station?.activated);
+  const canOperate = activated && canWriteSubscription;
   const open = state.cashSessions.find((c) => c.status === 'ouverte');
   const theoretical = open ? theoreticalCash(state, open.id) : 0;
   const methods = financeSnapshotFromState(state).paymentMethods.filter((m) => m.active);
@@ -48,8 +49,8 @@ export default function Cash() {
           {dataSource === 'supabase' && authReady && identity &&
             <button className="wg-btn wg-btn-ghost" onClick={() => safe(() => refreshFinance())}><FiRefreshCw /> Actualiser</button>}
           {open
-            ? <button className="wg-btn wg-btn-danger" disabled={!activated} onClick={() => { setCounted(theoretical); setCloseMode(true); }}><FiLock /> Clôturer avec comptage</button>
-            : <button className="wg-btn wg-btn-primary" disabled={!activated} onClick={() => setOpenMode(true)}><FiPlus /> Ouvrir la caisse</button>}
+            ? <button className="wg-btn wg-btn-danger" disabled={!canOperate} onClick={() => { setCounted(theoretical); setCloseMode(true); }}><FiLock /> Clôturer avec comptage</button>
+            : <button className="wg-btn wg-btn-primary" disabled={!canOperate} onClick={() => setOpenMode(true)}><FiPlus /> Ouvrir la caisse</button>}
         </div>}
       />
       {!activated && <div className="mb-5"><LockedPanel /></div>}
@@ -70,7 +71,7 @@ export default function Cash() {
           <StatCard label="Mouvements" value={String(movements.filter((m) => m.cashSessionId === open.id).length)} hint="Journal P06 signé" icon={<FiDollarSign />} accent="bg-amber-500/10 text-amber-400" />
         </div>
       ) : (
-        <Card className="mb-5"><EmptyState icon={<FiDollarSign />} title="Aucune caisse ouverte" description="Ouvrez une caisse avec un fond pour autoriser les encaissements en espèces. Les autres moyens de paiement restent enregistrables." action={activated ? <button className="wg-btn wg-btn-primary" onClick={() => setOpenMode(true)}><FiPlus /> Ouvrir la caisse</button> : undefined} /></Card>
+        <Card className="mb-5"><EmptyState icon={<FiDollarSign />} title="Aucune caisse ouverte" description="Ouvrez une caisse avec un fond pour autoriser les encaissements en espèces. Les autres moyens de paiement restent enregistrables." action={activated ? <button className="wg-btn wg-btn-primary" disabled={!canOperate} onClick={() => setOpenMode(true)}><FiPlus /> Ouvrir la caisse</button> : undefined} /></Card>
       )}
 
       <Card className="mt-5">
@@ -97,7 +98,7 @@ export default function Cash() {
                       <td className="wg-td">{ecart === null || ecart === undefined ? '—' : <span className={ecart === 0 ? 'text-emerald-400' : 'text-amber-400'}>{ecart > 0 ? '+' : ''}{formatFCFA(ecart)}</span>}</td>
                       <td className="wg-td"><Badge tone={c.status === 'ouverte' ? 'success' : 'neutral'}>{c.status === 'ouverte' ? 'Ouverte' : 'Clôturée'}</Badge></td>
                       <td className="wg-td">
-                        {c.status === 'cloturee' && !open && <button className="wg-link text-xs" onClick={() => { setReopenId(c.id); setReason(''); }}><FiRotateCcw className="inline" /> Réouvrir</button>}
+                        {c.status === 'cloturee' && !open && <button className="wg-link text-xs" disabled={!canOperate} onClick={() => { setReopenId(c.id); setReason(''); }}><FiRotateCcw className="inline" /> Réouvrir</button>}
                         {c.reopenReason && <p className="wg-muted mt-1 text-[10px]">Motif : {c.reopenReason}</p>}
                       </td>
                     </tr>
@@ -157,10 +158,10 @@ export default function Cash() {
                   </div>
                   <p className="wg-muted text-xs">{!frozen && dataSource === 'supabase' ? 'Estimation sur les fiches chargées' : 'Attendu sur la période'} : {formatFCFA(expected)} · {m.affectsCash ? 'impacte la caisse espèces' : 'hors caisse espèces'}</p>
                   <div className="mt-3 flex gap-2">
-                    <Input label={`Compté ${name} (FCFA)`} type="number" min="0" step="1" value={value} disabled={frozen}
+                    <Input label={`Compté ${name} (FCFA)`} type="number" min="0" step="1" value={value} disabled={frozen || !canOperate}
                       hint={!frozen ? 'Saisissez un montant entier positif ou nul.' : undefined}
                       onChange={(e) => setCountedByMethod({ ...countedByMethod, [m.id]: e.target.value === '' ? '' : readNumber(e.target.value) })} />
-                    <button className="wg-btn wg-btn-primary whitespace-nowrap" disabled={frozen || !activated || invalid}
+                    <button className="wg-btn wg-btn-primary whitespace-nowrap" disabled={frozen || !canOperate || invalid}
                       onClick={() => { if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) void safe(async () => { await reconcileChannel(m.id, start, end, value); }); }}>
                       <FiLock /> Figer
                     </button>
@@ -198,10 +199,10 @@ export default function Cash() {
       </Card>
 
       <Modal open={openMode} onClose={() => setOpenMode(false)} title="Ouvrir la caisse">
-        <Input label="Fond de caisse (FCFA) *" type="number" min="0" value={float} onChange={(e) => setFloat(readNumber(e.target.value))} hint="Montant en espèces présent au départ." />
+        <Input label="Fond de caisse (FCFA) *" type="number" min="0" disabled={!canOperate} value={float} onChange={(e) => setFloat(readNumber(e.target.value))} hint="Montant en espèces présent au départ." />
         <div className="mt-5 flex justify-end gap-2">
           <button className="wg-btn wg-btn-ghost" onClick={() => setOpenMode(false)}><FiX /> Annuler</button>
-          <button className="wg-btn wg-btn-primary" onClick={() => safe(async () => { await openCash(float); setOpenMode(false); })}>Ouvrir la caisse</button>
+          <button className="wg-btn wg-btn-primary" disabled={!canOperate} onClick={() => safe(async () => { await openCash(float); setOpenMode(false); })}>Ouvrir la caisse</button>
         </div>
       </Modal>
 
@@ -252,6 +253,7 @@ export default function Cash() {
           label="Montant physique compté (FCFA) *"
           type="number"
           min="0"
+          disabled={!canOperate}
           value={counted}
           onChange={(e) => setCounted(readNumber(e.target.value))}
           hint="Saisissez la valeur exacte des billets et pièces comptés."
@@ -261,6 +263,7 @@ export default function Cash() {
           <button className="wg-btn wg-btn-ghost" onClick={() => setCloseMode(false)}>Annuler</button>
           <button
             className="wg-btn wg-btn-primary"
+            disabled={!canOperate}
             onClick={() => safe(async () => {
               await closeCash(counted);
               setCloseMode(false);
@@ -273,10 +276,10 @@ export default function Cash() {
 
       <Modal open={Boolean(reopenId)} onClose={() => setReopenId(null)} title="Réouverture motivée">
         <p className="wg-muted mb-4 text-sm">Toute réouverture doit être motivée. Le dernier comptage devient le nouveau fond ; les mouvements précédents ne sont pas recomptés.</p>
-        <Input label="Motif *" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ex. erreur de comptage à la clôture" />
+        <Input label="Motif *" disabled={!canOperate} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ex. erreur de comptage à la clôture" />
         <div className="mt-5 flex justify-end gap-2">
           <button className="wg-btn wg-btn-ghost" onClick={() => setReopenId(null)}>Annuler</button>
-          <button className="wg-btn wg-btn-primary" onClick={() => safe(async () => { if (reopenId) await reopenCash(reopenId, reason); setReopenId(null); })}><FiRotateCcw /> Réouvrir</button>
+          <button className="wg-btn wg-btn-primary" disabled={!canOperate} onClick={() => safe(async () => { if (reopenId) await reopenCash(reopenId, reason); setReopenId(null); })}><FiRotateCcw /> Réouvrir</button>
         </div>
       </Modal>
     </div>

@@ -9,11 +9,12 @@ import {
 } from '../components/ui';
 
 export default function Consumptions() {
-  const { state, dataSource, refreshStock, saveServiceConsumption, consumeWash } = useStore();
+  const { state, dataSource, canWriteSubscription, refreshStock, saveServiceConsumption, consumeWash } = useStore();
   const safe = useSafeAction();
   const [open, setOpen] = useState(false);
   const [f, setF] = useState({ serviceId: '', productId: '', qtyPerWash: 1, active: true });
   const activated = Boolean(state.station?.activated);
+  const canOperate = activated && canWriteSubscription;
   const productById = new Map(state.products.map((p) => [p.id, p]));
   const serviceById = new Map(state.stockServices.map((s) => [s.id, s]));
   const consumed = new Set(state.consumptionRuns.map((r) => r.washId));
@@ -26,7 +27,7 @@ export default function Consumptions() {
       <PageHeader title="Consommations" subtitle="Normes produit × prestation, consommation théorique valorisée une seule fois par lavage et coût de revient certifiable."
         actions={<div className="flex gap-2">
           {dataSource === 'supabase' && <button className="wg-btn wg-btn-ghost" onClick={() => { void refreshStock().catch(() => {}); }}><FiRefreshCw /> Actualiser</button>}
-          <button className="wg-btn wg-btn-primary" disabled={!activated || state.stockServices.length === 0 || state.products.length === 0} onClick={() => setOpen(true)}><FiPlus /> Nouvelle norme</button>
+          <button className="wg-btn wg-btn-primary" disabled={!canOperate || state.stockServices.length === 0 || state.products.length === 0} onClick={() => setOpen(true)}><FiPlus /> Nouvelle norme</button>
         </div>} />
 
       {!activated && <div className="mb-5"><LockedPanel /></div>}
@@ -70,7 +71,7 @@ export default function Consumptions() {
               <tbody>{eligible.map((w) => (
                 <tr key={w.id}><td className="wg-td font-semibold">{w.number}</td><td className="wg-td">{w.plate}</td>
                   <td className="wg-td"><Badge>{w.status === 'delivered' ? 'Livrée' : 'Prête'}</Badge></td>
-                  <td className="wg-td"><button className="wg-link text-xs" onClick={() => safe(async () => { await consumeWash(w.id); })}>Consommer</button></td></tr>
+                  <td className="wg-td"><button className="wg-link text-xs" disabled={!canOperate} onClick={() => safe(async () => { await consumeWash(w.id); })}>Consommer</button></td></tr>
               ))}</tbody>
             </table></div>
           )}
@@ -120,7 +121,7 @@ export default function Consumptions() {
           </Select>
         </div>
         <div className="mt-5 flex justify-end gap-2"><button className="wg-btn wg-btn-ghost" onClick={() => setOpen(false)}><FiX /> Annuler</button>
-          <button className="wg-btn wg-btn-primary" onClick={() => safe(async () => {
+          <button className="wg-btn wg-btn-primary" disabled={!canOperate} onClick={() => safe(async () => {
             await saveServiceConsumption({ serviceId: f.serviceId, productId: f.productId, qtyPerWash: f.qtyPerWash, active: f.active });
             setF({ serviceId: '', productId: '', qtyPerWash: 1, active: true }); setOpen(false);
           })}>Enregistrer</button></div>

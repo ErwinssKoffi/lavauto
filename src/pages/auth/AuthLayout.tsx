@@ -2,6 +2,8 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { FiCheckCircle, FiLock, FiShield } from 'react-icons/fi';
 import { Logo } from '../../components/ui';
+import { DemoNotice } from '../../components/DemoNotice';
+import { useStore } from '../../lib/store';
 
 const POINTS = [
   'Vos tarifs, vos horaires, vos règles de caisse',
@@ -13,6 +15,7 @@ const POINTS = [
  *  Formulaire sur surface claire et centrée ; panneau photo à droite,
  *  masqué sur téléphone (le formulaire reste plein largeur). */
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
+  const { authKind } = useStore();
   return (
     <div className="flex min-h-screen bg-white text-slate-900">
       {/* Formulaire */}
@@ -21,6 +24,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <Link to="/" className="text-slate-900"><Logo /></Link>
           <Link to="/" className="text-xs font-semibold text-slate-500 hover:text-sky-600">← Retour à l’accueil</Link>
         </header>
+        {authKind === 'local' && <DemoNotice />}
         <div className="flex flex-1 items-center justify-center px-6 py-8 sm:px-10 lg:px-16">
           <div className="w-full max-w-[460px] wg-fade-in">{children}</div>
         </div>
@@ -54,7 +58,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             </div>
           </div>
           <div className="flex items-center gap-2 text-[11px] text-white/60">
-            <FiLock /> Session chiffrée · 30 jours · Aucun mot de passe oublié par e-mail
+            <FiLock /> {authKind === 'local' ? 'Accès de démonstration local, sans e-mail' : 'Connexion par e-mail et mot de passe'}
           </div>
         </div>
       </div>

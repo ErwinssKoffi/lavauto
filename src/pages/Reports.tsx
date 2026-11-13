@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { FiAlertTriangle, FiDownload, FiFileText, FiRefreshCw } from 'react-icons/fi';
 import { useStore } from '../lib/store';
+import { usePermissions } from '../lib/usePermissions';
+import { redactStockProfitability } from '../lib/finance';
 import { buildReport, periodRange, type Period } from '../lib/metrics';
 import { downloadCSV, formatDate, formatFCFA, todayISO } from '../lib/format';
 import { PAY_METHOD_LABELS, type ProfitabilityReport } from '../types';
@@ -24,7 +26,11 @@ const monthStartISO = (): string => {
 };
 
 export default function Reports() {
-  const { state, dataSource, authReady, identity, refreshFinance, certifyCosts, stationMetrics, stationMetricsError, refreshStationMetrics } = useStore();
+  const { state, dataSource, authReady, identity, subscriptionAccess, canWriteSubscription,
+    refreshFinance, certifyCosts, stationMetrics, stationMetricsError, refreshStationMetrics } = useStore();
+  const { can } = usePermissions();
+  const hasStock = Boolean(identity?.isPlatformAdmin || subscriptionAccess?.features.stock);
+  const canCertify = hasStock && canWriteSubscription && can('settings.manage');
   const safe = useSafeAction();
   const [period, setPeriod] = useState<Period>('jour');
   const [certOpen, setCertOpen] = useState(false);
@@ -37,9 +43,12 @@ export default function Reports() {
   const server = state.profitability;
   const connected = dataSource === 'supabase';
   // Aucune substitution par une file limitée ou par une ancienne période.
-  const p: ProfitabilityReport | null = connected
+  const rawProfitability: ProfitabilityReport | null = connected
     ? (server && server.periodStart === from && server.periodEnd === to ? server : null)
     : r.profitability;
+  // En local aussi, un passage en Standard ne doit pas afficher les coûts
+  // Premium conservés sur l'appareil. L'autorisation réelle reste côté serveur.
+  const p = rawProfitability && (hasStock ? rawProfitability : redactStockProfitability(rawProfitability));
   const current = connected && stationMetrics && state.station && stationMetrics.stationId === state.station.id
     && stationMetrics.periodStart === from && stationMetrics.periodEnd === to ? stationMetrics : null;
   const detail = connected ? current : r;
@@ -75,17 +84,18 @@ export default function Reports() {
     </div>;
   }
   const labelPartial = p.definitions.partialBalance ?? 'Solde partiel : encaissé − dépenses ; PAS un bénéfice net';
+  const stockCostsUnavailable = p.purchases === null || p.consumptions === null || p.operatingExpenses == null;
 
   const indicatorRows: [string, string, string | number][] = [
     ['Chiffre d’affaires', 'Total des fiches non annulées', p.revenue],
     ['Encaissements nets', 'Paiements moins remboursements', p.collected],
     ['Créances', 'Total moins encaissé', p.receivables],
     ['Dépenses constatées', 'Dépenses enregistrées', p.expenses],
-    ['Achats valorisés', 'Jamais une charge de période', p.purchases],
-    ['Consommations valorisées', 'Sorties de stock au coût moyen', p.consumptions],
-    ['Charges d’exploitation', 'Hors achats de stock rattachés', p.operatingExpenses ?? p.expenses],
+    ['Achats valorisés', 'Jamais une charge de période', p.purchases ?? 'Non disponible'],
+    ['Consommations valorisées', 'Sorties de stock au coût moyen', p.consumptions ?? 'Non disponible'],
+    ['Charges d’exploitation', 'Hors achats de stock rattachés', p.operatingExpenses ?? 'Non disponible'],
     ['Commissions validées', 'Relevés figés uniquement', p.commissions],
-    ['Charges fixes', 'Catégories identifiées', p.fixedCosts],
+    ['Charges fixes', 'Catégories identifiées', p.fixedCosts ?? 'Non disponible'],
     ['Solde partiel', labelPartial, p.partialBalance],
     ['Marge brute', p.certified ? p.definitions.grossMargin ?? 'Marge brute certifiée' : 'Coûts manquants', p.grossMargin ?? '—'],
     ['Résultat net', p.certified ? p.definitions.result ?? 'Résultat net certifié' : 'Coûts manquants', p.result ?? '—'],
@@ -119,12 +129,14 @@ export default function Reports() {
       <PageHeader title="Rapports" subtitle={`Station ${state.station?.name ?? '—'} · jour / semaine / mois : CA, encaissé, créances, coûts et solde partiel (${label}).`}
         actions={<div className="flex gap-2">
           {dataSource === 'supabase' && <button className="wg-btn wg-btn-ghost" onClick={reload}><FiRefreshCw /> Actualiser</button>}
-          <button className="wg-btn wg-btn-ghost" onClick={() => setCertOpen(true)}><FiFileText /> {connected ? 'Certification entreprise' : 'Certifier les coûts'}</button>
+          <button className="wg-btn wg-btn-ghost" disabled={!canCertify} title={!hasStock ? 'Module stock non inclus' : !canWriteSubscription ? 'Abonnement en lecture seule' : undefined} onClick={() => setCertOpen(true)}><FiFileText /> {connected ? 'Certification entreprise' : 'Certifier les coûts'}</button>
           <button className="wg-btn wg-btn-primary" onClick={exportCSV}><FiDownload /> Exporter en CSV</button>
         </div>} />
       <div className="mb-5"><Tabs value={period} onChange={setPeriod} options={PERIODS} /></div>
 
-      <div className="mb-5">{p.costsMissing ? <Alert kind="warn"><FiAlertTriangle className="mr-1 inline" />
+      <div className="mb-5">{stockCostsUnavailable ? <Alert kind="info"><FiAlertTriangle className="mr-1 inline" />
+        <strong>{p.label}.</strong> Les coûts de stock et le résultat certifié sont indisponibles, pas égaux à zéro. Les dépenses et le solde partiel restent consultables ; ce solde n’est <strong>PAS un bénéfice net</strong>.
+      </Alert> : p.costsMissing ? <Alert kind="warn"><FiAlertTriangle className="mr-1 inline" />
         <strong>Coûts manquants : {p.label}.</strong> Le solde partiel n’est <strong>PAS un bénéfice net</strong>. La marge brute et le résultat restent NULL tant que les consommations valorisées, les achats rattachés et l’attestation de période ne sont pas complets.
       </Alert> : <Alert kind="success"><FiFileText className="mr-1 inline" />
         <strong>{p.label}.</strong> Coûts attestés le {p.certifiedAt ? formatDate(p.certifiedAt) : '—'} : marge brute {amount(p.grossMargin)} et résultat net {amount(p.result)}. Le solde partiel n’est <strong>PAS un bénéfice net</strong>.
@@ -141,7 +153,7 @@ export default function Reports() {
       <Card className="mt-5">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-bold">Décomposition financière</h2>
-          <Badge tone={p.costsMissing ? 'warn' : 'success'}>{fromRpc ? 'RPC station' : 'Calcul local'} · {p.certified ? 'coûts certifiés' : 'coûts manquants'}</Badge>
+          <Badge tone={p.costsMissing ? 'warn' : 'success'}>{fromRpc ? 'RPC station' : 'Calcul local'} · {stockCostsUnavailable ? 'coûts indisponibles' : p.certified ? 'coûts certifiés' : 'coûts manquants'}</Badge>
         </div>
         <div className="wg-scroll-x rounded-xl border" style={{ borderColor: 'var(--wg-border)' }}>
           <table>
@@ -199,7 +211,7 @@ export default function Reports() {
           placeholder="Je certifie les achats rattachés, les mouvements valorisés et les commissions validées de la période." />
         <p className="wg-muted mt-3 text-xs">La publication du résultat net est refusée si des coûts sont ambigus, non valorisés ou non validés. Le relevé certifié est immuable.</p>
         <div className="mt-5 flex justify-end gap-2"><button className="wg-btn wg-btn-ghost" onClick={() => setCertOpen(false)}>Annuler</button>
-          <button className="wg-btn wg-btn-primary" onClick={() => safe(async () => {
+          <button className="wg-btn wg-btn-primary" disabled={!canCertify} onClick={() => safe(async () => {
             await certifyCosts(cert);
             await refreshFinance(from, to);
             setCert({ ...cert, attestation: '' });

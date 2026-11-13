@@ -1,4 +1,5 @@
 import { expect, test, type Route } from '@playwright/test';
+import { fakePlanRows, fakeStationSetup, fakeSubscriptionAccess } from './fixtures/mock-supabase';
 
 const company = '11111111-1111-4111-8111-111111111111';
 const station = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -35,16 +36,15 @@ test('un logo privé est associé, retrouvé après rechargement, remplacé et r
       return json(route, { access_token: jwt, token_type: 'bearer', expires_in: 3600, refresh_token: 'refresh-test', user });
     }
     if (url.pathname === '/auth/v1/user') { userReads += 1; return json(route, user); }
-    if (url.pathname === '/rest/v1/plans') return json(route, [{
-      id: 'essai', name: 'Essai', price_monthly_minor: 0, currency_code: 'XOF', trial_days: 14, sort_order: 1, features: [],
-      plan_limits: [{ key: 'stations', value_int: 1 }, { key: 'employees', value_int: 3 }, { key: 'washes_per_month', value_int: 100 }],
-    }]);
+    if (url.pathname === '/rest/v1/plans') return json(route, fakePlanRows());
+    if (url.pathname === '/rest/v1/rpc/my_subscription_access') return json(route, fakeSubscriptionAccess(company));
     if (url.pathname === '/rest/v1/rpc/my_context') return json(route, {
       authenticated: true, profileReady: true, active: true, userId, email, fullName: 'Propriétaire', roleKey: 'owner', isPlatformAdmin: false,
       companyId: company, company: { id: company, name: 'Entreprise', city: 'Abidjan', phone: '', currency_code: 'XOF', suspended: false, created_at: now },
       stations: [{ id: station, name: 'Station A', city: 'Abidjan', activated: true, logoPath: savedPath }],
       permissions: ['settings.manage', 'washes.view', 'employees.manage'],
     });
+    if (url.pathname === '/rest/v1/rpc/my_station_setup') return json(route, fakeStationSetup(savedPath));
     if (url.pathname === '/rest/v1/rpc/my_company_users') return json(route, [{ id: userId, fullName: 'Propriétaire', email, roleKey: 'owner', active: true, stationIds: [station] }]);
     if (url.pathname === '/rest/v1/rpc/my_company_invitations') return json(route, []);
     if (url.pathname === '/rest/v1/rpc/claim_rpc_idempotency') return json(route, { firstCall: true });

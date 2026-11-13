@@ -6,14 +6,14 @@ import { Alert, Badge } from '../../components/ui';
 import { useStore } from '../../lib/store';
 
 export default function SignIn() {
-  const { signIn, authError, clearAuthError, state } = useStore();
+  const { signIn, authError, clearAuthError, state, authKind } = useStore();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const notice = params.get('confirmed') === '1'
+  const notice = authKind !== 'supabase' ? null : params.get('confirmed') === '1'
     ? 'Adresse e-mail confirmée. Vous pouvez maintenant vous connecter.'
     : params.get('reset') === '1'
       ? 'Mot de passe mis à jour. Connectez-vous avec votre nouveau mot de passe.'
@@ -39,7 +39,7 @@ export default function SignIn() {
 
   return (
     <AuthLayout>
-      <Badge tone="accent"><FiLock /> Connexion sécurisée</Badge>
+      <Badge tone="accent"><FiLock /> {authKind === 'local' ? 'Connexion de démonstration' : 'Connexion par e-mail'}</Badge>
       <h1 className="mt-4 text-3xl font-extrabold tracking-tight">Bonjour 👋</h1>
       <p className="mt-2 text-sm text-slate-500">Connectez-vous pour retrouver votre station.</p>
 
@@ -81,7 +81,11 @@ export default function SignIn() {
       <div className="mt-5 rounded-xl border border-sky-100 bg-sky-50 p-3.5 text-xs leading-relaxed text-slate-600">
         <div className="flex items-start gap-2">
           <FiInfo className="mt-0.5 shrink-0 text-sky-600" />
-          <p><strong>Mot de passe oublié ?</strong> Utilisez « Mot de passe oublié » : Supabase Auth envoie un lien de réinitialisation sécurisé à l’adresse du compte. Aucun mot de passe provisoire n’est communiqué à l’entreprise.</p>
+          {authKind === 'local' ? (
+            <p><strong>Mot de passe oublié ?</strong> Aucun e-mail ni lien de récupération n’est disponible dans cette démonstration. Ne réinitialisez pas le navigateur sans avoir sauvegardé ses données.</p>
+          ) : (
+            <p><strong>Mot de passe oublié ?</strong> Utilisez « Mot de passe oublié » pour demander un lien de réinitialisation Supabase Auth. L’envoi dépend de la configuration e-mail du service.</p>
+          )}
         </div>
       </div>
 

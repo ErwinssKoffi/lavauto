@@ -57,4 +57,8 @@ test('reçu local : aperçu exact, impression isolée et vrai PDF téléchargeab
   const bytes = await readFile(path!);
   expect(bytes.subarray(0, 5).toString()).toBe('%PDF-');
   expect(bytes.length).toBeGreaterThan(1000);
+  await preview.getByRole('button', { name: 'Fermer' }).click();
+  await expect(preview).toHaveCount(0);
+  await detail.getByRole('button', { name: 'Fermer' }).first().click();
+  await expect(detail).toHaveCount(0);
 });

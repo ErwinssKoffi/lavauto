@@ -1,10 +1,10 @@
 # LAVAUTO — Base de données & architecture du domaine (Prompts 03–09)
 
-> Le journal ci-dessous décrit les phases précédentes. `051_station_logo.sql` et `052_atomic_wash_creation.sql` ont été appliquées sur `lavauto` via le connecteur, sous `20261112130423_station_logo` et `20261112130520_atomic_wash_creation` ; leurs contenus correspondent aux fichiers locaux. `051` ajoute le chemin privé du logo ; `052` ajoute la création atomique et la distinction des canaux mobiles. Le dépôt contient maintenant **54 migrations locales numérotées**, sans `048` : `053` (WhatsApp), `054` (périmètre station et métriques) et `055` (validation et finance) n’ont pas été appliquées à distance. Voir [whatsapp-receipts.md](whatsapp-receipts.md) et [testing.md](testing.md).
+> Le journal ci-dessous décrit les phases précédentes. `051_station_logo.sql` et `052_atomic_wash_creation.sql` ont été appliquées sur `lavauto` via le connecteur, sous `20261112130423_station_logo` et `20261112130520_atomic_wash_creation` ; leurs contenus correspondent aux fichiers locaux. `051` ajoute le chemin privé du logo ; `052` ajoute la création atomique et la distinction des canaux mobiles. Le dépôt contient maintenant **56 migrations locales numérotées** (`001`–`057`, sans `048`) : `053` (WhatsApp), `054` (périmètre station et métriques), `055` (validation et finance), `056` (configuration/catalogue) et `057` (abonnements, quotas et droits) n’ont pas été appliquées à distance. Voir [subscriptions.md](subscriptions.md), [whatsapp-receipts.md](whatsapp-receipts.md) et [testing.md](testing.md).
 
 **Date :** 12/11/2026 · **Projet Supabase :** `lavauto` (`cgxrqorwmmcyqescatzs`, `eu-central-1`, PostgreSQL 17.11) · **Branche historique P10 :** `arena/868cde36-lavauto` · **Statut historique :** schéma P03, Auth / RBAC P04, cœur lavages P05, finance P06, stock P07, CRM P08, analytics / administration SaaS P09 et QA / déploiement P10 appliqués.
 
-> Les sections de phases décrivent le schéma historique réellement appliqué à leur date ; les vérifications de `051` et `052` sont documentées séparément dans [testing.md](testing.md). Le projet `BarberShop` (`fpapxbfsiiwgpvsefsec`) n'a pas été consulté en écriture ni modifié. Aucune clé `service_role`, aucun secret et aucune donnée métier de démonstration n'ont été introduits.
+> Les sections de phases décrivent le schéma historique à leur date, pas une certification actuelle. `056` prépare des RPC de configuration/catalogue ; `057` ajoute les droits de formule, demandes, quotas et masquages : elles ont été testées en bases isolées seulement. Les 71 tables observées ont RLS activée, mais les politiques génériques historiques `009` restent larges à l’intérieur du tenant. La migration locale `057` ajoute des policies et retire certains grants, ce qui peut casser des clients historiques : revoir grants, politiques et compatibilité avant toute application autorisée. Voir [testing.md](testing.md). Le projet `BarberShop` (`fpapxbfsiiwgpvsefsec`) n'a pas été consulté en écriture ni modifié. Aucune clé `service_role`, aucun secret et aucune donnée métier de démonstration n'ont été introduits.
 
 ---
 
@@ -22,7 +22,7 @@ Le Prompt 03 pose les fondations persistantes de l'ERP SaaS multi-entreprises, *
 | Historique | Prix figé dans `wash_items`, statuts dans `wash_status_history`, paiements, mouvements de caisse et de stock **append-only** ; `REVOKE UPDATE/DELETE` + triggers d'immuabilité. |
 | Transactions | 8 fonctions métier `SECURITY DEFINER` contrôlent permission, état, périmètre, idempotence et cohérence dans une seule transaction ; 11 fonctions Auth/RBAC supplémentaires ajoutées au Prompt 04. |
 | Versionnement | 49 migrations historiques P03–P10 ont été suivies par `051` et `052` sur `lavauto`, soit 51 entrées distantes. Le fichier `048` a été retiré sans jamais être appliqué. Les versions distantes horodatées diffèrent des noms locaux : ne pas les rejouer. |
-| Réversibilité | `VITE_DATA_SOURCE=local` restaure immédiatement le comportement frontend précédent ; les migrations restent en place. |
+| Mode local | Données du navigateur, distinctes de Supabase et non synchronisées. Changer de mode ou d’origine ne restaure ni ne migre les données ; protéger les deux stockages avant tout changement. |
 
 ### Ce qui n'est **pas** dans le Prompt 03
 
@@ -273,10 +273,10 @@ Le tableau des compteurs ci-dessus décrit l'état historique P03/P04 ; l'état 
 ## 9. Dette connue et étape suivante
 
 - L'Auth Supabase, les redirections, la confirmation e-mail, les invitations, les affectations multi-stations et les permissions serveur sont livrés au **Prompt 04** ; aucun compte ni e-mail de test n'a été créé.
-- Les RPC d'écriture du cycle lavages (P05) et de la finance (P06) sont appelées par le frontend en mode Supabase Auth vérifiée ; le catalogue et l'abonnement restent des écritures locales.
+- Les RPC d’écriture du cycle lavages et de la finance sont appelées en mode connecté. `056`, encore locale, prépare la persistance du catalogue ; les changements d’abonnement ne constituent pas une facturation automatisée.
 - `metrics.ts` expose toujours `partialBalance` (solde partiel, **PAS un bénéfice net**). Depuis P07, `grossMargin` et `netResult` ne sont publiés qu'après l'attestation immuable `finance_cost_periods` ; hors certification, `costsMissing=true` et les deux valeurs restent `NULL`.
 - `wash_number_seq` est globale ; `UNIQUE (station_id, number)` garantit l'unicité par station. La numérotation globale est conservée au Prompt 05 ; un raffinement par station reste ouvert.
-- Aucun bucket Storage, aucun fournisseur de communication, aucun envoi réel ou simulé : P08 n'ajoute qu'une file `notification_outbox` en attente. Aucune donnée client/lavage/paiement en base.
+- Historique P08 : la file `notification_outbox` ne fournit pas d’envoi. Un bucket privé a ensuite été ajouté en P10 ; aucun parcours Storage réel n’a été validé dans cette branche. WhatsApp exige une installation distincte non déployée.
 - `npm run lint` existe désormais (lint statique sans dépendance, TD-29 partiellement traité) ; CI GitHub Actions et 15 specs Playwright sont livrés au Prompt 10, ESLint/Prettier restent ouverts.
 
 **Prompt 07 — livré :** 4 migrations additives `030`–`033` portent le schéma à **33 migrations**. Elles ajoutent 4 tables, 11 RPC de stock, `my_stock_board()` et la certification des coûts. Voir [`docs/stock.md`](stock.md) ; test distant `p07_rollback.sql` **22/22** en `ROLLBACK`, sans fixture résiduelle.

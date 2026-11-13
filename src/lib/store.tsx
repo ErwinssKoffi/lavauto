@@ -3,7 +3,7 @@ import React, {
 } from 'react';
 import type {
   AppState, AppUser, CashSession, Client, Company, DayHours, Expense, PayMethod,
-  Plan, Role, Service, Session, Station, Subscription, VehicleCategory, Wash,
+  Plan, PlanFeature, Role, Service, Session, Station, Subscription, VehicleCategory, Wash,
   WashItem, WashPost, WashQualityResult, WashStatus,
 } from '../types';
 import { ApiError, PAY_METHOD_DB_KEY } from '../types';
@@ -59,16 +59,17 @@ import {
   type PendingWashCreation,
 } from './washCreation';
 import { getPlans, setPlansCache } from './plans';
+import { accessCanWrite, localSubscriptionAccess, type SubscriptionAccess, type SubscriptionRequest } from './subscription';
 import {
   analyticsBoardFromState, emptyAnalyticsBoard, emptyPlatformBoard,
   emptySubscriptionUsage, monthStartISO, platformBoardFromState,
-  subscriptionUsageFromState,
+  quotaMonthStartISO, redactStockAnalytics, subscriptionUsageFromState,
   type AnalyticsSnapshot, type PlatformSnapshot, type SubscriptionUsageSnapshot,
 } from './analytics';
 import {
   getDataSource, getDataAdapter,
   type CompanySubscriptionPayload, type CompanySuspensionPayload,
-  type DataAdapter, type DataSource, type PlanLimitPayload, type PlanPayload,
+  type DataAdapter, type DataSource, type PlanLimitPayload, type PlanPayload, type StationSetupSnapshot,
 } from '../services/adapters/DataAdapter';
 import { getAuthPort } from '../services/auth/getAuthPort';
 import type { AuthPort, AuthResult, AuthChange } from '../services/auth/AuthPort';
@@ -76,10 +77,12 @@ import {
   mapIdentityToAppState, type AuthIdentity, type Invitation, type InvitePayload,
   type SignUpPayload, type UpdateUserPayload,
 } from '../services/auth/authTypes';
-import { clearDemoPasswords } from './demoPasswords';
+import { DEMO_PASSWORDS_KEY, DEMO_STATE_KEY, protectDemoState, readDemoState, serializeDemoState, withDemoStorageLock, writeDemoState } from './demoStorage';
 import { isStationLogoPath } from './image';
 import type { StationMetrics } from './stationMetrics';
 import { clearPendingPayment, readPendingPayment, savePendingPayment, PaymentCommandError, type PendingPayment } from './paymentAttempt';
+import { assertPendingExpense, clearPendingExpense, readPendingExpense, savePendingExpense, ExpenseCommandError, type PendingExpense } from './expenseAttempt';
+import { clearPendingRevocation, readPendingRevocation, savePendingRevocation, type PendingRevocation } from './revocationAttempt';
 import {
   validateCertification, validateConsumption, validateCustomer, validateDate, validateEmail,
   validateExpense, validateFleet, validateFleetContract, validateFleetReceivable, validateInventory,
@@ -107,8 +110,6 @@ import type { LocalAuthAdapter } from '../services/auth/LocalAuthAdapter';
 // localStorage ; les écritures métier restent locales jusqu'aux RPC P05+,
 // sans réécrire les formulaires ni le contrat général de useStore().
 // ═══════════════════════════════════════════════════════════════════════════
-
-const STORAGE_KEY = 'washguard.state.v1';
 
 export const DEFAULT_DAYS: DayHours[] = [
   { day: 'Lundi', open: '08:00', close: '18:00', closed: false },
@@ -147,43 +148,32 @@ const TEST_AUTH = import.meta.env.VITE_WG_TEST_AUTH === '1';
 interface TestBridge { __WG_TEST_SESSION__?: { session?: Session | null } }
 
 /** L'état métier est persisté, JAMAIS la session (Prompt 04). */
-export function load(): AppState {
-  let persisted: Partial<AppState> = {};
+export function load(stored = readDemoState()): AppState {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as Partial<AppState>;
-      const { session: _ignored, ...rest } = parsed;
-      persisted = rest;
+    const { session: _ignored, ...persisted } = stored.status === 'ok' ? stored.value : {};
+    const state: AppState = withCrmDefaults(withStockDefaults(withFinanceDefaults({
+      ...emptyState(), ...persisted, session: null,
+    })));
+    // Les anciennes URL (parfois signées ou externes) ne sont jamais réutilisées
+    // comme chemin privé. Un nouveau téléversement est nécessaire pour ces logos.
+    if (state.station) {
+      const { logoUrl: _legacyLogoUrl, ...station } = state.station as Station & { logoUrl?: unknown };
+      state.station = { ...station, logoPath: isStationLogoPath(station.logoPath)
+        && station.logoPath.startsWith(`${station.companyId}/`) ? station.logoPath : null };
     }
-  } catch { /* état corrompu → repartir à vide */ }
-  const state: AppState = withCrmDefaults(withStockDefaults(withFinanceDefaults({
-    ...emptyState(), ...persisted, session: null,
-  })));
-  // Les anciennes URL (parfois signées ou externes) ne sont jamais réutilisées
-  // comme chemin privé. Un nouveau téléversement est nécessaire pour ces logos.
-  if (state.station) {
-    const { logoUrl: _legacyLogoUrl, ...station } = state.station as Station & { logoUrl?: unknown };
-    state.station = { ...station, logoPath: isStationLogoPath(station.logoPath)
-      && station.logoPath.startsWith(`${station.companyId}/`) ? station.logoPath : null };
+    // Mapping idempotent des anciens statuts, sans réécrire l'entrée brute
+    // si la normalisation de l'ancien état échoue.
+    state.washes = normalizeWashes(persisted.washes as unknown[] | undefined);
+    state.washPosts = Array.isArray(persisted.washPosts) ? persisted.washPosts : [];
+    if (TEST_AUTH && typeof window !== 'undefined' && stored.status !== 'unreadable') {
+      const injected = (window as unknown as TestBridge).__WG_TEST_SESSION__?.session;
+      if (injected) state.session = injected;
+    }
+    return state;
+  } catch {
+    if (stored.raw !== null) protectDemoState(stored.raw);
+    return emptyState();
   }
-  // Prompt 05 : mapping des 4 statuts FR → 7 statuts EN + historique initial
-  // par fiche importée. Idempotent, appliqué à chaque lecture du stockage.
-  state.washes = normalizeWashes(persisted.washes as unknown[] | undefined);
-  state.washPosts = Array.isArray(persisted.washPosts) ? persisted.washPosts : [];
-  // Pont de compilation réservé au harnais JSDOM ; absent de la build Vite.
-  if (TEST_AUTH && typeof window !== 'undefined') {
-    const injected = (window as unknown as TestBridge).__WG_TEST_SESSION__?.session;
-    if (injected) state.session = injected;
-  }
-  return state;
-}
-
-export function persist(state: AppState): void {
-  try {
-    const { session: _ignored, ...withoutSession } = state;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(withoutSession));
-  } catch { /* quota plein ou stockage indisponible */ }
 }
 
 // ─── Onboarding : 13 étapes, 8 obligatoires, état constaté ───────────────────
@@ -324,10 +314,23 @@ interface Ctx {
   dataSource: DataSource;
   /** Les simulations de stock sont réservées à une source ET une Auth locales. */
   isLocalStockDemo: boolean;
+  /** Avertissement persistant en cas de conflit inter-onglets ou d'échec d'écriture. */
+  demoStorageIssue: string | null;
+  /** L'état de démonstration affiché n'a pas encore été confirmé dans le stockage. */
+  demoStoragePending: boolean;
   /** Les commandes stock sont reliées au port RPC Supabase. */
   isServerStock: boolean;
   /** Erreur de chargement des tarifs : aucun prix local n'est affiché en repli. */
   plansError: string | null;
+  subscriptionAccess: SubscriptionAccess | null;
+  subscriptionStatus: 'loading' | 'ready' | 'error';
+  subscriptionError: string | null;
+  canWriteSubscription: boolean;
+  refreshSubscriptionAccess: () => Promise<SubscriptionAccess | null>;
+  subscriptionRequests: SubscriptionRequest[];
+  subscriptionRequestsError: string | null;
+  refreshSubscriptionRequests: () => Promise<void>;
+  decideSubscriptionRequest: (requestId: string, approve: boolean) => Promise<void>;
   onboarding: OnboardingStep[];
   missing: string[];
   // Auth / RBAC (Prompt 04) : serveur唯一 autorité, UI = reflet des permissions.
@@ -354,18 +357,31 @@ interface Ctx {
   updateUser: (p: UpdateUserPayload) => Promise<void>;
   refreshUsers: () => Promise<AppUser[]>;
   refreshInvitations: () => Promise<Invitation[]>;
+  /** Les listes peuvent être périmées jusqu'à une relecture explicite réussie. */
+  employeeReadWarning: string | null;
+  /** Ces incertitudes sont gardées pendant la navigation, pas au rechargement. */
+  unconfirmedInvitation: { email: string; message: string } | null;
+  unconfirmedAccountUpdate: { userId: string; message: string } | null;
+  /** Tentative conservée dans cet onglet pour le même compte et la même entreprise. */
+  unconfirmedRevocation: { id: string; message: string } | null;
+  revocationRecoveryLoading: boolean;
+  revocationRecoveryError: string | null;
+  refreshEmployeeData: () => Promise<void>;
   // données de base / paramètres
-  updateCompany: (patch: Partial<Company>) => void;
-  updateStation: (patch: Partial<Station>) => void;
+  setupStatus: 'loading' | 'ready' | 'error';
+  setupError: string | null;
+  refreshSetup: () => Promise<void>;
+  updateCompany: (patch: Partial<Company>) => void | Promise<void>;
+  updateStation: (patch: Partial<Station>) => void | Promise<void>;
   setStationLogoPath: (stationId: string, userId: string, path: string | null) => void;
-  setHours: (hours: DayHours[]) => void;
-  addCategory: (name: string) => void;
-  toggleCategory: (id: string) => void;
-  removeCategory: (id: string) => void;
-  addService: (name: string, description: string) => void;
-  updateService: (id: string, patch: Partial<Service>) => void;
-  setPrice: (serviceId: string, categoryId: string, price: number) => void;
-  removeService: (id: string) => void;
+  setHours: (hours: DayHours[]) => void | Promise<void>;
+  addCategory: (name: string) => void | Promise<void>;
+  toggleCategory: (id: string) => void | Promise<void>;
+  removeCategory: (id: string) => void | Promise<void>;
+  addService: (name: string, description: string) => void | Promise<void>;
+  updateService: (id: string, patch: Partial<Service>) => void | Promise<void>;
+  setPrice: (serviceId: string, categoryId: string, price: number) => void | Promise<void>;
+  removeService: (id: string) => void | Promise<void>;
   updateEmployee: (id: string, patch: Partial<AppUser>) => void;
   addClient: (p: { name: string; phone: string; plate: string; notes: string }) => void;
   updateClient: (id: string, p: Partial<Client>) => void;
@@ -387,6 +403,9 @@ interface Ctx {
   closeCash: (counted: number) => void | Promise<void>;
   reopenCash: (sessionId: string, reason: string) => void | Promise<void>;
   addExpense: (p: Omit<Expense, 'id' | 'stationId' | 'status' | 'cancelReason' | 'createdBy' | 'createdAt' | 'cashSessionId'>) => void | Promise<void>;
+  pendingExpense: PendingExpense | null;
+  pendingExpenseError: string | null;
+  retryPendingExpense: () => Promise<void>;
   cancelExpense: (id: string, reason: string) => void | Promise<void>;
   // Prompt 06 : annulation d'encaissement, rapprochements par canal, relevés figés.
   cancelPayment: (paymentId: string, reason: string) => void | Promise<void>;
@@ -447,9 +466,9 @@ interface Ctx {
   setCompanySubscription: (p: CompanySubscriptionPayload) => Promise<void>;
   setCompanySuspended: (p: CompanySuspensionPayload) => Promise<void>;
   // abonnement / plateforme
-  requestPlanChange: (planId: string) => void;
+  requestPlanChange: (planId: string) => Promise<void>;
   toggleCompanySuspension: (companyId: string) => void;
-  activateStation: () => void;
+  activateStation: () => void | Promise<void>;
   resetAll: () => Promise<void>;
 }
 
@@ -469,6 +488,27 @@ function clearStationCollections(s: AppState): AppState {
   };
 }
 
+function setupPatchMatches(value: object, patch: object): boolean {
+  const record = value as Record<string, unknown>;
+  return Object.entries(patch).every(([key, expected]) => {
+    const actual = record[key];
+    if (typeof expected === 'string') return actual === expected.trim();
+    if (key === 'paymentMethods' && Array.isArray(expected) && Array.isArray(actual)) {
+      return JSON.stringify([...actual].sort()) === JSON.stringify([...expected].sort());
+    }
+    if (key === 'hours' && Array.isArray(expected) && Array.isArray(actual)) {
+      return expected.length === actual.length && expected.every((h, i) =>
+        h.day === actual[i]?.day && h.open === actual[i]?.open && h.close === actual[i]?.close && h.closed === actual[i]?.closed);
+    }
+    return actual === expected;
+  });
+}
+
+function hasDemoStateToPersist(state: AppState, baseline: string | null): boolean {
+  return baseline !== null || Boolean(state.company || state.station || state.subscription || state.profitability || state.washCounter)
+    || Object.values(state).some((value) => Array.isArray(value) && value.length > 0);
+}
+
 type StationScope = { epoch: number; userId: string | null; companyId: string | null; stationId: string | null };
 const stationSelectionKey = (userId: string, companyId: string | null) =>
   `washguard.station-selection.v1:${userId}:${companyId ?? ''}`;
@@ -482,22 +522,68 @@ function rememberedStation(userId: string, companyId: string | null): string | n
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   // Les données métier connectées ne sont ni restaurées ni persistées dans le
   // cache de démonstration : seul un contexte JWT vérifié peut les afficher.
-  const [state, setState] = useState<AppState>(() => getDataSource() === 'supabase' && !TEST_AUTH ? emptyState() : load());
+  const [initialDemoRead] = useState(() => readDemoState());
+  const [state, setState] = useState<AppState>(() => getDataSource() === 'supabase' && !TEST_AUTH ? emptyState() : load(initialDemoRead));
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [authReady, setAuthReady] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authRecovery, setAuthRecovery] = useState(false);
   const [identity, setIdentity] = useState<AuthIdentity | null>(null);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
+  // L'avertissement de relecture est en mémoire ; la tentative de révocation
+  // est conservée séparément dans l'onglet et ne contient aucun jeton Auth.
+  const [employeeReadWarning, setEmployeeReadWarning] = useState<string | null>(null);
+  const [unconfirmedInvitation, setUnconfirmedInvitation] = useState<{ email: string; message: string } | null>(null);
+  const unconfirmedInvitationRef = useRef<{ userId: string; companyId: string } | null>(null);
+  const [unconfirmedAccountUpdate, setUnconfirmedAccountUpdate] = useState<{ userId: string; message: string } | null>(null);
+  const unconfirmedAccountUpdateRef = useRef<{ userId: string; companyId: string } | null>(null);
+  const invitationsInFlight = useRef(new Set<string>());
+  const accountUpdatesInFlight = useRef(new Set<string>());
+  const [revocationRecovery, setRevocationRecovery] = useState<{
+    userId: string; companyId: string; pending: PendingRevocation | null; error: string | null;
+  } | null>(null);
+  const revocationsInFlight = useRef(new Set<string>());
   const [pendingWashState, setPendingWashState] = useState<PendingWashCreation | null>(null);
   const [pendingWashError, setPendingWashError] = useState<string | null>(null);
+  const [pendingExpenseState, setPendingExpenseState] = useState<PendingExpense | null>(null);
+  const [pendingExpenseError, setPendingExpenseError] = useState<string | null>(null);
+  const expensesInFlight = useRef(new Set<string>());
   const washCreationInFlight = useRef(new Set<string>());
   const paymentsInFlight = useRef(new Set<string>());
-  const [theme, setTheme] = useState<'dark' | 'light'>(() =>
-    localStorage.getItem('washguard.theme') === 'light' ? 'light' : 'dark'
-  );
+  const setupInFlight = useRef(false);
+  const localWashReservations = useRef(new Set<string>());
+  const localAccountReservations = useRef(new Set<string>());
+  const [setupLoad, setSetupLoad] = useState<{ epoch: number; status: 'loading' | 'ready' | 'error'; error: string | null }>({ epoch: -1, status: 'loading', error: null });
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    try { return localStorage.getItem('washguard.theme') === 'light' ? 'light' : 'dark'; }
+    catch { return 'dark'; }
+  });
   const stateRef = useRef(state);
   stateRef.current = state;
+  useEffect(() => {
+    localWashReservations.current.clear();
+    localAccountReservations.current.clear();
+  }, [state.company?.id]);
+  useEffect(() => {
+    for (const wash of state.washes) localWashReservations.current.delete(wash.id);
+    for (const user of state.users.filter((u) => u.active)) {
+      localAccountReservations.current.delete(`id:${user.id}`);
+      localAccountReservations.current.delete(`email:${user.email.toLowerCase()}`);
+    }
+  }, [state.washes, state.users]);
+  const demoBaseline = useRef<string | null>(initialDemoRead.raw);
+  // L'interface ne confond pas l'état React affiché et sa dernière écriture
+  // confirmée : le verrou inter-onglets peut retarder la sauvegarde.
+  const [demoSavedRaw, setDemoSavedRaw] = useState<string | null>(initialDemoRead.raw);
+  const demoWriteGeneration = useRef(0);
+  const demoIssueRef = useRef<string | null>(null);
+  const [demoStorageIssue, setDemoStorageIssue] = useState<string | null>(null);
+  const demoSuccessQueue = useRef<{ id: string; message: string }[]>([]);
+  const [demoSuccessVersion, setDemoSuccessVersion] = useState(0);
+  const markDemoIssue = useCallback((message: string) => {
+    demoIssueRef.current = message;
+    setDemoStorageIssue(message);
+  }, []);
   const authKeyRef = useRef('');
   const authGenerationRef = useRef(0);
   const scopeRef = useRef<StationScope>({ epoch: 0, userId: null, companyId: null, stationId: null });
@@ -516,7 +602,50 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const authPort = useMemo<AuthPort>(() => getAuthPort({
     getState: () => stateRef.current,
     setState: (updater) => setState(updater),
+    onStateCommitted: (raw) => { demoBaseline.current = raw; setDemoSavedRaw(raw); },
   }), []);
+  const recoveryScope = authPort.kind === 'supabase' && identity?.companyId
+    ? { userId: identity.userId, companyId: identity.companyId } : null;
+  const currentRevocation = recoveryScope && revocationRecovery?.userId === recoveryScope.userId
+    && revocationRecovery.companyId === recoveryScope.companyId ? revocationRecovery : null;
+  const revocationRecoveryLoading = Boolean(recoveryScope && !currentRevocation);
+  const revocationRecoveryError = currentRevocation?.error ?? null;
+  const unconfirmedRevocation = currentRevocation?.pending ? {
+    id: currentRevocation.pending.invitationId,
+    message: `Révocation non confirmée : elle a peut-être été enregistrée. Reprenez uniquement cette même révocation ou vérifiez avec le support ; un refus ultérieur ne prouverait pas que la première tentative a échoué. Invitation : ${currentRevocation.pending.invitationId}. Ce rappel est conservé pour ce compte dans cet onglet ; il peut disparaître si l’onglet ou son stockage est supprimé, ou sur un autre appareil.`,
+  } : null;
+  useEffect(() => {
+    if (authPort.kind !== 'supabase' || !identity?.userId || !identity.companyId) {
+      setRevocationRecovery(null); return;
+    }
+    const userId = identity.userId;
+    const companyId = identity.companyId;
+    try {
+      setRevocationRecovery({ userId, companyId, pending: readPendingRevocation(userId, companyId), error: null });
+    } catch (error) {
+      setRevocationRecovery({ userId, companyId, pending: null,
+        error: error instanceof Error ? error.message : 'Stockage de session inaccessible : vérifiez les comptes avec le support.' });
+    }
+  }, [authPort.kind, identity?.userId, identity?.companyId]);
+  const demoRaw = useMemo(() => authPort.kind === 'local' ? serializeDemoState(state) : null, [authPort.kind, state]);
+  const demoStoragePending = authPort.kind === 'local' && !demoStorageIssue
+    && hasDemoStateToPersist(state, demoSavedRaw) && demoRaw !== demoSavedRaw;
+  const showToast = useCallback((kind: Toast['kind'], message: string) => {
+    const id = uid('toast');
+    setToasts((t) => [...t, { id, kind, message }]);
+    window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4500);
+  }, []);
+  const notify = useCallback((kind: Toast['kind'], message: string) => {
+    if (kind === 'success' && authPort.kind === 'local') {
+      // Les transformations React précèdent l'écriture en localStorage : ne
+      // montrer leur succès qu'après écriture et relecture sous le même verrou.
+      if (demoIssueRef.current) return;
+      demoSuccessQueue.current.push({ id: uid('notice'), message });
+      setDemoSuccessVersion((v) => v + 1);
+      return;
+    }
+    showToast(kind, message);
+  }, [authPort.kind, showToast]);
 
   // ── Adaptateur de lecture (Prompt 03) ──────────────────────────────────────
   // Le mode local conserve ses tarifs immédiatement. Le mode Supabase part
@@ -527,6 +656,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   // `demoMode` décrit l'état de l'interface et n'est pas un garde de sécurité.
   // Une configuration mixte ne doit jamais activer ces mutations locales.
   const isLocalStockDemo = dataSource === 'local' && authPort.kind === 'local';
+  const localSetup = authPort.kind === 'local' && (dataSource === 'local' || TEST_AUTH);
+  const serverSetup = dataSource === 'supabase' && authPort.kind === 'supabase' && Boolean(adapter.setupCommands);
+  const setupStatus: 'loading' | 'ready' | 'error' = localSetup ? 'ready'
+    : !serverSetup ? 'error' : setupLoad.epoch === scopeRef.current.epoch ? setupLoad.status : 'loading';
+  const setupError = localSetup ? null : !serverSetup ? 'Configuration mixte : les réglages ne peuvent pas être enregistrés.'
+    : setupLoad.epoch === scopeRef.current.epoch ? setupLoad.error : null;
   // Les RPC exigent une vraie session Supabase Auth. Le harnais JSDOM garde le
   // port Auth local même en VITE_DATA_SOURCE=supabase : il continue donc à
   // exercer les règles métier locales (gardes 409, caisse, prix figé).
@@ -548,7 +683,41 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     && Boolean(adapter.analyticsCommands);
   const [plans, setPlans] = useState<Plan[]>(() => dataSource === 'local' ? getPlans() : []);
   const [plansError, setPlansError] = useState<string | null>(null);
+  const [subscriptionLoad, setSubscriptionLoad] = useState<{
+    epoch: number; userId: string; companyId: string; status: 'loading' | 'ready' | 'error';
+    access: SubscriptionAccess | null; error: string | null;
+  } | null>(null);
+  const [subscriptionRequests, setSubscriptionRequests] = useState<SubscriptionRequest[]>([]);
+  const [subscriptionRequestsError, setSubscriptionRequestsError] = useState<string | null>(null);
+  const subscriptionRequestInFlight = useRef(false);
+  const [, setSubscriptionClock] = useState(0);
+  const serverSubscription = dataSource === 'supabase' && authPort.kind === 'supabase' && Boolean(adapter.subscriptionCommands);
+  const localSubscription = authPort.kind === 'local' ? localSubscriptionAccess(state, plans) : null;
+  const currentSubscriptionLoad = subscriptionLoad?.epoch === scopeRef.current.epoch
+    && subscriptionLoad.userId === identity?.userId && subscriptionLoad.companyId === identity?.companyId ? subscriptionLoad : null;
+  const subscriptionAccess = serverSubscription ? currentSubscriptionLoad?.access ?? null : localSubscription;
+  const subscriptionStatus: 'loading' | 'ready' | 'error' = serverSubscription
+    ? currentSubscriptionLoad?.status ?? 'loading' : subscriptionAccess ? 'ready' : 'error';
+  const subscriptionError = serverSubscription ? currentSubscriptionLoad?.error ?? null
+    : subscriptionAccess ? null : 'Aucun abonnement local correspondant.';
+  const canWriteSubscription = Boolean(identity?.isPlatformAdmin) || accessCanWrite(subscriptionAccess);
   const [analyticsBoard, setAnalyticsBoard] = useState<AnalyticsSnapshot>(() => emptyAnalyticsBoard());
+  const canReadAnalytics = Boolean(identity?.isPlatformAdmin || subscriptionAccess?.features.consolidation);
+  const canReadStockAnalytics = Boolean(identity?.isPlatformAdmin || subscriptionAccess?.features.stock);
+  const analyticsRights = useRef({ canRead: canReadAnalytics, canReadStock: canReadStockAnalytics, version: 0 });
+  if (analyticsRights.current.canRead !== canReadAnalytics || analyticsRights.current.canReadStock !== canReadStockAnalytics) {
+    analyticsRights.current = { canRead: canReadAnalytics, canReadStock: canReadStockAnalytics, version: analyticsRights.current.version + 1 };
+  }
+  // Filtrer dès le rendu, puis effacer la projection devenue sensible sans
+  // toucher aux données métier. Une réponse en vol vérifie aussi ces droits.
+  const visibleAnalyticsBoard = useMemo(() => !canReadAnalytics
+    ? emptyAnalyticsBoard(analyticsBoard.periodStart, analyticsBoard.periodEnd, analyticsBoard.compareStart, analyticsBoard.compareEnd)
+    : canReadStockAnalytics ? analyticsBoard : redactStockAnalytics(analyticsBoard),
+  [analyticsBoard, canReadAnalytics, canReadStockAnalytics]);
+  useEffect(() => {
+    if (!canReadAnalytics) setAnalyticsBoard((board) => emptyAnalyticsBoard(board.periodStart, board.periodEnd, board.compareStart, board.compareEnd));
+    else if (!canReadStockAnalytics) setAnalyticsBoard((board) => redactStockAnalytics(board));
+  }, [canReadAnalytics, canReadStockAnalytics]);
   const [subscriptionUsage, setSubscriptionUsage] = useState<SubscriptionUsageSnapshot>(() => emptySubscriptionUsage());
   const [platformBoard, setPlatformBoard] = useState<PlatformSnapshot>(() => emptyPlatformBoard(dataSource === 'local' ? getPlans() : []));
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
@@ -574,23 +743,92 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
   }, [serverWash, authReady, identity?.userId, state.station?.id]);
 
+  const pendingExpense = serverFinance && pendingExpenseState?.userId === identity?.userId
+    && pendingExpenseState?.stationId === state.station?.id ? pendingExpenseState : null;
+  useEffect(() => {
+    if (!serverFinance || !authReady || !identity?.userId || !state.station?.id) {
+      setPendingExpenseState(null); setPendingExpenseError(null); return;
+    }
+    try {
+      setPendingExpenseState(readPendingExpense(identity.userId, state.station.id));
+      setPendingExpenseError(null);
+    } catch (error) {
+      setPendingExpenseState(null);
+      setPendingExpenseError(error instanceof Error ? error.message : 'Tentative de dépense inaccessible.');
+    }
+  }, [serverFinance, authReady, identity?.userId, state.station?.id]);
+
   // Les produits d'exemple ne sont créés que pour la démonstration entièrement
   // locale, jamais lors de la normalisation d'un tableau de bord serveur vide.
   useEffect(() => {
-    if (isLocalStockDemo && state.station && state.products.length === 0) {
+    if (isLocalStockDemo && state.station && state.products.length === 0
+      && accessCanWrite(localSubscription) && localSubscription?.features.stock) {
       setState((current) => seedLocalDemoStock(current));
     }
-  }, [isLocalStockDemo, state.station?.id, state.products.length]);
+  }, [isLocalStockDemo, state.station?.id, state.products.length, localSubscription?.canWrite, localSubscription?.features.stock]);
 
   useEffect(() => {
-    if (authPort.kind === 'local') persist(state);
-  }, [state, authPort.kind]);
+    if (authPort.kind !== 'local' || demoIssueRef.current) return;
+    // Ne pas créer un état vide au premier rendu : un autre onglet pourrait
+    // être en train d'inscrire son propriétaire.
+    const pendingNotices = new Set(demoSuccessQueue.current.map((item) => item.id));
+    if (pendingNotices.size === 0 && !hasDemoStateToPersist(state, demoBaseline.current)) return;
+    const generation = demoWriteGeneration.current;
+    void withDemoStorageLock(() => {
+      if (demoIssueRef.current || generation !== demoWriteGeneration.current || stateRef.current !== state) return;
+      const stored = readDemoState();
+      if (stored.status === 'unreadable' || stored.status === 'unavailable') {
+        throw new Error('Stockage local illisible ou inaccessible. Les modifications récentes ne sont pas conservées.');
+      }
+      if (stored.raw !== demoBaseline.current) {
+        throw new Error('Les données ont changé dans un autre onglet. Les modifications de cet onglet ne sont pas conservées ; sauvegardez les données, puis rechargez.');
+      }
+      // Une écriture périmée programmée juste avant notre propre inscription
+      // ne peut pas remplacer l'entreprise qui vient d'être créée.
+      if (stored.status === 'ok' && stored.value.company && state.company?.id !== stored.value.company.id) return;
+      const raw = serializeDemoState(state);
+      if (raw !== stored.raw) {
+        try { writeDemoState(raw); }
+        catch { throw new Error('Écriture locale impossible (stockage inaccessible ou plein). Les modifications récentes ne sont pas conservées.'); }
+        demoBaseline.current = raw;
+      }
+      setDemoSavedRaw(raw);
+      const confirmed = demoSuccessQueue.current.filter((item) => pendingNotices.has(item.id));
+      demoSuccessQueue.current = demoSuccessQueue.current.filter((item) => !pendingNotices.has(item.id));
+      confirmed.forEach((item) => showToast('success', item.message));
+    }).catch((error: unknown) => {
+      demoSuccessQueue.current = [];
+      markDemoIssue(error instanceof Error ? error.message : 'Écriture locale impossible.');
+    });
+  }, [state, authPort.kind, markDemoIssue, showToast, demoSuccessVersion]);
 
-  const notify = useCallback((kind: Toast['kind'], message: string) => {
-    const id = uid('toast');
-    setToasts((t) => [...t, { id, kind, message }]);
-    window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4500);
-  }, []);
+  useEffect(() => {
+    if (authPort.kind !== 'local') return;
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      const current = stateRef.current;
+      if (!hasDemoStateToPersist(current, demoBaseline.current)) return;
+      // Une alerte native est une protection supplémentaire, pas une garantie :
+      // certains navigateurs l'ignorent ou l'exigent après une interaction.
+      if (serializeDemoState(current) !== demoBaseline.current) {
+        event.preventDefault();
+        event.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [authPort.kind]);
+
+  useEffect(() => {
+    if (authPort.kind !== 'local') return;
+    const onStorage = (event: StorageEvent) => {
+      if ((event.key === DEMO_STATE_KEY || event.key === null) && event.newValue !== demoBaseline.current) {
+        markDemoIssue('Les données ont changé dans un autre onglet. Les modifications de cet onglet ne sont pas conservées ; sauvegardez les données, puis rechargez.');
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [authPort.kind, markDemoIssue]);
+
   const dismissToast = useCallback((id: string) => setToasts((t) => t.filter((x) => x.id !== id)), []);
 
   const sessionFromIdentity = useCallback((value: AuthIdentity, stationId: string | null): Session => ({
@@ -612,17 +850,25 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const refreshInvitations = useCallback(async (): Promise<Invitation[]> => {
     const generation = authGenerationRef.current;
+    const current = beginRequest('employeeInvitations');
     const list = await authPort.listInvitations();
-    if (generation === authGenerationRef.current) setInvitations(list);
+    if (generation !== authGenerationRef.current || !current()) {
+      throw new ApiError('employee_read_superseded', 'La lecture des invitations a été remplacée : actualisez les comptes.');
+    }
+    setInvitations((previous) => generation === authGenerationRef.current && current() ? list : previous);
     return list;
-  }, [authPort]);
+  }, [authPort, beginRequest]);
 
   const refreshUsers = useCallback(async (): Promise<AppUser[]> => {
     const generation = authGenerationRef.current;
+    const current = beginRequest('employeeUsers');
     const users = await authPort.refreshUsers();
-    if (generation === authGenerationRef.current) setState((s) => ({ ...s, users }));
+    if (generation !== authGenerationRef.current || !current()) {
+      throw new ApiError('employee_read_superseded', 'La lecture des comptes a été remplacée : actualisez-les.');
+    }
+    setState((s) => generation === authGenerationRef.current && current() ? { ...s, users } : s);
     return users;
-  }, [authPort]);
+  }, [authPort, beginRequest]);
 
   const applyAuthChange = useCallback((change: AuthChange) => {
     const value = change.identity;
@@ -635,6 +881,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setState((s) => authPort.kind === 'supabase' ? emptyState() : { ...s, session: null });
       setIdentity(null);
       setInvitations([]);
+      setEmployeeReadWarning(null);
+      setUnconfirmedInvitation(null);
+      unconfirmedInvitationRef.current = null;
+      setUnconfirmedAccountUpdate(null);
+      unconfirmedAccountUpdateRef.current = null;
+      setRevocationRecovery(null);
       setToasts([]);
       setAssignableUsers([]);
       setStationMetrics(null);
@@ -657,6 +909,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (key === authKeyRef.current) return;
     const previousScope = scopeRef.current;
     const sameUser = previousScope.userId === value.userId && previousScope.companyId === value.companyId;
+    if (!sameUser) {
+      setEmployeeReadWarning(null); setUnconfirmedInvitation(null);
+      unconfirmedInvitationRef.current = null; setUnconfirmedAccountUpdate(null);
+      unconfirmedAccountUpdateRef.current = null; setRevocationRecovery(null);
+    }
     const previousStation = stateRef.current.station;
     const available = new Set(value.stations.map((s) => s.id));
     const selected = [sameUser ? previousScope.stationId : null,
@@ -706,24 +963,37 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     });
 
     void (async () => {
+      // Ces lectures initiales partagent les mêmes versions que les relectures
+      // après mutation : une réponse tardive ne doit pas restaurer un ancien état.
+      const usersCurrent = beginRequest('employeeUsers');
+      let current = usersCurrent;
       try {
         const { users } = await authPort.listUsers();
         if (authGenerationRef.current !== generation) return;
-        if (authPort.kind === 'supabase') {
+        if (authPort.kind === 'supabase' && usersCurrent()) {
           // Une sélection effectuée pendant la lecture est conservée.
           const projected = mapIdentityToAppState(value, users, scopeRef.current.stationId);
-          setState((s) => authGenerationRef.current === generation && s.session?.userId === value.userId
+          setState((s) => authGenerationRef.current === generation && usersCurrent() && s.session?.userId === value.userId
             ? { ...s, users: projected.users } : s);
         }
+        current = beginRequest('employeeInvitations');
+        const invitationsCurrent = current;
         const nextInvitations = await authPort.listInvitations();
-        if (authGenerationRef.current === generation) setInvitations(nextInvitations);
+        if (authGenerationRef.current === generation && invitationsCurrent()) {
+          setInvitations((previous) => authGenerationRef.current === generation && invitationsCurrent() ? nextInvitations : previous);
+        }
       } catch {
-        if (authGenerationRef.current === generation) setAuthError('Lecture du profil ou des permissions impossible.');
+        if (authGenerationRef.current === generation && current()) {
+          setAuthError('Lecture du profil ou des permissions impossible.');
+          if (authPort.kind === 'supabase') {
+            setEmployeeReadWarning((warning) => warning ?? 'Les comptes ou les invitations n’ont pas pu être relus. Actualisez-les avant toute action.');
+          }
+        }
       } finally {
         if (authGenerationRef.current === generation) setAuthReady(true);
       }
     })();
-  }, [authPort, sessionFromIdentity, reasonMessage]);
+  }, [authPort, beginRequest, sessionFromIdentity, reasonMessage]);
 
   const selectStation = useCallback((stationId: string) => {
     if (authPort.kind !== 'supabase' || !authReady || !identity
@@ -774,10 +1044,79 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return () => { active = false; };
   }, [adapter, notify]);
 
+  const refreshSubscriptionAccess = useCallback(async (): Promise<SubscriptionAccess | null> => {
+    if (authPort.kind === 'local') return localSubscriptionAccess(stateRef.current, plans);
+    const scope = { ...scopeRef.current };
+    const commands = adapter.subscriptionCommands;
+    if (!serverSubscription || !commands || !authReady || !identity || identity.isPlatformAdmin
+      || !scope.userId || !scope.companyId || scope.userId !== identity.userId) {
+      throw new ApiError('subscription_unavailable', 'Abonnement serveur indisponible pour cette session.');
+    }
+    const current = beginRequest('subscriptionAccess');
+    setSubscriptionLoad({ epoch: scope.epoch, userId: scope.userId, companyId: scope.companyId,
+      status: 'loading', access: null, error: null });
+    try {
+      const access = await commands.read(scope.companyId);
+      if (!current()) throw new ApiError('station_changed', 'Session ou station changée pendant la lecture de l’abonnement.');
+      setSubscriptionLoad({ epoch: scope.epoch, userId: scope.userId, companyId: scope.companyId,
+        status: 'ready', access, error: null });
+      setState((s) => current() && s.session?.userId === scope.userId ? {
+        ...s, subscription: { id: access.id, companyId: access.companyId, planId: access.planId,
+          status: access.status === 'trial' ? 'essai' : access.status === 'active' ? 'active' : 'suspendue',
+          startedAt: access.startedAt, trialEndsAt: access.trialEndsAt, pendingPlanId: access.pendingPlanId },
+      } : s);
+      return access;
+    } catch (error) {
+      if (current()) setSubscriptionLoad({ epoch: scope.epoch, userId: scope.userId, companyId: scope.companyId,
+        status: 'error', access: null, error: error instanceof Error ? error.message : 'Lecture impossible.' });
+      throw error;
+    }
+  }, [adapter, authPort.kind, serverSubscription, authReady, identity, beginRequest, plans]);
+
+  useEffect(() => {
+    if (!serverSubscription || !authReady || !identity?.companyId || identity.isPlatformAdmin) return;
+    const read = () => { void refreshSubscriptionAccess().catch(() => { /* état d’erreur visible et écriture bloquée */ }); };
+    read();
+    const interval = window.setInterval(read, 60_000);
+    window.addEventListener('focus', read);
+    return () => { window.clearInterval(interval); window.removeEventListener('focus', read); };
+  }, [serverSubscription, authReady, identity?.userId, identity?.companyId, identity?.isPlatformAdmin,
+    scopeRef.current.epoch, refreshSubscriptionAccess]);
+
+  // Réafficher la lecture seule à l'échéance de l'essai OU de la période
+  // payante. L'heure estimée vient du serveur, qui reste toujours l'autorité.
+  useEffect(() => {
+    const deadline = subscriptionAccess?.clientWriteDeadline;
+    if (deadline === null || deadline === undefined || !subscriptionAccess?.canWrite) return;
+    let timer: number | undefined;
+    const schedule = () => {
+      const wait = deadline - Date.now();
+      if (wait <= 0) { setSubscriptionClock((n) => n + 1); return; }
+      // Une période mensuelle peut dépasser la limite d'un setTimeout.
+      timer = window.setTimeout(schedule, Math.min(wait + 50, 2_147_000_000));
+    };
+    schedule();
+    return () => { if (timer !== undefined) window.clearTimeout(timer); };
+  }, [subscriptionAccess?.clientWriteDeadline, subscriptionAccess?.canWrite]);
+
+  const refreshSubscriptionRequests = useCallback(async (): Promise<void> => {
+    if (!serverSubscription || !authReady || !identity?.isPlatformAdmin || !adapter.subscriptionCommands) {
+      setSubscriptionRequests([]); return;
+    }
+    const current = beginRequest('subscriptionRequests');
+    try {
+      const requests = await adapter.subscriptionCommands.listRequests();
+      if (current()) { setSubscriptionRequests(requests); setSubscriptionRequestsError(null); }
+    } catch (error) {
+      if (current()) { setSubscriptionRequests([]); setSubscriptionRequestsError(error instanceof Error ? error.message : 'Demandes indisponibles.'); }
+      throw error;
+    }
+  }, [adapter, serverSubscription, authReady, identity?.isPlatformAdmin, beginRequest]);
+
   const toggleTheme = useCallback(() => {
     setTheme((t) => {
       const next = t === 'dark' ? 'light' : 'dark';
-      localStorage.setItem('washguard.theme', next);
+      try { localStorage.setItem('washguard.theme', next); } catch { /* préférence facultative */ }
       document.documentElement.classList.toggle('dark', next === 'dark');
       return next;
     });
@@ -801,8 +1140,73 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   /** Mutation simple, avec journalisation optionnelle. */
   const mutate = useCallback((fn: (s: AppState) => AppState) => setState((s) => fn(s)), []);
 
+  // La projection complète est relue pour une station et une session vérifiées.
+  // Une réponse tardive ne traverse jamais un changement de compte ou station.
+  const readSetup = useCallback(async (background = false): Promise<StationSetupSnapshot> => {
+    const commands = adapter.setupCommands;
+    const scope = { ...scopeRef.current };
+    if (!serverSetup || !commands || !authReady || !identity || !scope.stationId || !scope.companyId) {
+      throw new ApiError('server_unavailable', 'Lecture du paramétrage serveur indisponible.');
+    }
+    const current = beginRequest('setup');
+    if (!background) setSetupLoad({ epoch: scope.epoch, status: 'loading', error: null });
+    try {
+      const snapshot = await commands.read(scope.stationId);
+      if (!current() || snapshot.company.id !== scope.companyId || snapshot.station.id !== scope.stationId) {
+        throw new ApiError('station_changed', 'La station ou la session a changé : rechargez avant de poursuivre.');
+      }
+      const catalog = mapCatalogToState(snapshot.catalog);
+      setState((cur) => current() && cur.session?.userId === scope.userId && cur.station?.id === scope.stationId
+        ? { ...cur, company: snapshot.company, station: snapshot.station, ...catalog } : cur);
+      setSetupLoad({ epoch: scope.epoch, status: 'ready', error: null });
+      return snapshot;
+    } catch (error) {
+      if (current()) setSetupLoad({ epoch: scope.epoch, status: 'error',
+        error: error instanceof Error ? error.message : 'Lecture du paramétrage impossible.' });
+      throw error;
+    }
+  }, [adapter, serverSetup, authReady, identity, beginRequest]);
+
+  const refreshSetup = useCallback(async (): Promise<void> => { await readSetup(); }, [readSetup]);
+  useEffect(() => {
+    if (!serverSetup || !authReady || !identity || !state.station?.id) return;
+    void readSetup().catch(() => { /* l'écran affiche l'erreur et propose une relecture */ });
+  }, [serverSetup, authReady, identity?.userId, state.station?.id, scopeRef.current.epoch, readSetup]);
+
+  const setupRpc = useCallback(async <T,>(
+    action: (commands: NonNullable<DataAdapter['setupCommands']>, stationId: string) => Promise<T>,
+    verified: (snapshot: StationSetupSnapshot, value: T) => boolean,
+  ): Promise<void> => {
+    const commands = adapter.setupCommands;
+    const scope = { ...scopeRef.current };
+    if (!serverSetup || !commands || !scope.stationId || setupLoad.epoch !== scope.epoch || setupLoad.status !== 'ready') {
+      throw new ApiError('server_unavailable', 'Relisez la station avant de modifier ses réglages.');
+    }
+    if (setupInFlight.current) throw new ApiError('operation_pending', 'Un enregistrement est déjà en cours. Patientez.');
+    setupInFlight.current = true;
+    try {
+      let result: T;
+      try { result = await action(commands, scope.stationId); }
+      catch (error) {
+        if (scope.epoch === scopeRef.current.epoch) setSetupLoad({ epoch: scope.epoch, status: 'error',
+          error: 'Écriture non confirmée. Relisez et vérifiez les données avant de réessayer.' });
+        throw error;
+      }
+      if (scope.epoch !== scopeRef.current.epoch) throw new ApiError('station_changed', 'Station changée : vérifiez l’opération dans sa station d’origine.');
+      let snapshot: StationSetupSnapshot;
+      try { snapshot = await readSetup(true); }
+      catch { throw new Error('Écriture envoyée, mais relecture impossible : vérifiez les données avant de réessayer.'); }
+      if (scope.epoch !== scopeRef.current.epoch) throw new ApiError('station_changed', 'Station changée : vérifiez l’opération dans sa station d’origine.');
+      if (!verified(snapshot, result)) {
+        setSetupLoad({ epoch: scope.epoch, status: 'error', error: 'La relecture ne confirme pas cette modification. Vérifiez les données avant de réessayer.' });
+        throw new Error('La relecture ne confirme pas cette modification. Vérifiez les données avant de réessayer.');
+      }
+    } finally { setupInFlight.current = false; }
+  }, [adapter, serverSetup, setupLoad, readSetup]);
+
   // ── Prompt 05 + 06 : boards serveur et commandes RPC ───────────────────────
-  const refreshFinance = useCallback(async (from?: string, to?: string): Promise<void> => {
+  const refreshFinance = useCallback(async (from?: string, to?: string, expected?: { id: string; pending: PendingExpense }, requireCurrent = false): Promise<void> => {
+    const mustRead = Boolean(expected || requireCurrent);
     const today = new Date();
     const first = new Date(today.getFullYear(), today.getMonth(), 1);
     const start = from ?? financePeriod.current?.start ?? `${first.getFullYear()}-${String(first.getMonth() + 1).padStart(2, '0')}-01`;
@@ -810,24 +1214,43 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     validatePeriod(start, endStr, 366);
     if (from !== undefined || to !== undefined) financePeriod.current = { start, end: endStr };
     if (!serverFinance) {
+      if (mustRead) throw new Error('Lecture finance serveur indisponible.');
       setState((cur) => withFinanceDefaults({ ...cur, profitability: localProfitability(cur, start, endStr) }));
       return;
     }
     const stationId = scopeRef.current.stationId;
     if (!authReady || !identity || !stationId || !identity.permissions.some((p) =>
-      ['reports.view', 'cash.open', 'cash.close', 'cash.reopen', 'expenses.create', 'expenses.cancel', 'commissions.view'].includes(p))) return;
+      ['reports.view', 'cash.open', 'cash.close', 'cash.reopen', 'expenses.create', 'expenses.cancel', 'commissions.view'].includes(p))) {
+      if (mustRead) throw new Error('Lecture finance non autorisée ou indisponible.');
+      return;
+    }
+    if (expected && (stationId !== expected.pending.stationId || identity.userId !== expected.pending.userId)) {
+      throw new Error('La session ou la station ne correspond pas à la dépense.');
+    }
     const current = beginRequest('finance');
     try {
       const [board, report] = await Promise.all([
         adapter.listFinanceBoard(stationId),
         identity.permissions.includes('reports.view') ? adapter.listProfitability(start, endStr, stationId) : Promise.resolve(null),
       ]);
-      if (!current()) return;
+      if (!current()) {
+        if (mustRead) throw new Error('Lecture finance dépassée par une autre actualisation.');
+        return;
+      }
+      if (expected) {
+        const p = expected.pending.payload;
+        const found = board.expenses.find((expense) => expense.id === expected.id
+          && expense.stationId === stationId && expense.idempotencyKey === p.idempotencyKey
+          && expense.amount === p.amount && expense.category.toLowerCase() === p.category.toLowerCase()
+          && expense.reason === p.reason && expense.supplier === p.supplier && expense.date === p.date
+          && expense.method === p.method && expense.status === 'enregistree');
+        if (!found) throw new Error('La dépense n’a pas été confirmée par la relecture.');
+      }
       setState((cur) => {
         if (!current()) return cur;
         return withStockDefaults(withFinanceDefaults({ ...cur, ...board, profitability: report }));
       });
-    } catch (error) { if (current()) throw error; }
+    } catch (error) { if (current() || mustRead) throw error; }
   }, [adapter, beginRequest, serverFinance, authReady, identity, state.station?.id]);
 
   const refreshWashes = useCallback(async (expectedPayment?: { washId: string; key: string }): Promise<void> => {
@@ -843,8 +1266,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
     const current = beginRequest('washes');
     try {
-      const [board, catalog, clients, assignable] = await Promise.all([
-        adapter.listWashBoard(stationId), adapter.listCatalog(stationId), adapter.listClients(stationId),
+      const [board, clients, assignable] = await Promise.all([
+        adapter.listWashBoard(stationId), adapter.listClients(stationId),
         identity.permissions.includes('washes.assign') ? adapter.listAssignableUsers(stationId) : Promise.resolve([]),
       ]);
       if (!current()) {
@@ -855,12 +1278,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         ?.payments.some((payment) => payment.idempotencyKey === expectedPayment.key)) {
         throw new Error('Paiement absent de la lecture de la fiche.');
       }
-      const projected = mapCatalogToState(catalog);
       setAssignableUsers(assignable);
       setState((cur) => {
         if (!current()) return cur;
         return { ...cur, washes: board.washes, washPosts: board.posts,
-          vehicleCategories: projected.vehicleCategories, services: projected.services,
           // La liste lavage fait autorité pour l'appartenance à cette station ;
           // les champs CRM supplémentaires déjà chargés restent disponibles.
           clients: clients.map((client) => ({ ...cur.clients.find((x) => x.id === client.id), ...client })) };
@@ -889,13 +1310,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const refreshStock = useCallback(async (): Promise<void> => {
     if (!serverStock) { setState((cur) => withStockDefaults(cur)); return; }
     const stationId = scopeRef.current.stationId;
-    if (!authReady || !identity || !stationId || !identity.permissions.includes('inventory.view')) return;
+    if (!authReady || !identity || !stationId || !identity.permissions.includes('inventory.view')
+      || (!identity.isPlatformAdmin && !subscriptionAccess?.features.stock)) return;
     const current = beginRequest('stock');
     try {
       const board: StockSnapshot = await adapter.listStockBoard(stationId);
       if (current()) setState((cur) => current() ? withStockDefaults({ ...cur, ...board }) : cur);
     } catch (error) { if (current()) throw error; }
-  }, [adapter, beginRequest, serverStock, authReady, identity, state.station?.id]);
+  }, [adapter, beginRequest, serverStock, authReady, identity, state.station?.id, subscriptionAccess?.features.stock]);
 
   const refreshCrm = useCallback(async (): Promise<void> => {
     if (!serverCrm) {
@@ -963,33 +1385,64 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       throw error;
     }
     setAnalyticsError(null);
+    if (!canReadAnalytics) return;
     if (!serverAnalytics) {
-      setAnalyticsBoard(analyticsBoardFromState(stateRef.current, start, end, compareStart, compareEnd));
-      setAnalyticsError(null); return;
+      const board = analyticsBoardFromState(stateRef.current, start, end, compareStart, compareEnd);
+      setAnalyticsBoard(canReadStockAnalytics ? board : redactStockAnalytics(board));
+      return;
     }
     if (!authReady || !identity || !identity.permissions.includes('analytics.view') || !identity.permissions.includes('reports.view')) return;
-    const current = beginRequest('analytics');
+    const rightsVersion = analyticsRights.current.version;
+    const requestCurrent = beginRequest('analytics');
+    const current = () => requestCurrent() && analyticsRights.current.version === rightsVersion;
     try {
       const board = await adapter.listAnalyticsBoard(start, end, compareStart, compareEnd);
-      if (current()) { setAnalyticsBoard(board); setAnalyticsError(null); }
+      if (current() && analyticsRights.current.canRead) {
+        setAnalyticsBoard((previous) => !current() || !analyticsRights.current.canRead ? previous
+          : analyticsRights.current.canReadStock ? board : redactStockAnalytics(board));
+        setAnalyticsError(null);
+      }
     } catch (error) {
       if (current()) {
         setAnalyticsError(error instanceof Error ? error.message : 'Lecture analytics impossible.');
         throw error;
       }
     }
-  }, [adapter, beginRequest, serverAnalytics, authReady, identity, state.station?.id]);
+  }, [adapter, beginRequest, serverAnalytics, authReady, identity, state.station?.id, canReadAnalytics, canReadStockAnalytics]);
 
-  const refreshSubscriptionUsage = useCallback(async (periodStart: string = monthStartISO()): Promise<void> => {
+  const canReadSubscriptionUsage = Boolean(identity && (identity.isPlatformAdmin || identity.permissions.includes('subscription.manage')
+    || (identity.permissions.includes('analytics.view') && subscriptionAccess?.features.consolidation)));
+  const refreshSubscriptionUsage = useCallback(async (periodStart: string = quotaMonthStartISO(), requireCurrent = false): Promise<void> => {
     if (!serverAnalytics) {
       const usage = subscriptionUsageFromState(stateRef.current, periodStart);
       setSubscriptionUsage(usage); setPlatformBoard(platformBoardFromState(stateRef.current, getPlans())); return;
     }
-    if (!authReady || !identity) return;
+    if (!authReady || !canReadSubscriptionUsage) {
+      // Une lecture explicitement requise ne peut pas être confirmée par un
+      // retour silencieux. Les appels facultatifs, eux, restent sans requête
+      // lorsque le rôle ou la formule ne donnent pas accès aux quotas.
+      if (requireCurrent) throw new ApiError('subscription_usage_unavailable', 'Relecture des quotas indisponible pour cette session.');
+      return;
+    }
     const current = beginRequest('subscription');
-    try { const usage = await adapter.listSubscriptionUsage(periodStart); if (current()) setSubscriptionUsage(usage); }
-    catch (error) { if (current()) throw error; }
-  }, [adapter, beginRequest, serverAnalytics, authReady, identity, state.station?.id]);
+    // Ne pas présenter un ancien relevé comme frais pendant ou après une
+    // relecture échouée. Les limites serveur restent l'autorité pour les quotas.
+    setSubscriptionUsage(emptySubscriptionUsage(periodStart));
+    try {
+      const usage = await adapter.listSubscriptionUsage(periodStart);
+      if (!current()) {
+        if (requireCurrent) throw new ApiError('subscription_read_superseded', 'Relecture des quotas remplacée : actualisez-les.');
+        return;
+      }
+      setSubscriptionUsage((previous) => current() ? usage : previous);
+    } catch (error) {
+      if (current()) {
+        setSubscriptionUsage((previous) => current() ? emptySubscriptionUsage(periodStart) : previous);
+        throw error;
+      }
+      if (requireCurrent) throw new ApiError('subscription_read_superseded', 'Relecture des quotas remplacée : actualisez-les.');
+    }
+  }, [adapter, beginRequest, serverAnalytics, authReady, identity?.userId, state.station?.id, canReadSubscriptionUsage]);
 
   const refreshPlatform = useCallback(async (): Promise<void> => {
     if (!serverAnalytics) { setPlatformBoard(platformBoardFromState(stateRef.current, getPlans())); setPlatformError(null); return; }
@@ -999,7 +1452,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     catch (error) { if (current()) throw error; }
   }, [adapter, beginRequest, serverAnalytics, authReady, identity, state.station?.id]);
 
-  const refreshUsageCounters = useCallback(async (periodStart: string = monthStartISO()): Promise<void> => {
+  const refreshUsageCounters = useCallback(async (periodStart: string = quotaMonthStartISO()): Promise<void> => {
     if (serverAnalytics && authReady && identity?.isPlatformAdmin && adapter.analyticsCommands) {
       await adapter.analyticsCommands.refreshSubscriptionUsage(periodStart);
     }
@@ -1101,15 +1554,20 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (!commands) return Promise.reject(new ApiError('server_unavailable', 'Commande finance indisponible en mode local.'));
     const epoch = scopeRef.current.epoch;
     return action(commands).then(async (value) => {
-      if (scopeRef.current.epoch !== epoch) return value;
-      await refreshWashes();
-      if (scopeRef.current.epoch !== epoch) return value;
-      await refreshFinance().catch((error: unknown) => {
-        notify('error', `Actualisation finance : ${error instanceof Error ? error.message : 'erreur'}`);
-      });
+      try {
+        if (scopeRef.current.epoch !== epoch) throw new Error('station changée');
+        await refreshWashes();
+        if (scopeRef.current.epoch !== epoch) throw new Error('station changée');
+        await refreshFinance(undefined, undefined, undefined, true);
+        if (scopeRef.current.epoch !== epoch) throw new Error('station changée');
+      } catch {
+        // La commande a pu être validée. Ne pas la répéter aveuglément : la
+        // lecture peut avoir échoué ou avoir été supplantée par une autre.
+        throw new ApiError('finance_unconfirmed', 'Commande envoyée, mais relecture finance non confirmée. Vérifiez la station et l’historique avant de répéter.');
+      }
       return value;
     });
-  }, [adapter, refreshWashes, refreshFinance, notify]);
+  }, [adapter, refreshWashes, refreshFinance]);
 
   const stockRpc = useCallback(<T,>(
     action: (c: NonNullable<DataAdapter['stockCommands']>) => Promise<T>
@@ -1189,8 +1647,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const saveCustomerProfile = useCallback((p: CustomerProfilePayload) => {
     assertSelectedStation(p.stationId); validateCustomer(p);
     return serverCrm ? crmRpc((c) => c.saveCustomerProfile(p))
-      : crmLocal((s) => saveCustomerProfileLocal(s, p));
-  }, [assertSelectedStation, serverCrm, crmRpc, crmLocal]);
+      : crmLocal((s) => {
+        const access = localSubscriptionAccess(s, plans);
+        const existing = s.clients.find((client) => client.id === p.customerId);
+        return saveCustomerProfileLocal(s, { ...p,
+          loyaltyOptIn: access?.features.loyalty ? p.loyaltyOptIn : existing?.loyaltyOptIn ?? false,
+          fleetId: access?.features.fleets ? p.fleetId : existing?.fleetId ?? null });
+      });
+  }, [assertSelectedStation, serverCrm, crmRpc, crmLocal, plans]);
   const saveCustomerVehicle = useCallback((p: CustomerVehiclePayload) => {
     assertSelectedStation(p.stationId); validatePlate(p.plate);
     return serverCrm ? crmRpc((c) => c.saveCustomerVehicle(p))
@@ -1267,12 +1731,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   // ── Auth : délégation au port, aucune session forgée ───────────────────────
   const signUp = useCallback(async (p: SignUpPayload): Promise<AuthResult> => {
+    if (authPort.kind === 'local' && demoIssueRef.current) throw new ApiError('demo_storage_unavailable', demoIssueRef.current);
     const result = await authPort.signUp(p);
     if (!result.confirmationRequired) notify('success', 'Votre espace est prêt. Bienvenue !');
     return result;
   }, [authPort, notify]);
 
   const signIn = useCallback(async (email: string, password: string): Promise<AuthResult> => {
+    if (authPort.kind === 'local' && demoIssueRef.current) throw new ApiError('demo_storage_unavailable', demoIssueRef.current);
     const result = await authPort.signIn(email, password);
     notify('success', `Bonjour ${result.identity?.fullName ?? ''} !`);
     return result;
@@ -1289,6 +1755,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setAnalyticsBoard(emptyAnalyticsBoard()); setSubscriptionUsage(emptySubscriptionUsage()); setPlatformBoard(emptyPlatformBoard());
       setIdentity(null);
       setInvitations([]);
+      setEmployeeReadWarning(null);
+      setUnconfirmedInvitation(null);
+      unconfirmedInvitationRef.current = null;
+      setUnconfirmedAccountUpdate(null);
+      unconfirmedAccountUpdateRef.current = null;
+      setRevocationRecovery(null);
       setAuthRecovery(false);
       setAuthError(null);
       setToasts([]);
@@ -1304,56 +1776,250 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setAuthRecovery(false);
   }, [authPort]);
 
+  const refreshEmployeeData = useCallback(async (): Promise<void> => {
+    const generation = authGenerationRef.current;
+    // En démo, l'adaptateur a déjà planifié une mise à jour React du compte :
+    // relire immédiatement stateRef pourrait restaurer une ancienne version.
+    // Certains rôles (par exemple un gérant en Standard) ne peuvent pas lire
+    // les quotas : ne pas prétendre les relire ni bloquer la gestion courante
+    // uniquement pour cette permission absente. Si la lecture était autorisée,
+    // elle est obligatoire et doit rester la plus récente.
+    const results = await Promise.allSettled(authPort.kind === 'supabase'
+      ? [refreshUsers(), refreshInvitations(), refreshSubscriptionAccess(),
+        ...(canReadSubscriptionUsage ? [refreshSubscriptionUsage(quotaMonthStartISO(), true)] : [])]
+      : [refreshInvitations()]);
+    if (generation !== authGenerationRef.current) {
+      throw new ApiError('session_changed', 'Session modifiée pendant la relecture des comptes.');
+    }
+    if (results.some((result) => result.status === 'rejected')) {
+      throw new ApiError('employee_read_failed', 'Actualisation incomplète : réessayez avant toute action.');
+    }
+    setEmployeeReadWarning(null);
+  }, [authPort.kind, refreshUsers, refreshInvitations, refreshSubscriptionAccess, refreshSubscriptionUsage, canReadSubscriptionUsage]);
+
+  const assertNoUnconfirmedAccountOperation = useCallback(() => {
+    const pendingInvite = unconfirmedInvitationRef.current;
+    if (pendingInvite && pendingInvite.userId === identity?.userId && pendingInvite.companyId === identity.companyId) {
+      throw new ApiError('invite_pending', 'Vérifiez l’invitation non confirmée avec le support avant toute autre action sur les comptes.');
+    }
+    const pendingUpdate = unconfirmedAccountUpdateRef.current;
+    if (pendingUpdate && pendingUpdate.userId === identity?.userId && pendingUpdate.companyId === identity.companyId) {
+      throw new ApiError('update_pending', 'Vérifiez la modification non confirmée avec le support avant toute autre action sur les comptes.');
+    }
+    if (identity?.userId && identity.companyId) {
+      const key = `${identity.userId}:${identity.companyId}`;
+      if (invitationsInFlight.current.has(key)) throw new ApiError('invite_in_flight', 'Une invitation est déjà en cours.');
+      if (accountUpdatesInFlight.current.has(key)) throw new ApiError('update_in_flight', 'Une modification de compte est déjà en cours.');
+    }
+  }, [identity?.userId, identity?.companyId]);
+
+  const assertNoPendingRevocation = useCallback(() => {
+    assertNoUnconfirmedAccountOperation();
+    if (authPort.kind !== 'supabase' || !identity?.userId || !identity.companyId) return;
+    const userId = identity.userId;
+    const companyId = identity.companyId;
+    let pending: PendingRevocation | null;
+    try { pending = readPendingRevocation(userId, companyId); }
+    catch (error) {
+      const message = error instanceof Error ? error.message : 'Stockage de session inaccessible : vérifiez avec le support.';
+      setRevocationRecovery({ userId, companyId, pending: null, error: message });
+      throw new ApiError('revoke_storage', message);
+    }
+    if (pending) {
+      setRevocationRecovery({ userId, companyId, pending, error: null });
+      throw new ApiError('revoke_pending', 'Vérifiez la révocation précédente avant toute autre action sur les comptes.');
+    }
+  }, [authPort.kind, identity?.userId, identity?.companyId, assertNoUnconfirmedAccountOperation]);
+
   const inviteUser = useCallback(async (p: InvitePayload) => {
-    const result = await authPort.invite(p);
-    await Promise.all([refreshUsers(), refreshInvitations()]);
-    notify('success', result.message ?? 'Invitation envoyée.');
-    return result;
-  }, [authPort, refreshUsers, refreshInvitations, notify]);
+    assertNoPendingRevocation();
+    const generation = authGenerationRef.current;
+    const userId = identity?.userId;
+    const companyId = identity?.companyId;
+    const lockKey = authPort.kind === 'supabase' && userId && companyId ? `${userId}:${companyId}` : null;
+    if (lockKey) invitationsInFlight.current.add(lockKey);
+    try {
+      let result: { id: string; message?: string };
+      try { result = await authPort.invite(p); }
+      catch (error) {
+        if (userId && companyId && scopeRef.current.userId === userId && scopeRef.current.companyId === companyId
+          && authPort.kind === 'supabase' && error instanceof ApiError
+          && ['invite_unconfirmed', 'reservation_unconfirmed'].includes(error.code)) {
+          const email = p.email.trim().toLowerCase();
+          unconfirmedInvitationRef.current = { userId, companyId };
+          setUnconfirmedInvitation({ email, message: `Invitation ou réservation non confirmée pour ${email} : un compte ou un e-mail peut déjà exister. Ne renvoyez pas avant vérification par le support. Ce rappel disparaît au rechargement ou à la déconnexion : notez l’adresse et faites vérifier son état.` });
+        }
+        throw error;
+      }
+      if (generation !== authGenerationRef.current) return result;
+      try { await refreshEmployeeData(); }
+      catch {
+        // Le service a confirmé l'invitation : une relecture échouée ne permet
+        // pas de la présenter comme annulée, ni d'encourager un second envoi.
+        if (generation === authGenerationRef.current) {
+          const warning = 'Invitation enregistrée, mais données non relues. Actualisez-les avant toute autre action.';
+          setEmployeeReadWarning(warning);
+          notify('info', warning);
+        }
+        return result;
+      }
+      if (generation === authGenerationRef.current) notify('success', result.message ?? 'Invitation envoyée.');
+      return result;
+    } finally {
+      if (lockKey) invitationsInFlight.current.delete(lockKey);
+    }
+  }, [authPort, identity?.userId, identity?.companyId, assertNoPendingRevocation, refreshEmployeeData, notify]);
 
   const revokeInvitation = useCallback(async (id: string) => {
-    await authPort.revokeInvitation(id);
-    await refreshInvitations();
-    notify('info', 'Invitation révoquée.');
-  }, [authPort, refreshInvitations, notify]);
+    assertNoUnconfirmedAccountOperation();
+    const generation = authGenerationRef.current;
+    let attempt: PendingRevocation | null = null;
+    let wasPending = false;
+    let lockKey: string | null = null;
+    const showRecovery = (pending: PendingRevocation | null, error: string | null, userId: string, companyId: string) => {
+      if (scopeRef.current.userId === userId && scopeRef.current.companyId === companyId) {
+        setRevocationRecovery({ userId, companyId, pending, error });
+      }
+    };
+    if (authPort.kind === 'supabase') {
+      const userId = identity?.userId;
+      const companyId = identity?.companyId;
+      if (!userId || !companyId) throw new ApiError('revoke_scope', 'Compte et entreprise vérifiés requis pour révoquer une invitation.');
+      lockKey = `${userId}:${companyId}`;
+      if (revocationsInFlight.current.has(lockKey)) throw new ApiError('revoke_in_flight', 'Une révocation est déjà en cours.');
+      revocationsInFlight.current.add(lockKey);
+      try {
+        const previous = readPendingRevocation(userId, companyId);
+        if (previous && previous.invitationId !== id) {
+          showRecovery(previous, null, userId, companyId);
+          throw new ApiError('revoke_pending', 'Vérifiez la révocation précédente avant toute autre révocation.');
+        }
+        wasPending = Boolean(previous);
+        attempt = previous ?? { version: 1, userId, companyId, invitationId: id, startedAt: new Date().toISOString() };
+        // Le marqueur précède l'envoi : même un rechargement pendant la RPC
+        // laisse la première opération à vérifier dans cet onglet.
+        if (!previous) savePendingRevocation(attempt);
+        showRecovery(attempt, null, userId, companyId);
+      } catch (error) {
+        revocationsInFlight.current.delete(lockKey);
+        if (!(error instanceof ApiError)) {
+          showRecovery(null, error instanceof Error ? error.message : 'Stockage de session inaccessible : vérifiez avec le support.', userId, companyId);
+        }
+        throw error;
+      }
+    }
+    try {
+      try { await authPort.revokeInvitation(id); }
+      catch (error) {
+        // Seul un refus certain de la toute première tentative permet de
+        // retirer le marqueur. Un refus d'un rejeu ne prouve rien sur l'envoi
+        // initial, et une exception inconnue reste conservatrice.
+        if (attempt && !wasPending && error instanceof ApiError && error.code !== 'revoke_unconfirmed') {
+          try {
+            clearPendingRevocation(attempt);
+            showRecovery(null, null, attempt.userId, attempt.companyId);
+          } catch (storageError) {
+            showRecovery(null, storageError instanceof Error ? storageError.message : 'Effacement non confirmé : vérifiez avec le support.', attempt.userId, attempt.companyId);
+          }
+        }
+        throw error;
+      }
+      if (attempt) {
+        try {
+          clearPendingRevocation(attempt);
+          showRecovery(null, null, attempt.userId, attempt.companyId);
+        } catch {
+          const warning = 'Révocation enregistrée, mais effacement du rappel non confirmé. Vérifiez les comptes et invitations avec le support avant toute autre action.';
+          showRecovery(null, warning, attempt.userId, attempt.companyId);
+          if (generation === authGenerationRef.current) notify('info', warning);
+          return;
+        }
+      }
+      if (generation !== authGenerationRef.current) return;
+      try { await refreshEmployeeData(); }
+      catch {
+        if (generation === authGenerationRef.current) {
+          const warning = 'Révocation enregistrée, mais données non relues. Actualisez-les avant toute autre action.';
+          setEmployeeReadWarning(warning);
+          notify('info', warning);
+        }
+        return;
+      }
+      if (generation === authGenerationRef.current) notify('success', 'Invitation révoquée et accès du compte désactivé.');
+    } finally {
+      if (lockKey) revocationsInFlight.current.delete(lockKey);
+    }
+  }, [authPort, identity?.userId, identity?.companyId, assertNoUnconfirmedAccountOperation, refreshEmployeeData, notify]);
 
   const updateUser = useCallback(async (p: UpdateUserPayload) => {
-    await authPort.updateUser(p);
-    await refreshUsers();
-    notify('success', 'Compte mis à jour.');
-  }, [authPort, refreshUsers, notify]);
+    assertNoPendingRevocation();
+    const generation = authGenerationRef.current;
+    const userId = identity?.userId;
+    const companyId = identity?.companyId;
+    const lockKey = authPort.kind === 'supabase' && userId && companyId ? `${userId}:${companyId}` : null;
+    if (lockKey) accountUpdatesInFlight.current.add(lockKey);
+    try {
+      await authPort.updateUser(p);
+    } catch (error) {
+      if (userId && companyId && scopeRef.current.userId === userId && scopeRef.current.companyId === companyId
+        && authPort.kind === 'supabase' && (!(error instanceof ApiError) || error.code === 'update_unconfirmed')) {
+        unconfirmedAccountUpdateRef.current = { userId, companyId };
+        setUnconfirmedAccountUpdate({ userId: p.userId,
+          message: `Modification de compte non confirmée : elle a peut-être été enregistrée. Les états affichés peuvent être périmés. Ne répétez pas l’action et faites vérifier le compte ${p.userId} avec le support. Ce rappel disparaît au rechargement ou à la déconnexion : notez l’identifiant et les changements demandés.` });
+      }
+      throw error;
+    } finally {
+      if (lockKey) accountUpdatesInFlight.current.delete(lockKey);
+    }
+    if (generation !== authGenerationRef.current) return;
+    try { await refreshEmployeeData(); }
+    catch {
+      if (generation === authGenerationRef.current) {
+        const warning = 'Compte mis à jour, mais données non relues. Actualisez-les avant toute autre action.';
+        setEmployeeReadWarning(warning);
+        notify('info', warning);
+      }
+      return;
+    }
+    if (generation === authGenerationRef.current) notify('success', 'Compte mis à jour.');
+  }, [authPort, identity?.userId, identity?.companyId, assertNoPendingRevocation, refreshEmployeeData, notify]);
 
   const clearAuthError = useCallback(() => setAuthError(null), []);
 
   // ── Données de base ────────────────────────────────────────────────────────
   const updateCompany = useCallback((patch: Partial<Company>) => {
     if (patch.phone !== undefined) validatePhone(patch.phone);
+    if (serverSetup) {
+      if (Object.keys(patch).some((key) => !['name', 'city', 'phone'].includes(key))) throw new ApiError('invalid_field', 'Champ entreprise non modifiable ici.');
+      return setupRpc((c, station) => c.saveCompany(station, patch), (snapshot) => setupPatchMatches(snapshot.company, patch));
+    }
+    if (!localSetup) throw new ApiError('server_unavailable', 'Modification indisponible dans cette configuration.');
     return mutate((s) => {
-    if (!s.company) return s;
-    const company = { ...s.company, ...patch };
-    return {
-      ...s, company,
-      platformCompanies: s.platformCompanies.map((c) => c.id === company.id ? {
-        ...c, name: company.name, city: company.city, phone: company.phone,
-      } : c),
-      auditLogs: logAction(s, 'Entreprise modifiée', Object.keys(patch).join(', ')),
-    };
+      if (!s.company) return s;
+      const company = { ...s.company, ...patch };
+      return { ...s, company, platformCompanies: s.platformCompanies.map((c) => c.id === company.id
+        ? { ...c, name: company.name, city: company.city, phone: company.phone } : c),
+        auditLogs: logAction(s, 'Entreprise modifiée', Object.keys(patch).join(', ')) };
     });
-  }, [mutate]);
+  }, [mutate, serverSetup, localSetup, setupRpc]);
 
   const updateStation = useCallback((patch: Partial<Station>) => {
     if (patch.phone !== undefined) validatePhone(patch.phone);
     if (patch.maxCashierDiscount !== undefined) validateMoney(patch.maxCashierDiscount);
     if (patch.monthlyTarget !== undefined) validateMoney(patch.monthlyTarget);
     if (patch.commissionRate !== undefined) validatePercentage(patch.commissionRate);
+    if (serverSetup) {
+      if (Object.keys(patch).some((key) => !['name', 'address', 'city', 'phone', 'hours', 'paymentMethods', 'commissionRate', 'monthlyTarget'].includes(key))) {
+        throw new ApiError('invalid_field', 'Ce réglage n’est pas disponible sur le serveur.');
+      }
+      return setupRpc((c, station) => c.saveStation(station, patch), (snapshot) => setupPatchMatches(snapshot.station, patch));
+    }
+    if (!localSetup) throw new ApiError('server_unavailable', 'Modification indisponible dans cette configuration.');
     return mutate((s) => {
-    if (!s.station) return s;
-    return {
-      ...s, station: { ...s.station, ...patch },
-      auditLogs: logAction(s, 'Station modifiée', Object.keys(patch).join(', ')),
-    };
+      if (!s.station) return s;
+      return { ...s, station: { ...s.station, ...patch }, auditLogs: logAction(s, 'Station modifiée', Object.keys(patch).join(', ')) };
     });
-  }, [mutate]);
+  }, [mutate, serverSetup, localSetup, setupRpc]);
 
   // Une requête terminée après un changement de session ne doit pas modifier
   // la station d'un autre utilisateur.
@@ -1367,51 +2033,96 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     };
   }), [mutate]);
 
-  const setHours = useCallback((hours: DayHours[]) => mutate((s) =>
-    s.station ? { ...s, station: { ...s.station, hours } } : s
-  ), [mutate]);
+  const setHours = useCallback((hours: DayHours[]) => updateStation({ hours }), [updateStation]);
 
-  const addCategory = useCallback((name: string) => mutate((s) => {
-    if (!s.station || !name.trim()) return s;
-    const cat: VehicleCategory = { id: uid('cat'), stationId: s.station.id, name: name.trim(), active: true };
-    return { ...s, vehicleCategories: [...s.vehicleCategories, cat] };
-  }), [mutate]);
+  const addCategory = useCallback((name: string) => {
+    if (!name.trim()) return;
+    if (serverSetup) return setupRpc((c, station) => c.saveCategory(station, null, name, true),
+      (snapshot, id) => snapshot.catalog.categories.some((item) => item.id === id && item.name === name.trim() && item.active));
+    if (!localSetup) throw new ApiError('server_unavailable', 'Catalogue indisponible dans cette configuration.');
+    return mutate((s) => {
+      if (!s.station) return s;
+      const cat: VehicleCategory = { id: uid('cat'), stationId: s.station.id, name: name.trim(), active: true };
+      return { ...s, vehicleCategories: [...s.vehicleCategories, cat] };
+    });
+  }, [mutate, serverSetup, localSetup, setupRpc]);
 
-  const toggleCategory = useCallback((id: string) => mutate((s) => ({
-    ...s, vehicleCategories: s.vehicleCategories.map((c) => c.id === id ? { ...c, active: !c.active } : c),
-  })), [mutate]);
+  const toggleCategory = useCallback((id: string) => {
+    if (serverSetup) {
+      const category = stateRef.current.vehicleCategories.find((item) => item.id === id);
+      if (!category) throw new ApiError('not_found', 'Catégorie introuvable.');
+      return setupRpc((c, station) => c.saveCategory(station, id, category.name, !category.active),
+        (snapshot) => snapshot.catalog.categories.some((item) => item.id === id && item.active === !category.active));
+    }
+    if (!localSetup) throw new ApiError('server_unavailable', 'Catalogue indisponible dans cette configuration.');
+    return mutate((s) => ({ ...s, vehicleCategories: s.vehicleCategories.map((c) => c.id === id ? { ...c, active: !c.active } : c) }));
+  }, [mutate, serverSetup, localSetup, setupRpc]);
 
-  const removeCategory = useCallback((id: string) => mutate((s) => ({
-    ...s, vehicleCategories: s.vehicleCategories.filter((c) => c.id !== id),
-  })), [mutate]);
+  const removeCategory = useCallback((id: string) => {
+    if (serverSetup) {
+      const category = stateRef.current.vehicleCategories.find((item) => item.id === id);
+      if (!category) throw new ApiError('not_found', 'Catégorie introuvable.');
+      return setupRpc((c, station) => c.saveCategory(station, id, category.name, category.active, true),
+        (snapshot) => !snapshot.catalog.categories.some((item) => item.id === id));
+    }
+    if (!localSetup) throw new ApiError('server_unavailable', 'Catalogue indisponible dans cette configuration.');
+    return mutate((s) => ({ ...s, vehicleCategories: s.vehicleCategories.filter((c) => c.id !== id) }));
+  }, [mutate, serverSetup, localSetup, setupRpc]);
 
-  const addService = useCallback((name: string, description: string) => mutate((s) => {
-    if (!s.station || !name.trim()) return s;
-    const svc: Service = {
-      id: uid('svc'), stationId: s.station.id, name: name.trim(),
-      description: description.trim(), active: true, prices: {},
-    };
-    return { ...s, services: [...s.services, svc] };
-  }), [mutate]);
+  const addService = useCallback((name: string, description: string) => {
+    if (!name.trim()) return;
+    if (serverSetup) return setupRpc((c, station) => c.saveService(station, null, name, description, true),
+      (snapshot, id) => snapshot.catalog.services.some((item) => item.id === id && item.name === name.trim() && item.description === description.trim() && item.active));
+    if (!localSetup) throw new ApiError('server_unavailable', 'Catalogue indisponible dans cette configuration.');
+    return mutate((s) => {
+      if (!s.station) return s;
+      const svc: Service = { id: uid('svc'), stationId: s.station.id, name: name.trim(), description: description.trim(), active: true, prices: {} };
+      return { ...s, services: [...s.services, svc] };
+    });
+  }, [mutate, serverSetup, localSetup, setupRpc]);
 
-  const updateService = useCallback((id: string, patch: Partial<Service>) => mutate((s) => ({
-    ...s, services: s.services.map((v) => v.id === id ? { ...v, ...patch } : v),
-  })), [mutate]);
+  const updateService = useCallback((id: string, patch: Partial<Service>) => {
+    if (serverSetup) {
+      if (Object.keys(patch).some((key) => !['name', 'description', 'active'].includes(key))) throw new ApiError('invalid_field', 'Champ prestation non modifiable ici.');
+      const service = stateRef.current.services.find((item) => item.id === id);
+      if (!service) throw new ApiError('not_found', 'Prestation introuvable.');
+      const next = { ...service, ...patch };
+      return setupRpc((c, station) => c.saveService(station, id, next.name, next.description, next.active),
+        (snapshot) => snapshot.catalog.services.some((item) => item.id === id && setupPatchMatches(item, { name: next.name, description: next.description, active: next.active })));
+    }
+    if (!localSetup) throw new ApiError('server_unavailable', 'Catalogue indisponible dans cette configuration.');
+    return mutate((s) => ({ ...s, services: s.services.map((v) => v.id === id ? { ...v, ...patch } : v) }));
+  }, [mutate, serverSetup, localSetup, setupRpc]);
 
   const setPrice = useCallback((serviceId: string, categoryId: string, price: number) => {
     validateMoney(price);
-    mutate((s) => ({ ...s, services: s.services.map((v) => v.id === serviceId
+    if (serverSetup) return setupRpc((c, station) => c.savePrice(station, serviceId, categoryId, price),
+      (snapshot) => snapshot.catalog.prices.some((item) => item.serviceId === serviceId && item.vehicleCategoryId === categoryId && item.priceMinor === price));
+    if (!localSetup) throw new ApiError('server_unavailable', 'Catalogue indisponible dans cette configuration.');
+    return mutate((s) => ({ ...s, services: s.services.map((v) => v.id === serviceId
       ? { ...v, prices: { ...v.prices, [categoryId]: price } } : v) }));
-  }, [mutate]);
+  }, [mutate, serverSetup, localSetup, setupRpc]);
 
-  const removeService = useCallback((id: string) => mutate((s) => ({
-    ...s, services: s.services.filter((v) => v.id !== id),
-  })), [mutate]);
+  const removeService = useCallback((id: string) => {
+    if (serverSetup) {
+      const service = stateRef.current.services.find((item) => item.id === id);
+      if (!service) throw new ApiError('not_found', 'Prestation introuvable.');
+      return setupRpc((c, station) => c.saveService(station, id, service.name, service.description, service.active, true),
+        (snapshot) => !snapshot.catalog.services.some((item) => item.id === id));
+    }
+    if (!localSetup) throw new ApiError('server_unavailable', 'Catalogue indisponible dans cette configuration.');
+    return mutate((s) => ({ ...s, services: s.services.filter((v) => v.id !== id) }));
+  }, [mutate, serverSetup, localSetup, setupRpc]);
 
-  const updateEmployee = useCallback((id: string, patch: Partial<AppUser>) => mutate((s) => {
-    const next = { ...s, users: s.users.map((u) => u.id === id ? { ...u, ...patch } : u) };
-    return { ...next, auditLogs: logAction(next, 'Employé modifié', `${id} : ${Object.keys(patch).join(', ')}`) };
-  }), [mutate]);
+  const updateEmployee = useCallback((id: string, patch: Partial<AppUser>) => {
+    // Le taux individuel affiché en démo n'est pas relié aux contrats serveur.
+    // Ne jamais le modifier seulement dans la projection d'une session connectée.
+    if (!isLocalStockDemo) throw new ApiError('server_unavailable', 'Réglage individuel indisponible en mode connecté.');
+    return mutate((s) => {
+      const next = { ...s, users: s.users.map((u) => u.id === id ? { ...u, ...patch } : u) };
+      return { ...next, auditLogs: logAction(next, 'Employé modifié', `${id} : ${Object.keys(patch).join(', ')}`) };
+    });
+  }, [mutate, isLocalStockDemo]);
 
   const addClient = useCallback((p: { name: string; phone: string; plate: string; notes: string }) => mutate((s) => {
     if (!s.station || !p.name.trim()) return s;
@@ -1528,6 +2239,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (p.payment && (!Number.isSafeInteger(p.payment.amount) || p.payment.amount < 0
       || !Object.prototype.hasOwnProperty.call(PAY_METHOD_DB_KEY, p.payment.method))) {
       throw new ApiError('invalid_payment', 'Le montant ou le moyen de paiement est invalide.');
+    }
+    if (p.payment && p.payment.amount > 0 && !st.paymentMethods.includes(p.payment.method)) {
+      throw new ApiError('invalid_payment', 'Configurez un moyen de paiement accepté avant d’encaisser.');
     }
     const gross = p.items.reduce((sum, item) => {
       const service = s.services.find((v) => v.id === item.serviceId && v.active && v.stationId === st.id);
@@ -1765,6 +2479,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         throw new ApiError('payment_pending', 'Vérifiez d’abord la tentative de paiement précédente avec son montant et sa clé d’origine.');
       }
       if (!previous) {
+        if (!s.station?.paymentMethods.includes(method)) throw new ApiError('invalid_payment', 'Configurez un moyen de paiement accepté avant d’encaisser.');
         if (wash.status === 'cancelled') throw new ApiError('wash_cancelled', 'Cette fiche est annulée : aucun encaissement possible.');
         if (amt > wash.total - wash.paid) throw new ApiError('overpayment', 'Le montant dépasse le reste à payer.');
         assertCashRule(method, amt);
@@ -1798,6 +2513,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         } finally { paymentsInFlight.current.delete(lock); }
       })();
     }
+    if (!s.station?.paymentMethods.includes(method)) throw new ApiError('invalid_payment', 'Configurez un moyen de paiement accepté avant d’encaisser.');
     if (wash.status === 'cancelled') throw new ApiError('wash_cancelled', 'Cette fiche est annulée : aucun encaissement possible.');
     if (amt > wash.total - wash.paid) throw new ApiError('overpayment', 'Le montant dépasse le reste à payer.');
     assertCashRule(method, amt);
@@ -1890,19 +2606,99 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     notify('info', 'Caisse réouverte (motif enregistré).');
   }, [assertActivated, notify, serverFinance, financeRpc]);
 
+  const submitPendingExpense = useCallback(async (pending: PendingExpense, recovering: boolean): Promise<void> => {
+    const commands = adapter.financeCommands;
+    if (!serverFinance || !commands || identity?.userId !== pending.userId
+      || stateRef.current.station?.id !== pending.stationId) {
+      throw new ApiError('station_changed', 'Reconnectez-vous à la même station pour vérifier cette dépense.');
+    }
+    const lock = `${pending.userId}:${pending.stationId}`;
+    if (expensesInFlight.current.has(lock)) throw new ApiError('expense_in_flight', 'Une dépense est déjà en cours.');
+    expensesInFlight.current.add(lock);
+    const epoch = scopeRef.current.epoch;
+    const current = () => scopeRef.current.epoch === epoch;
+    const storageProblem = 'La conservation de la tentative n’est plus confirmée. Vérifiez la dépense et le stockage de cet onglet avant de continuer.';
+    const keepPending = () => {
+      if (!current()) return;
+      setPendingExpenseState(pending);
+      try { assertPendingExpense(pending); }
+      catch { setPendingExpenseError(storageProblem); }
+    };
+    try {
+      let id: string;
+      try { id = await commands.addExpense(pending.payload); }
+      catch (error) {
+        if (current() && !recovering && error instanceof ExpenseCommandError && error.outcome === 'rejected') {
+          try { clearPendingExpense(pending); if (current()) setPendingExpenseState(null); }
+          catch { keepPending(); if (current()) setPendingExpenseError(storageProblem); }
+        } else keepPending();
+        throw error;
+      }
+      if (!current()) throw new ApiError('station_changed', 'Dépense envoyée à la station précédente : vérifiez-la dans cette station.');
+      try { await refreshFinance(undefined, undefined, { id, pending }); }
+      catch { keepPending(); throw new Error('Dépense envoyée, mais relecture non confirmée : vérifiez la même tentative.'); }
+      if (!current()) throw new ApiError('station_changed', 'Station changée : vérifiez la dépense dans sa station d’origine.');
+      try { clearPendingExpense(pending); }
+      catch {
+        keepPending();
+        if (current()) setPendingExpenseError(storageProblem);
+        throw new Error('Dépense confirmée, mais effacement de la tentative non confirmé : vérifiez l’historique puis rechargez cet onglet.');
+      }
+      setPendingExpenseState((previous) => previous?.payload.idempotencyKey === pending.payload.idempotencyKey ? null : previous);
+      setPendingExpenseError(null);
+      notify('success', 'Dépense enregistrée et relue.');
+    } finally { expensesInFlight.current.delete(lock); }
+  }, [adapter, identity?.userId, serverFinance, refreshFinance, notify]);
+
+  const retryPendingExpense = useCallback(async (): Promise<void> => {
+    const stationId = stateRef.current.station?.id;
+    if (!serverFinance || !identity?.userId || !stationId) throw new ApiError('server_unavailable', 'Même compte et station requis pour vérifier la dépense.');
+    if (pendingExpenseError) throw new ApiError('expense_storage', pendingExpenseError);
+    const pending = readPendingExpense(identity.userId, stationId);
+    if (!pending) throw new ApiError('not_found', 'Aucune tentative de dépense conservée dans cet onglet.');
+    await submitPendingExpense(pending, true);
+  }, [identity?.userId, serverFinance, submitPendingExpense, pendingExpenseError]);
+
   const addExpense = useCallback((p: Omit<Expense, 'id' | 'stationId' | 'status' | 'cancelReason' | 'createdBy' | 'createdAt' | 'cashSessionId'>): void | Promise<void> => {
     assertActivated();
     const s = stateRef.current;
     validateExpense(p);
+    if (!s.station?.paymentMethods.includes(p.method)) throw new ApiError('invalid_payment', 'Configurez un moyen de paiement accepté avant d’enregistrer une dépense.');
     assertCashRule(p.method, p.amount);
-    const key = p.idempotencyKey ?? `expense-${uid('idem')}`;
-    if ((s.expenses ?? []).some((e) => e.idempotencyKey === key)) return;
+    const key = p.idempotencyKey ?? idempotencyKey('expense');
     if (serverFinance) {
-      return financeRpc((c) => c.addExpense({
-        stationId: s.station!.id, amount: p.amount,
-        category: p.category, reason: p.reason.trim(), supplier: p.supplier,
-        date: p.date, method: p.method, idempotencyKey: key,
-      })).then(() => {});
+      if (!identity?.userId || !s.station?.id) throw new ApiError('station_changed', 'Session ou station indisponible.');
+      if (expensesInFlight.current.has(`${identity.userId}:${s.station.id}`)) {
+        throw new ApiError('expense_in_flight', 'Une dépense est déjà en cours.');
+      }
+      if (pendingExpenseError || (pendingExpenseState?.userId === identity.userId && pendingExpenseState.stationId === s.station.id)) {
+        throw new ApiError('expense_pending', pendingExpenseError ?? 'Vérifiez la tentative précédente avant une nouvelle dépense.');
+      }
+      let previous: PendingExpense | null;
+      try { previous = readPendingExpense(identity.userId, s.station.id); }
+      catch (error) {
+        setPendingExpenseError(error instanceof Error ? error.message : 'Tentative de dépense inaccessible.');
+        throw error;
+      }
+      if (previous) {
+        setPendingExpenseState(previous);
+        throw new ApiError('expense_pending', 'Vérifiez la tentative précédente avant une nouvelle dépense.');
+      }
+      const pending: PendingExpense = {
+        version: 1, userId: identity.userId, stationId: s.station.id, startedAt: new Date().toISOString(),
+        payload: { stationId: s.station.id, amount: p.amount, category: p.category.trim(), reason: p.reason.trim(),
+          supplier: p.supplier.trim(), date: p.date, method: p.method, idempotencyKey: key },
+      };
+      try { savePendingExpense(pending); }
+      catch (error) {
+        setPendingExpenseError(error instanceof Error ? error.message : 'Tentative de dépense inaccessible.');
+        throw error;
+      }
+      setPendingExpenseState(pending);
+      return submitPendingExpense(pending, false);
+    }
+    if ((s.expenses ?? []).some((e) => e.idempotencyKey === key)) {
+      throw new ApiError('expense_duplicate', 'Cette clé de dépense est déjà utilisée : vérifiez la dépense existante.');
     }
     const open = s.cashSessions.find((c) => c.status === 'ouverte');
     const at = new Date().toISOString();
@@ -1927,7 +2723,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       };
     });
     notify('success', 'Dépense enregistrée.');
-  }, [assertActivated, assertCashRule, notify, serverFinance, financeRpc]);
+  }, [assertActivated, assertCashRule, notify, serverFinance, identity?.userId, submitPendingExpense, pendingExpenseError, pendingExpenseState]);
 
   const cancelExpense = useCallback((id: string, reason: string): void | Promise<void> => {
     assertActivated();
@@ -2144,6 +2940,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       id: p.planId, name: p.name.trim(), priceMonthly: Math.round(p.priceMinor),
       trial: p.trialDays > 0,
       limits: existing?.limits ?? { stations: 1, employees: 3, washesPerMonth: 100 },
+      entitlements: existing?.entitlements ? { ...existing.entitlements } : undefined,
       features: p.features.length > 0 ? p.features : existing?.features ?? [],
     };
     const updated = existing
@@ -2209,20 +3006,60 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, [serverAnalytics, analyticsRpc, notify]);
 
   // ── Abonnement / plateforme / activation ──────────────────────────────────
-  const requestPlanChange = useCallback((planId: string) => {
+  const requestPlanChange = useCallback(async (planId: string): Promise<void> => {
     const plan = plans.find((p) => p.id === planId);
-    const current = stateRef.current;
-    if (!plan || !current.subscription || current.subscription.companyId !== current.company?.id) {
-      notify('error', 'Aucun abonnement local correspondant : aucune note n’a été enregistrée.');
+    if (!plan || !['standard', 'premium'].includes(planId)) throw new ApiError('invalid_plan', 'Formule payante indisponible.');
+    if (subscriptionRequestInFlight.current) throw new ApiError('request_pending', 'Une demande est déjà en cours.');
+    if (serverSubscription && adapter.subscriptionCommands) {
+      if (!identity?.permissions.includes('subscription.manage')) throw new ApiError('forbidden', 'Seul le propriétaire peut demander une formule.');
+      const epoch = scopeRef.current.epoch;
+      subscriptionRequestInFlight.current = true;
+      try {
+        try { await adapter.subscriptionCommands.request(planId); }
+        catch (error) {
+          // Une réponse perdue n'est ni un rejet certain ni une activation.
+          // La commande est idempotente pour la même formule : relire avant tout nouvel essai.
+          let checked: SubscriptionAccess | null = null;
+          try { checked = await refreshSubscriptionAccess(); } catch { /* vérifier plus tard */ }
+          if (scopeRef.current.epoch !== epoch || checked?.pendingPlanId !== planId) {
+            throw new ApiError('request_unconfirmed', `Demande non confirmée. Relisez l’abonnement avant de réessayer. ${error instanceof Error ? error.message : ''}`);
+          }
+          notify('info', `Demande « ${plan.name} » retrouvée en attente. Elle n’est pas encore activée.`);
+          return;
+        }
+        const checked = await refreshSubscriptionAccess().catch(() => null);
+        if (scopeRef.current.epoch !== epoch || checked?.pendingPlanId !== planId) {
+          throw new ApiError('request_unconfirmed', 'Demande envoyée, mais son état n’a pas été confirmé. Relisez l’abonnement avant de réessayer.');
+        }
+        notify('success', `Demande « ${plan.name} » enregistrée ; validation administrateur en attente. Aucun paiement automatique.`);
+      } finally { subscriptionRequestInFlight.current = false; }
       return;
+    }
+    if (authPort.kind !== 'local' || dataSource !== 'local' || !stateRef.current.subscription
+      || stateRef.current.subscription.companyId !== stateRef.current.company?.id) {
+      throw new ApiError('subscription_unavailable', 'Aucun abonnement disponible : aucune demande n’a été enregistrée.');
     }
     setState((s) => {
       if (!s.subscription || s.subscription.companyId !== s.company?.id) return s;
       const next = { ...s, subscription: { ...s.subscription, pendingPlanId: planId } };
-      return { ...next, auditLogs: logAction(next, 'Demande locale de changement de formule', plan.name) };
+      return { ...next, auditLogs: logAction(next, 'Choix local de formule', plan.name) };
     });
-    notify('success', `Note de passage à « ${plan.name} » enregistrée dans ce navigateur uniquement, sans envoi au serveur.`);
-  }, [notify, plans]);
+    notify('success', `Choix « ${plan.name} » noté dans ce navigateur uniquement. Aucune demande réelle ni paiement.`);
+  }, [adapter, authPort.kind, dataSource, identity, notify, plans, refreshSubscriptionAccess, serverSubscription]);
+
+  const decideSubscriptionRequest = useCallback(async (requestId: string, approve: boolean): Promise<void> => {
+    if (!serverSubscription || !identity?.isPlatformAdmin || !adapter.subscriptionCommands) {
+      throw new ApiError('forbidden', 'La validation réelle exige un administrateur plateforme connecté.');
+    }
+    const epoch = scopeRef.current.epoch;
+    await adapter.subscriptionCommands.decide(requestId, approve).catch((error: unknown) => {
+      throw new ApiError('decision_unconfirmed', `Décision non confirmée. Relisez les demandes et l’entreprise avant de réessayer. ${error instanceof Error ? error.message : ''}`);
+    });
+    if (scopeRef.current.epoch !== epoch) throw new ApiError('station_changed', 'Session modifiée : vérifiez la décision dans la plateforme.');
+    try { await Promise.all([refreshSubscriptionRequests(), refreshPlatform()]); }
+    catch { throw new ApiError('decision_unconfirmed', 'Décision enregistrée, mais relecture indisponible. Vérifiez la plateforme avant toute nouvelle action.'); }
+    notify('success', approve ? 'Demande validée : formule activée. Aucun paiement n’a été enregistré.' : 'Demande refusée. La formule précédente est conservée.');
+  }, [adapter, identity?.isPlatformAdmin, notify, refreshPlatform, refreshSubscriptionAccess, refreshSubscriptionRequests, serverSubscription]);
 
   const toggleCompanySuspension = useCallback((companyId: string) => {
     setState((s) => {
@@ -2245,6 +3082,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (missingNow.length > 0) {
       throw new ApiError('onboarding_incomplete', 'La station ne peut pas ouvrir : des étapes obligatoires manquent.', missingNow);
     }
+    if (serverSetup) return setupRpc((c, station) => c.activate(station), (snapshot) => snapshot.station.activated)
+      .then(() => { notify('success', 'Station activée : l’exploitation est ouverte.'); });
+    if (!localSetup) throw new ApiError('server_unavailable', 'Activation indisponible dans cette configuration.');
     setState((cur) => {
       const next = {
         ...cur,
@@ -2253,66 +3093,154 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       return { ...next, auditLogs: logAction(next, 'Station activée', 'Ouverture de l’exploitation') };
     });
     notify('success', 'Station activée : l’exploitation est ouverte.');
-  }, [notify]);
+  }, [notify, serverSetup, localSetup, setupRpc]);
 
   const resetAll = useCallback(async () => {
-    clearDemoPasswords();
-    (authPort as LocalAuthAdapter).clearAll?.();
-    try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignoré */ }
+    if (!isLocalStockDemo) {
+      throw new ApiError('forbidden', 'La réinitialisation locale est indisponible en mode connecté.');
+    }
+    await withDemoStorageLock(() => {
+      const stored = readDemoState();
+      if (stored.status === 'unavailable' || stored.raw !== demoBaseline.current) {
+        markDemoIssue('Les données ont changé ou sont inaccessibles. Sauvegardez et rechargez avant toute réinitialisation.');
+        throw new ApiError('demo_storage_unavailable', 'Réinitialisation bloquée : les données ont changé ou sont inaccessibles.');
+      }
+      const passwordsBefore = localStorage.getItem(DEMO_PASSWORDS_KEY);
+      try {
+        localStorage.removeItem(DEMO_STATE_KEY);
+        localStorage.removeItem(DEMO_PASSWORDS_KEY);
+        if (localStorage.getItem(DEMO_STATE_KEY) !== null || localStorage.getItem(DEMO_PASSWORDS_KEY) !== null) throw new Error('effacement non confirmé');
+      } catch {
+        try {
+          if (stored.raw !== null) localStorage.setItem(DEMO_STATE_KEY, stored.raw);
+          if (passwordsBefore !== null) localStorage.setItem(DEMO_PASSWORDS_KEY, passwordsBefore);
+        } catch { /* état incertain : l'avertissement reste explicite */ }
+        markDemoIssue('Réinitialisation non confirmée. Sauvegardez et vérifiez les clés locales avant de poursuivre.');
+        throw new ApiError('demo_storage_unavailable', 'Effacement non confirmé : vérifiez les données locales.');
+      }
+      demoWriteGeneration.current += 1;
+      demoBaseline.current = null;
+      setDemoSavedRaw(null);
+      stateRef.current = emptyState();
+      (authPort as LocalAuthAdapter).clearAll?.();
+    });
     authGenerationRef.current += 1;
     authKeyRef.current = 'signed-out';
     scopeRef.current = { epoch: scopeRef.current.epoch + 1, userId: null, companyId: null, stationId: null };
     setAssignableUsers([]); setStationMetrics(null); setStationMetricsError(null);
     setAuthReady(true);
-    setState(emptyState());
+    setState(stateRef.current);
     setIdentity(null);
     setInvitations([]);
     setAuthRecovery(false);
     setAuthError(null);
-    if (authPort.kind === 'supabase') await authPort.signOut();
     notify('info', 'Données locales de démonstration effacées.');
-  }, [authPort, notify]);
+  }, [authPort, isLocalStockDemo, notify, markDemoIssue]);
 
   const viewEpoch = scopeRef.current.epoch;
   const scoped = <A extends unknown[], R>(fn: (...args: A) => R) => (...args: A): R => {
+    if (authPort.kind === 'local' && demoIssueRef.current) {
+      throw new ApiError('demo_storage_unavailable', demoIssueRef.current);
+    }
     if (authPort.kind === 'supabase' && viewEpoch !== scopeRef.current.epoch) {
       throw new ApiError('station_changed', 'La station ou la session a changé : vérifiez l’opération initiale avant de poursuivre.');
     }
     return fn(...args);
   };
 
+  const assertSubscriptionWrite = (feature?: PlanFeature) => {
+    if (identity?.isPlatformAdmin) return;
+    const access = authPort.kind === 'local' ? localSubscriptionAccess(stateRef.current, plans) : subscriptionAccess;
+    if (!accessCanWrite(access)) throw new ApiError('subscription_read_only',
+      access ? 'Abonnement en lecture seule : demandez une formule et attendez sa validation.'
+        : 'Abonnement non confirmé : relisez-le avant toute opération.');
+    if (feature && !access?.features[feature]) throw new ApiError('plan_feature', 'Ce module n’est pas inclus dans la formule active.');
+  };
+  const scopedWrite = <A extends unknown[], R>(fn: (...args: A) => R, feature?: PlanFeature) => scoped((...args: A): R => {
+    assertSubscriptionWrite(feature);
+    return fn(...args);
+  });
+  const localQuota = (kind: 'employees' | 'washes') => {
+    if (authPort.kind !== 'local') return;
+    const current = stateRef.current;
+    const access = localSubscriptionAccess(current, plans);
+    const plan = plans.find((item) => item.id === access?.planId);
+    if (!plan) throw new ApiError('quota_unavailable', 'Limite de formule indisponible.');
+    if (kind === 'employees') {
+      const active = current.users.filter((u) => u.active);
+      const pending = [...localAccountReservations.current].filter((key) => !active.some((u) =>
+        key === `id:${u.id}` || key === `email:${u.email.toLowerCase()}`)).length;
+      if (active.length + pending >= plan.limits.employees) throw new ApiError('quota_reached', 'Quota de comptes actifs atteint (propriétaire inclus).');
+    } else {
+      const now = new Date();
+      const first = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
+      const end = Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1);
+      const used = current.washes.filter((w) => w.status !== 'cancelled' && Date.parse(w.createdAt) >= first && Date.parse(w.createdAt) < end);
+      const ids = new Set(current.washes.map((w) => w.id));
+      const pending = [...localWashReservations.current].filter((id) => !ids.has(id)).length;
+      if (used.length + pending >= plan.limits.washesPerMonth) throw new ApiError('quota_reached', 'Quota de lavages du mois atteint.');
+    }
+  };
+  const inviteWithQuota = scopedWrite(async (payload: InvitePayload) => {
+    localQuota('employees');
+    const key = `email:${payload.email.trim().toLowerCase()}`;
+    if (authPort.kind === 'local') localAccountReservations.current.add(key);
+    try { return await inviteUser(payload); }
+    catch (error) { localAccountReservations.current.delete(key); throw error; }
+  });
+  const updateUserWithQuota = scopedWrite(async (payload: UpdateUserPayload) => {
+    const target = stateRef.current.users.find((u) => u.id === payload.userId);
+    const reactivating = authPort.kind === 'local' && payload.active === true && target?.active === false;
+    if (reactivating) localQuota('employees');
+    const key = `id:${payload.userId}`;
+    if (reactivating) localAccountReservations.current.add(key);
+    try { await updateUser(payload); }
+    catch (error) { localAccountReservations.current.delete(key); throw error; }
+  });
+  const createWashWithQuota = scopedWrite((payload: WashPayload) => {
+    localQuota('washes');
+    const result = createWash(payload);
+    if (authPort.kind === 'local' && !(result instanceof Promise)) localWashReservations.current.add(result.id);
+    return result;
+  });
+
   const value: Ctx = {
-    state, toasts, notify: (kind, message) => { if (authPort.kind !== 'supabase' || viewEpoch === scopeRef.current.epoch) notify(kind, message); }, dismissToast, theme, toggleTheme, plans, dataSource, isLocalStockDemo, isServerStock: serverStock, plansError,
+    state, toasts, notify: (kind, message) => { if (authPort.kind !== 'supabase' || viewEpoch === scopeRef.current.epoch) notify(kind, message); }, dismissToast, theme, toggleTheme, plans, dataSource, isLocalStockDemo, demoStorageIssue, demoStoragePending, isServerStock: serverStock, plansError,
+    subscriptionAccess, subscriptionStatus, subscriptionError, canWriteSubscription, refreshSubscriptionAccess,
+    subscriptionRequests, subscriptionRequestsError, refreshSubscriptionRequests, decideSubscriptionRequest,
     onboarding, missing,
     authReady, authError, authRecovery, authKind: authPort.kind, identity, selectStation, invitations, clearAuthError,
     assignableUsers: serverWash ? assignableUsers : state.users.filter((u) => u.active &&
       (u.stationIds?.length ? u.stationIds.includes(state.station?.id ?? '') : !u.stationId || u.stationId === state.station?.id)),
     stationMetrics, stationMetricsError, refreshStationMetrics,
     signUp, signIn, signOut, requestPasswordReset, updatePassword,
-    inviteUser, revokeInvitation, updateUser, refreshUsers, refreshInvitations,
-    updateCompany: scoped(updateCompany), updateStation: scoped(updateStation), setStationLogoPath: scoped(setStationLogoPath), setHours: scoped(setHours), addCategory: scoped(addCategory), toggleCategory: scoped(toggleCategory), removeCategory: scoped(removeCategory),
-    addService: scoped(addService), updateService: scoped(updateService), setPrice: scoped(setPrice), removeService: scoped(removeService),
-    updateEmployee: scoped(updateEmployee), addClient: scoped(addClient), updateClient: scoped(updateClient),
-    createWash: scoped(createWash), pendingWash, pendingWashError, retryPendingWash: scoped(retryPendingWash),
-    setWashStatus: scoped(setWashStatus), addPayment: scoped(addPayment), assignWash: scoped(assignWash), recordQualityCheck: scoped(recordQualityCheck), createWashPost: scoped(createWashPost),
+    inviteUser: inviteWithQuota, revokeInvitation: scopedWrite(revokeInvitation), updateUser: updateUserWithQuota, refreshUsers, refreshInvitations,
+    employeeReadWarning, unconfirmedInvitation, unconfirmedAccountUpdate, unconfirmedRevocation, revocationRecoveryLoading, revocationRecoveryError, refreshEmployeeData,
+    setupStatus, setupError, refreshSetup,
+    updateCompany: scopedWrite(updateCompany), updateStation: scopedWrite(updateStation), setStationLogoPath: scoped(setStationLogoPath), setHours: scopedWrite(setHours), addCategory: scopedWrite(addCategory), toggleCategory: scopedWrite(toggleCategory), removeCategory: scopedWrite(removeCategory),
+    addService: scopedWrite(addService), updateService: scopedWrite(updateService), setPrice: scopedWrite(setPrice), removeService: scopedWrite(removeService),
+    updateEmployee: scopedWrite(updateEmployee), addClient: scopedWrite(addClient), updateClient: scopedWrite(updateClient),
+    createWash: createWashWithQuota, pendingWash, pendingWashError, retryPendingWash: scopedWrite(retryPendingWash),
+    setWashStatus: scopedWrite(setWashStatus), addPayment: scopedWrite(addPayment), assignWash: scopedWrite(assignWash), recordQualityCheck: scopedWrite(recordQualityCheck), createWashPost: scopedWrite(createWashPost),
     refreshWashes, vehicleHistory,
-    openCash: scoped(openCash), closeCash: scoped(closeCash), reopenCash: scoped(reopenCash), addExpense: scoped(addExpense), cancelExpense: scoped(cancelExpense),
-    cancelPayment: scoped(cancelPayment), reconcileChannel: scoped(reconcileChannel), createCommissionPeriod: scoped(createCommissionPeriod), validateCommissionPeriod: scoped(validateCommissionPeriod),
-    recordCommissionPayout: scoped(recordCommissionPayout), refreshFinance,
-    refreshStock, saveSupplier: scoped(saveSupplier), saveProduct: scoped(saveProduct), createPurchaseOrder: scoped(createPurchaseOrder), receivePurchaseLines: scoped(receivePurchaseLines),
-    startInventory: scoped(startInventory), recordInventoryCount: scoped(recordInventoryCount), closeInventory: scoped(closeInventory), saveServiceConsumption: scoped(saveServiceConsumption),
-    consumeWash: scoped(consumeWash), linkExpenseToOrder: scoped(linkExpenseToOrder), certifyCosts: scoped(certifyCosts),
-    updateStockThreshold: scoped(updateStockThreshold), adjustProductStock: scoped(adjustProductStock),
-    refreshCrm, saveCustomerProfile: scoped(saveCustomerProfile), saveCustomerVehicle: scoped(saveCustomerVehicle), createLoyaltyProgram: scoped(createLoyaltyProgram),
-    enrollLoyaltyCustomer: scoped(enrollLoyaltyCustomer), recordLoyaltyTransaction: scoped(recordLoyaltyTransaction), accrueLoyaltyForWash: scoped(accrueLoyaltyForWash),
-    savePackagePlan: scoped(savePackagePlan), sellPackageToCustomer: scoped(sellPackageToCustomer), consumePackageForWash: scoped(consumePackageForWash),
-    savePromotion: scoped(savePromotion), applyPromotionToWash: scoped(applyPromotionToWash), saveFleet: scoped(saveFleet), saveFleetContract: scoped(saveFleetContract),
-    attachFleetVehicle: scoped(attachFleetVehicle), recordFleetReceivable: scoped(recordFleetReceivable), enqueueNotification: scoped(enqueueNotification),
-    cancelPendingNotification: scoped(cancelPendingNotification),
-    analyticsBoard, subscriptionUsage, platformBoard, analyticsError, platformError,
+    openCash: scopedWrite(openCash), closeCash: scopedWrite(closeCash), reopenCash: scopedWrite(reopenCash),
+    addExpense: scopedWrite(addExpense), pendingExpense, pendingExpenseError, retryPendingExpense: scopedWrite(retryPendingExpense), cancelExpense: scopedWrite(cancelExpense),
+    cancelPayment: scopedWrite(cancelPayment), reconcileChannel: scopedWrite(reconcileChannel), createCommissionPeriod: scopedWrite(createCommissionPeriod), validateCommissionPeriod: scopedWrite(validateCommissionPeriod),
+    recordCommissionPayout: scopedWrite(recordCommissionPayout), refreshFinance,
+    refreshStock, saveSupplier: scopedWrite(saveSupplier, 'stock'), saveProduct: scopedWrite(saveProduct, 'stock'), createPurchaseOrder: scopedWrite(createPurchaseOrder, 'stock'), receivePurchaseLines: scopedWrite(receivePurchaseLines, 'stock'),
+    startInventory: scopedWrite(startInventory, 'stock'), recordInventoryCount: scopedWrite(recordInventoryCount, 'stock'), closeInventory: scopedWrite(closeInventory, 'stock'), saveServiceConsumption: scopedWrite(saveServiceConsumption, 'stock'),
+    consumeWash: scopedWrite(consumeWash, 'stock'), linkExpenseToOrder: scopedWrite(linkExpenseToOrder, 'stock'), certifyCosts: scopedWrite(certifyCosts, 'stock'),
+    updateStockThreshold: scopedWrite(updateStockThreshold, 'stock'), adjustProductStock: scopedWrite(adjustProductStock, 'stock'),
+    refreshCrm, saveCustomerProfile: scopedWrite(saveCustomerProfile), saveCustomerVehicle: scopedWrite(saveCustomerVehicle), createLoyaltyProgram: scopedWrite(createLoyaltyProgram, 'loyalty'),
+    enrollLoyaltyCustomer: scopedWrite(enrollLoyaltyCustomer, 'loyalty'), recordLoyaltyTransaction: scopedWrite(recordLoyaltyTransaction, 'loyalty'), accrueLoyaltyForWash: scopedWrite(accrueLoyaltyForWash, 'loyalty'),
+    savePackagePlan: scopedWrite(savePackagePlan, 'loyalty'), sellPackageToCustomer: scopedWrite(sellPackageToCustomer, 'loyalty'), consumePackageForWash: scopedWrite(consumePackageForWash, 'loyalty'),
+    savePromotion: scopedWrite(savePromotion, 'loyalty'), applyPromotionToWash: scopedWrite(applyPromotionToWash, 'loyalty'), saveFleet: scopedWrite(saveFleet, 'fleets'), saveFleetContract: scopedWrite(saveFleetContract, 'fleets'),
+    attachFleetVehicle: scopedWrite(attachFleetVehicle, 'fleets'), recordFleetReceivable: scopedWrite(recordFleetReceivable, 'fleets'), enqueueNotification: scopedWrite(enqueueNotification, 'loyalty'),
+    cancelPendingNotification: scopedWrite(cancelPendingNotification, 'loyalty'),
+    analyticsBoard: visibleAnalyticsBoard, subscriptionUsage, platformBoard, analyticsError, platformError,
     refreshAnalytics, refreshSubscriptionUsage, refreshUsageCounters, refreshPlatform,
     savePlan, setPlanLimit, setCompanySubscription, setCompanySuspended,
-    requestPlanChange, toggleCompanySuspension, activateStation: scoped(activateStation), resetAll,
+    requestPlanChange: scoped(requestPlanChange), toggleCompanySuspension: scoped(toggleCompanySuspension), activateStation: scopedWrite(activateStation), resetAll: scoped(resetAll),
   };
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

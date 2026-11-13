@@ -1,4 +1,7 @@
-import type { Plan } from '../types';
+import type { Plan, PlanFeatures } from '../types';
+
+const allAdvanced: PlanFeatures = { stock: true, loyalty: true, fleets: true, consolidation: true, audit: true };
+const noAdvanced: PlanFeatures = { stock: false, loyalty: false, fleets: false, consolidation: false, audit: false };
 
 // ─── Table `plans` / cache ───────────────────────────────────────────────────
 // La vitrine lit ses tarifs dans la base pour ne jamais être désynchronisée
@@ -16,11 +19,11 @@ export const PLANS: Plan[] = [
     priceMonthly: 0,
     trial: true,
     limits: { stations: 1, employees: 3, washesPerMonth: 100 },
+    entitlements: { ...allAdvanced },
     features: [
-      '14 jours pour ouvrir votre station',
-      '1 station, 3 comptes employés',
-      '100 lavages pour démarrer',
-      'Tous les modules de gestion',
+      '14 jours, tous les modules',
+      '1 station, 3 comptes actifs (propriétaire inclus)',
+      '100 lavages par mois',
     ],
   },
   {
@@ -29,12 +32,11 @@ export const PLANS: Plan[] = [
     priceMonthly: 15000,
     trial: false,
     limits: { stations: 1, employees: 10, washesPerMonth: 1000 },
+    entitlements: { ...noAdvanced },
     features: [
-      'Tout ce que contient l’essai',
-      '1 station, 10 comptes employés',
+      'Gestion essentielle : lavages, clients, employés, caisse, dépenses, rapports et commissions',
+      '1 station, 10 comptes actifs (propriétaire inclus)',
       '1 000 lavages par mois',
-      'Rapports et exports CSV',
-      'Commissions et objectif du mois',
     ],
   },
   {
@@ -43,13 +45,11 @@ export const PLANS: Plan[] = [
     priceMonthly: 35000,
     trial: false,
     limits: { stations: 5, employees: 50, washesPerMonth: 100000 },
+    entitlements: { ...allAdvanced },
     features: [
-      'Tout ce que contient Standard',
-      'Jusqu’à 5 stations',
-      '50 comptes employés',
-      'Lavages illimités',
-      'Journal des opérations sensibles',
-      'Support prioritaire',
+      'Gestion essentielle et modules avancés',
+      'Jusqu’à 5 stations, 50 comptes actifs (propriétaire inclus)',
+      'Jusqu’à 100 000 lavages par mois',
     ],
   },
 ];
@@ -60,6 +60,7 @@ export function clonePlans(): Plan[] {
     ...plan,
     limits: { ...plan.limits },
     features: [...plan.features],
+    entitlements: plan.entitlements ? { ...plan.entitlements } : undefined,
   }));
 }
 
@@ -79,6 +80,7 @@ export function setPlansCache(plans: Plan[]): void {
     ...plan,
     limits: { ...plan.limits },
     features: [...plan.features],
+    entitlements: plan.entitlements ? { ...plan.entitlements } : undefined,
   }));
 }
 

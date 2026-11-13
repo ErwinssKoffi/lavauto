@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
-import { computeOnboarding, emptyState, load, persist } from '../../src/lib/store';
+import { computeOnboarding, emptyState, load } from '../../src/lib/store';
+import { serializeDemoState, writeDemoState } from '../../src/lib/demoStorage';
 import { mapIdentityToAppState, mapMyContext } from '../../src/services/auth/authTypes';
 import type { Station } from '../../src/types';
 
@@ -39,7 +40,7 @@ describe('chemin du logo dans l’état', () => {
     expect(restored.station?.logoPath).toBeNull();
     expect(restored.station).not.toHaveProperty('logoUrl');
     expect(computeOnboarding(restored).find((step) => step.id === 'logo')?.done).toBe(false);
-    persist(restored);
+    writeDemoState(serializeDemoState(restored));
     expect(localStorage.getItem('washguard.state.v1')).not.toContain('token=old');
     expect(localStorage.getItem('washguard.state.v1')).not.toContain('example.com');
   });
@@ -47,7 +48,7 @@ describe('chemin du logo dans l’état', () => {
   it('persiste seulement le chemin et constate l’étape facultative', () => {
     const state = emptyState();
     state.station = { ...station(), logoPath };
-    persist(state);
+    writeDemoState(serializeDemoState(state));
     const restored = load();
     expect(restored.station?.logoPath).toBe(logoPath);
     expect(computeOnboarding(restored).find((step) => step.id === 'logo')?.done).toBe(true);
@@ -63,7 +64,7 @@ describe('chemin du logo dans l’état', () => {
     expect(identity.stations[0].logoPath).toBeNull();
     const state = emptyState();
     state.station = { ...station(), logoPath: otherPath };
-    persist(state);
+    writeDemoState(serializeDemoState(state));
     expect(load().station?.logoPath).toBeNull();
   });
 

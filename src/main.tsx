@@ -6,7 +6,8 @@ import { StoreProvider } from './lib/store';
 import { ErrorBoundary } from './components/feedback';
 import './index.css';
 
-const saved = localStorage.getItem('washguard.theme');
+let saved: string | null = null;
+try { saved = localStorage.getItem('washguard.theme'); } catch { /* préférence facultative */ }
 document.documentElement.classList.toggle(
   'dark',
   saved === null ? true : saved === 'dark'

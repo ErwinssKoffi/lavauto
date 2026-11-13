@@ -36,7 +36,7 @@ const MOVEMENT_LABELS: Record<string, string> = {
 
 export default function Stock() {
   const {
-    state, dataSource, refreshStock, saveSupplier, saveProduct,
+    state, dataSource, canWriteSubscription, refreshStock, saveSupplier, saveProduct,
     createPurchaseOrder, receivePurchaseLines, startInventory,
     recordInventoryCount, closeInventory, linkExpenseToOrder, certifyCosts,
   } = useStore();
@@ -45,6 +45,7 @@ export default function Stock() {
   const [modal, setModal] = useState<ModalId>(null);
   const stationId = state.station?.id ?? '';
   const activated = Boolean(state.station?.activated);
+  const canOperate = activated && canWriteSubscription;
   const productById = new Map(state.products.map((p) => [p.id, p]));
   const orderById = new Map(state.purchaseOrders.map((o) => [o.id, o]));
   const openSession = state.inventorySessions.find((s) => s.status === 'open');
@@ -77,7 +78,7 @@ export default function Stock() {
       <PageHeader title="Stocks & achats" subtitle="Produits, fournisseurs, commandes, réceptions partielles, inventaires et mouvements valorisés."
         actions={<div className="flex gap-2">
           {dataSource === 'supabase' && <button className="wg-btn wg-btn-ghost" onClick={() => { void refreshStock().catch(() => {}); }}><FiRefreshCw /> Actualiser</button>}
-          <button className="wg-btn wg-btn-primary" disabled={!activated} onClick={() => openModal('product')}><FiPlus /> Nouveau produit</button>
+          <button className="wg-btn wg-btn-primary" disabled={!canOperate} onClick={() => openModal('product')}><FiPlus /> Nouveau produit</button>
         </div>} />
 
       {!activated && <div className="mb-5"><LockedPanel /></div>}
@@ -119,7 +120,7 @@ export default function Stock() {
       </Card>}
 
       {tab === 'fournisseurs' && <Card>
-        <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-bold">Fournisseurs</h2><button className="wg-btn wg-btn-primary" disabled={!activated} onClick={() => openModal('supplier')}><FiPlus /> Nouveau fournisseur</button></div>
+        <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-bold">Fournisseurs</h2><button className="wg-btn wg-btn-primary" disabled={!canOperate} onClick={() => openModal('supplier')}><FiPlus /> Nouveau fournisseur</button></div>
         {state.suppliers.length === 0 ? <EmptyState icon={<FiTruck />} title="Aucun fournisseur" description="Ajoutez un fournisseur pour l’associer à une commande." /> : (
           <div className="wg-scroll-x rounded-xl border" style={{ borderColor: 'var(--wg-border)' }}><table>
             <thead><tr><th className="wg-th">Nom</th><th className="wg-th">Téléphone</th><th className="wg-th">E-mail</th><th className="wg-th">Adresse</th><th className="wg-th">État</th></tr></thead>
@@ -135,8 +136,8 @@ export default function Stock() {
       {tab === 'commandes' && <div className="grid gap-5">
         <Card>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-bold">Commandes fournisseurs</h2>
-            <div className="flex gap-2"><button className="wg-btn wg-btn-ghost" disabled={!activated || state.products.length === 0} onClick={() => openModal('order')}><FiPlus /> Commander</button>
-              <button className="wg-btn wg-btn-primary" disabled={!activated || state.purchaseOrders.length === 0} onClick={() => openModal('receipt')}>Réceptionner</button></div>
+            <div className="flex gap-2"><button className="wg-btn wg-btn-ghost" disabled={!canOperate || state.products.length === 0} onClick={() => openModal('order')}><FiPlus /> Commander</button>
+              <button className="wg-btn wg-btn-primary" disabled={!canOperate || state.purchaseOrders.length === 0} onClick={() => openModal('receipt')}>Réceptionner</button></div>
           </div>
           {state.purchaseOrders.length === 0 ? <EmptyState icon={<FiTruck />} title="Aucune commande" description="Une commande est un engagement : aucun mouvement de stock n’est créé à ce stade." /> : (
             <div className="wg-scroll-x rounded-xl border" style={{ borderColor: 'var(--wg-border)' }}><table>
@@ -169,9 +170,9 @@ export default function Stock() {
 
       {tab === 'inventaire' && <Card>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-bold">Sessions d’inventaire</h2>
-          <div className="flex gap-2"><button className="wg-btn wg-btn-ghost" disabled={!activated || Boolean(openSession)} onClick={() => safe(async () => { await startInventory(stationId); })}>Ouvrir un inventaire</button>
-            <button className="wg-btn wg-btn-primary" disabled={!activated || !openSession} onClick={() => openModal('count')}>Saisir un comptage</button>
-            {openSession && <button className="wg-btn wg-btn-danger" onClick={() => safe(async () => { await closeInventory(openSession.id); })}>Clôturer</button>}</div>
+          <div className="flex gap-2"><button className="wg-btn wg-btn-ghost" disabled={!canOperate || Boolean(openSession)} onClick={() => safe(async () => { await startInventory(stationId); })}>Ouvrir un inventaire</button>
+            <button className="wg-btn wg-btn-primary" disabled={!canOperate || !openSession} onClick={() => openModal('count')}>Saisir un comptage</button>
+            {openSession && <button className="wg-btn wg-btn-danger" disabled={!canOperate} onClick={() => safe(async () => { await closeInventory(openSession.id); })}>Clôturer</button>}</div>
         </div>
         {state.inventorySessions.length === 0 ? <EmptyState icon={<FiBox />} title="Aucun inventaire" description="Un seul inventaire ouvert par station ; les écarts créent des mouvements tracés." /> : (
           <div className="wg-scroll-x rounded-xl border" style={{ borderColor: 'var(--wg-border)' }}><table>
@@ -218,7 +219,7 @@ export default function Stock() {
       {tab === 'couts' && <div className="grid gap-5 lg:grid-cols-2">
         <Card>
           <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-bold">Dépenses d’achat rattachées</h2>
-            <button className="wg-btn wg-btn-primary" disabled={!activated || stockExpenses.length === 0 || state.purchaseOrders.length === 0} onClick={() => openModal('link')}>Rattacher</button></div>
+            <button className="wg-btn wg-btn-primary" disabled={!canOperate || stockExpenses.length === 0 || state.purchaseOrders.length === 0} onClick={() => openModal('link')}>Rattacher</button></div>
           <Alert kind="info">Un achat de stock déjà valorisé à la réception est rattaché à sa commande pour éviter un double comptage dans le résultat net.</Alert>
           {stockExpenses.length === 0 ? <EmptyState icon={<FiBox />} title="Aucune dépense d’achat" description="Les catégories achats, stock et fournitures apparaîtront ici." /> : (
             <div className="mt-4 wg-scroll-x rounded-xl border" style={{ borderColor: 'var(--wg-border)' }}><table>
@@ -232,7 +233,7 @@ export default function Stock() {
         </Card>
         <Card>
           <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-bold">Attestations de coûts</h2>
-            <button className="wg-btn wg-btn-ghost" disabled={!activated} onClick={() => openModal('cert')}><FiPlus /> Certifier une période</button></div>
+            <button className="wg-btn wg-btn-ghost" disabled={!canOperate} onClick={() => openModal('cert')}><FiPlus /> Certifier une période</button></div>
           <Alert kind={state.costCertifications.length ? 'success' : 'warn'}>
             {state.costCertifications.length
               ? 'Une période certifiée publie une marge brute et un résultat net calculables.'
@@ -262,7 +263,7 @@ export default function Stock() {
         </div>
         <p className="wg-muted mt-3 text-xs">Le coût moyen démarre à zéro et sera calculé à la première réception valorisée.</p>
         <div className="mt-5 flex justify-end gap-2"><button className="wg-btn wg-btn-ghost" onClick={close}><FiX /> Annuler</button>
-          <button className="wg-btn wg-btn-primary" onClick={() => safe(async () => {
+          <button className="wg-btn wg-btn-primary" disabled={!canOperate} onClick={() => safe(async () => {
             await saveProduct({ stationId, ...product });
             setProduct({ name: '', sku: '', category: '', unit: 'unité', reorderLevel: 0 }); close();
           })}>Enregistrer</button></div>
@@ -276,7 +277,7 @@ export default function Stock() {
           <Input label="Adresse" value={supplier.address} onChange={(e) => setSupplier({ ...supplier, address: e.target.value })} />
         </div>
         <div className="mt-5 flex justify-end gap-2"><button className="wg-btn wg-btn-ghost" onClick={close}><FiX /> Annuler</button>
-          <button className="wg-btn wg-btn-primary" onClick={() => safe(async () => {
+          <button className="wg-btn wg-btn-primary" disabled={!canOperate} onClick={() => safe(async () => {
             await saveSupplier({ stationId, ...supplier });
             setSupplier({ name: '', phone: '', email: '', address: '' }); close();
           })}>Enregistrer</button></div>
@@ -297,7 +298,7 @@ export default function Stock() {
         </div>
         <p className="wg-muted mt-3 text-xs">Clé d’idempotence : {order.idempotencyKey}. La commande n’incrémente pas le stock.</p>
         <div className="mt-5 flex justify-end gap-2"><button className="wg-btn wg-btn-ghost" onClick={close}><FiX /> Annuler</button>
-          <button className="wg-btn wg-btn-primary" onClick={() => safe(async () => {
+          <button className="wg-btn wg-btn-primary" disabled={!canOperate} onClick={() => safe(async () => {
             await createPurchaseOrder({
               stationId, number: order.number, supplierId: order.supplierId || null,
               orderedAt: todayISO(), expectedAt: order.expectedAt || null,
@@ -322,7 +323,7 @@ export default function Stock() {
         </div>
         <p className="wg-muted mt-3 text-xs">La réception partielle met à jour le coût moyen pondéré et crée un mouvement immuable.</p>
         <div className="mt-5 flex justify-end gap-2"><button className="wg-btn wg-btn-ghost" onClick={close}><FiX /> Annuler</button>
-          <button className="wg-btn wg-btn-primary" onClick={() => safe(async () => {
+          <button className="wg-btn wg-btn-primary" disabled={!canOperate} onClick={() => safe(async () => {
             await receivePurchaseLines({
               orderId: receipt.orderId, receiptKey: receipt.receiptKey,
               lines: [{ productId: receipt.productId, qty: receipt.qty, unitCostMinor: receipt.unitCost }],
@@ -340,7 +341,7 @@ export default function Stock() {
         </div>
         <Textarea label="Motif de l’écart" value={count.reason} onChange={(e) => setCount({ ...count, reason: e.target.value })} />
         <div className="mt-5 flex justify-end gap-2"><button className="wg-btn wg-btn-ghost" onClick={close}><FiX /> Annuler</button>
-          <button className="wg-btn wg-btn-primary" onClick={() => safe(async () => {
+          <button className="wg-btn wg-btn-primary" disabled={!canOperate} onClick={() => safe(async () => {
             await recordInventoryCount({ sessionId: openSession?.id ?? count.sessionId, productId: count.productId, countedQty: count.countedQty, reason: count.reason });
             setCount({ sessionId: openSession?.id ?? '', productId: '', countedQty: 0, reason: '' }); close();
           })}>Enregistrer</button></div>
@@ -357,7 +358,7 @@ export default function Stock() {
         </div>
         <p className="wg-muted mt-3 text-xs">Le rattachement est immuable : une dépense déjà liée à une autre commande est refusée.</p>
         <div className="mt-5 flex justify-end gap-2"><button className="wg-btn wg-btn-ghost" onClick={close}><FiX /> Annuler</button>
-          <button className="wg-btn wg-btn-primary" onClick={() => safe(async () => { await linkExpenseToOrder(link.expenseId, link.orderId); close(); })}>Rattacher</button></div>
+          <button className="wg-btn wg-btn-primary" disabled={!canOperate} onClick={() => safe(async () => { await linkExpenseToOrder(link.expenseId, link.orderId); close(); })}>Rattacher</button></div>
       </Modal>
 
       <Modal open={modal === 'cert'} onClose={close} title="Certifier les coûts d’une période">
@@ -369,7 +370,7 @@ export default function Stock() {
           placeholder="Je certifie les achats rattachés, les mouvements valorisés et les commissions validées de la période." />
         <p className="wg-muted mt-3 text-xs">La certification refuse les achats ambigus, les mouvements non valorisés et les commissions brouillon. Le relevé est immuable.</p>
         <div className="mt-5 flex justify-end gap-2"><button className="wg-btn wg-btn-ghost" onClick={close}><FiX /> Annuler</button>
-          <button className="wg-btn wg-btn-primary" onClick={() => safe(async () => { await certifyCosts(cert); setCert({ ...cert, attestation: '' }); close(); })}>Certifier</button></div>
+          <button className="wg-btn wg-btn-primary" disabled={!canOperate} onClick={() => safe(async () => { await certifyCosts(cert); setCert({ ...cert, attestation: '' }); close(); })}>Certifier</button></div>
       </Modal>
     </div>
   );

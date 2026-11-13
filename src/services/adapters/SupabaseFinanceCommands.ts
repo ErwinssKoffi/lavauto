@@ -1,4 +1,5 @@
 import { validateExpense, validateMoney, validatePeriod } from '../../lib/validation';
+import { ExpenseCommandError } from '../../lib/expenseAttempt';
 import type {
   ExpenseCreatePayload, FinanceCommands,
 } from './DataAdapter';
@@ -16,13 +17,34 @@ function dbMethod(method: PayMethod): string {
   return key;
 }
 
+/** Sans clé de reprise, un échec réseau n'est jamais une preuve de rollback. */
+export class FinanceCommandError extends Error {
+  constructor(message: string, readonly outcome: 'rejected' | 'unknown') {
+    super(message);
+    this.name = 'FinanceCommandError';
+  }
+}
+
+function uncertain(detail: string): FinanceCommandError {
+  return new FinanceCommandError(`Résultat de la commande financière incertain : ${detail}. Vérifiez la station et l’historique avant de répéter.`, 'unknown');
+}
+
 export class SupabaseFinanceCommands implements FinanceCommands {
   constructor(private readonly client: SupabaseReader) {}
 
   private async rpc(name: string, args: Record<string, unknown> = {}): Promise<unknown> {
-    const { data, error }: SupabaseResult<unknown> = await this.client.rpc(name, args);
-    if (error) throw new Error(error.message);
-    return data;
+    let result: SupabaseResult<unknown>;
+    try { result = await this.client.rpc(name, args); }
+    catch (error) { throw uncertain(error instanceof Error ? error.message : 'réponse réseau absente'); }
+    if (result.error) {
+      const status = result.status;
+      const code = result.error.code;
+      const rejected = status !== undefined && status >= 400 && status < 500 && status !== 408 && status !== 429
+        && Boolean(code && /^(?:22[0-9A-Z]{3}|23[0-9A-Z]{3}|42501|P0001|P0002|PGRST\d+)$/.test(code) && code !== '23505');
+      if (rejected) throw new FinanceCommandError(result.error.message, 'rejected');
+      throw uncertain(result.error.message);
+    }
+    return result.data;
   }
 
   async openCash(stationId: string, openingFloat: number, number = ''): Promise<string> {
@@ -32,7 +54,8 @@ export class SupabaseFinanceCommands implements FinanceCommands {
       p_opening_float_minor: openingFloat,
       p_number: number,
     });
-    return String(data);
+    if (typeof data !== 'string' || !data.trim()) throw uncertain('identifiant de caisse absent');
+    return data;
   }
 
   async closeCash(sessionId: string, counted: number): Promise<void> {
@@ -52,17 +75,35 @@ export class SupabaseFinanceCommands implements FinanceCommands {
 
   async addExpense(p: ExpenseCreatePayload): Promise<string> {
     validateExpense(p);
-    const data = await this.rpc('record_expense_by_key', {
-      p_station_id: p.stationId,
-      p_amount_minor: p.amount,
-      p_category_name: p.category,
-      p_reason: p.reason,
-      p_supplier: p.supplier,
-      p_spent_at: p.date,
-      p_method_key: dbMethod(p.method),
-      p_idempotency_key: p.idempotencyKey,
-    });
-    return String(data);
+    let result: SupabaseResult<unknown>;
+    try {
+      result = await this.client.rpc('record_expense_by_key', {
+        p_station_id: p.stationId,
+        p_amount_minor: p.amount,
+        p_category_name: p.category,
+        p_reason: p.reason,
+        p_supplier: p.supplier,
+        p_spent_at: p.date,
+        p_method_key: dbMethod(p.method),
+        p_idempotency_key: p.idempotencyKey,
+      });
+    } catch (error) {
+      throw new ExpenseCommandError(`Résultat de la dépense incertain : ${error instanceof Error ? error.message : 'réponse réseau absente'}`, 'unknown');
+    }
+    if (result.error) {
+      // Seul un refus structuré et sans ambiguïté permet d'oublier une
+      // première tentative. Une réponse de proxy, un conflit d'unicité ou un
+      // code réseau ne prouvent pas que l'écriture précédente est absente.
+      const status = result.status;
+      const code = result.error.code;
+      const rejected = status !== undefined && status >= 400 && status < 500 && status !== 408 && status !== 429
+        && Boolean(code && /^(?:22[0-9A-Z]{3}|23[0-9A-Z]{3}|42501|P0001|P0002|PGRST\d+)$/.test(code) && code !== '23505');
+      throw new ExpenseCommandError(`Dépense : ${result.error.message}`, rejected ? 'rejected' : 'unknown');
+    }
+    if (typeof result.data !== 'string' || !result.data.trim()) {
+      throw new ExpenseCommandError('Résultat de la dépense incertain : identifiant serveur absent.', 'unknown');
+    }
+    return result.data;
   }
 
   async cancelExpense(id: string, reason: string): Promise<void> {
@@ -88,7 +129,8 @@ export class SupabaseFinanceCommands implements FinanceCommands {
     const data = await this.rpc('create_commission_period', {
       p_station_id: stationId, p_start: start, p_end: end,
     });
-    return String(data);
+    if (typeof data !== 'string' || !data.trim()) throw uncertain('identifiant de période absent');
+    return data;
   }
 
   async validateCommissionPeriod(periodId: string): Promise<void> {

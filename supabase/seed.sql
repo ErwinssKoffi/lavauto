@@ -1,6 +1,7 @@
 -- =============================================================================
--- LAVAUTO / WASHGUARD — SEED DATA (Données Initiales de Référence)
--- Marché Ivoirien & Zone UEMOA (Devise : FCFA / XOF)
+-- LAVAUTO / WASHGUARD — SEED HISTORIQUE, INCOMPATIBLE AVEC LES MIGRATIONS 001–057
+-- Ne pas exécuter : ce fichier vise un ancien schéma et contient des exemples.
+-- Les formules effectives sont configurées dans les migrations et en plateforme.
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
@@ -21,14 +22,14 @@ VALUES
         "1 station de lavage",
         "10 comptes employés",
         "1 000 lavages par mois",
-        "Gestion des stocks & consommables",
+        "Gestion essentielle de la station",
         "Commissions des laveurs & exports CSV"
     ]'::jsonb, FALSE, TRUE),
     ('premium', 'Premium Multi-Stations', 35000, 5, 50, 100000, '[
         "Tout ce que contient Standard",
         "Jusqu’à 5 stations de lavage",
         "50 comptes employés",
-        "Lavages et fiches illimités",
+        "Quota mensuel défini par la formule",
         "Suivi des flottes d’entreprises",
         "Journal d’audit des opérations sensibles",
         "Support technique prioritaire"

@@ -70,7 +70,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   fake.store = {
     state: { station: station(), company: null, session: { userId: 'user-a', stationId: 'station-a', companyId: 'company-a' }, auditLogs: [], stockAlerts: [], products: [], stockLevels: [] },
-    dataSource: 'supabase', authKind: 'supabase', setStationLogoPath: fake.setPath, notify: fake.notify,
+    dataSource: 'supabase', authKind: 'supabase', canWriteSubscription: true, setStationLogoPath: fake.setPath, notify: fake.notify,
     updateStation: fake.updateStation, updateCompany: vi.fn(), setHours: vi.fn(), resetAll: vi.fn(),
     updateStockThreshold: vi.fn(), adjustProductStock: vi.fn(),
   };
@@ -101,6 +101,19 @@ describe('éditeur de logo privé', () => {
     expect(container.querySelector('input[type="url"]')).toBeNull();
     expect(fake.upload).not.toHaveBeenCalled();
     expect(fake.sign).not.toHaveBeenCalled();
+  });
+
+  it('conserve l’aperçu mais bloque les mutations du logo en lecture seule', async () => {
+    fake.store.canWriteSubscription = false;
+    const state = fake.store.state as { station: ReturnType<typeof station> };
+    state.station = station(pathA);
+    await render();
+    expect(input().disabled).toBe(true);
+    expect(button('Enregistrer le logo').disabled).toBe(true);
+    expect(button('Retirer le logo').disabled).toBe(true);
+    expect(fake.sign).toHaveBeenCalled();
+    await click('Retirer le logo');
+    expect(fake.save).not.toHaveBeenCalled();
   });
 
   it('valide les formats, la taille et les fichiers vides avant l’envoi', async () => {
@@ -262,7 +275,7 @@ describe('éditeur de logo privé', () => {
   it('enregistrer les coordonnées dans Paramètres ne remplace pas le chemin du logo', async () => {
     const state = fake.store.state as { station: ReturnType<typeof station> };
     state.station = station(pathA);
-    await render(React.createElement(MemoryRouter, { future: { v7_startTransition: true, v7_relativeSplatPath: true } }, React.createElement(Settings)));
+    await render(React.createElement(MemoryRouter, null, React.createElement(Settings)));
     const identityButton = [...container.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Enregistrer');
     expect(identityButton).toBeDefined();
     await act(async () => { identityButton!.click(); });

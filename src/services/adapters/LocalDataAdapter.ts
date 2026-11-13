@@ -32,6 +32,8 @@ const ROLE_KEYS: Record<string, string> = {
 
 export class LocalDataAdapter implements DataAdapter {
   readonly source: DataSource = 'local';
+  readonly setupCommands = null;
+  readonly subscriptionCommands = null;
   /** Aucune RPC : les mutations locales restent synchrones dans `store.tsx`. */
   readonly washCommands = null;
   readonly financeCommands = null;

@@ -1,6 +1,6 @@
 # Mise en route — parcours d'ouverture
 
-> Ce document décrit le parcours **tel qu'implémenté dans le frontend**. Depuis le Prompt 04, l'identité, les permissions et le tenant viennent de Supabase Auth / `my_context()` ; les RPC du Prompt 05 couvrent désormais le cycle lavages ; le logo utilise le Storage privé et la migration `051` en mode connecté ; plusieurs autres écritures métier de ce parcours restent locales dans `src/lib/store.tsx`. Le schéma distant applique déjà `company_id`, RLS et les contraintes d'unicité décrites derrière ce contrat.
+> Ce document décrit le code de cette branche, **pas une recette de production**. En démonstration les données restent dans le navigateur. En mode connecté, l’identité vient de Supabase Auth / `my_context()` ; `056` prépare la lecture et les écritures autorisées des réglages et du catalogue, et `057` les droits d’abonnement. `053`–`057` ne sont pas appliquées sur `lavauto` ; ne pas activer ce frontend connecté avant réconciliation, recette et autorisation distincte. L’essai de 14 jours s’arrête immédiatement si une formule payante est validée avant son échéance : voir [subscriptions.md](subscriptions.md).
 
 Ce n'est **pas** un formulaire de bienvenue. C'est un parcours de **treize étapes** dont l'état est **constaté sur les données réellement enregistrées** : aucune étape n'est cochée par le navigateur, aucun bouton ne déclare une étape « faite ». Le badge « Constaté » apparaît uniquement quand les données correspondantes existent.
 
@@ -11,9 +11,9 @@ Le formulaire d'inscription est groupé en deux temps :
 1. **Votre entreprise et sa station** — nom de l'entreprise, nom de la station, téléphone, ville ;
 2. **Votre compte de propriétaire** — nom, e-mail, mot de passe, confirmation.
 
-Le contrat crée **une seule fois** l'entreprise, sa station, le compte propriétaire et l'abonnement d'essai, puis ouvre l'écran **Mise en route**. Une seconde soumission ne recrée rien (idempotence). En mode Supabase, `mailer_autoconfirm=false` impose de confirmer l'e-mail avant la première session ; le bootstrap idempotent est déclenché par le trigger `AFTER INSERT ON auth.users`.
+En démo, l’inscription crée un espace uniquement dans ce navigateur, refuse de remplacer un espace existant et ne vérifie ni n’envoie d’e-mail. Une perte de stockage empêche la connexion ultérieure. En mode Supabase, la création dépend du bootstrap serveur et de la configuration Auth réelle ; la confirmation par e-mail et la délivrabilité doivent être vérifiées sur une recette autorisée.
 
-À ce stade, la station n'a **ni horaires, ni catégories, ni prestations, ni prix, ni moyens de paiement**. Aucune donnée d'exemple n'est ajoutée et **aucun prix n'est inventé** : la station ouvre quand vous avez choisi vos tarifs.
+À ce stade, la station n'a **ni horaires, ni catégories, ni prestations, ni prix, ni moyens de paiement**. Aucun prix n'est inventé ; des produits de stock d’exemple peuvent être ajoutés en démonstration locale seulement.
 
 ## Les treize étapes
 
@@ -37,7 +37,7 @@ Le contrat crée **une seule fois** l'entreprise, sa station, le compte proprié
 
 L’étape logo utilise le même éditeur que **Paramètres** : fichier PNG, JPEG ou WebP de 5 Mo maximum, puis **Enregistrer le logo**. Elle nécessite Supabase et la migration `051` sur la cible ; elle est désactivée en mode local. L’ancienne saisie d’URL ne constitue plus un logo : un nouveau téléversement est nécessaire. Le remplacement et le retrait dissocient l’ancien fichier sans le supprimer.
 
-Les libellés proposés à la saisie (« Berline », « Lavage extérieur »…) sont des **raccourcis** : rien n'est inséré sans un clic de l'utilisateur. Les champs de prix démarrent vides ; la grille n'est constatée complète que lorsque toutes les cases sont renseignées.
+Les libellés proposés à la saisie (« Berline », « Lavage extérieur »…) sont des **raccourcis** : rien n'est inséré sans un clic de l'utilisateur. Les champs de prix démarrent vides ; valider un prix en quittant la case ou avec Entrée. En mode connecté, l’écran attend la relecture serveur et bloque les réglages en cas d’échec ou de réponse incohérente. En local, une alerte signale une persistance impossible.
 
 ## Refus : `409 onboarding_incomplete`
 
@@ -48,9 +48,9 @@ Tant que l'activation n'a pas eu lieu, **toute écriture de métier est refusée
 - ouverture, clôture ou réouverture de caisse ;
 - enregistrement ou annulation d'une dépense.
 
-La réponse est `409 onboarding_incomplete` et contient la liste des étapes obligatoires manquantes. L'interface affiche ce blocage dans un panneau dédié sur chaque module concerné, avec un lien vers la mise en route.
+L’interface locale signale `onboarding_incomplete` avec les étapes manquantes. Les refus SQL connectés peuvent avoir un autre code HTTP ; ils doivent être vérifiés sur la cible et ne sont pas démontrés par ce garde d’interface.
 
-Le garde est centralisé : `assertActivated()` dans `src/lib/store.tsx`. Il n'est **pas** possible de contourner le blocage depuis un écran, puisque chaque action métier passe par ce garde.
+Le garde d’interface est `assertActivated()` dans `src/lib/store.tsx`. Il ne remplace pas les contrôles serveur, RLS et permissions, qui doivent être vérifiés indépendamment.
 
 L'activation elle-même refuse (`409 onboarding_incomplete`) si une étape obligatoire manque ; le bouton se débloque automatiquement quand les données sont enregistrées.
 
@@ -64,9 +64,9 @@ Vérifications appliquées à la saisie d'une fiche (voir `createWash` dans `sto
 - l'employé doit être renseigné ;
 - au moins une prestation active doit être sélectionnée ;
 - chaque prestation doit avoir un prix dans la grille pour la catégorie choisie, sinon `missing_price` ;
-- la remise ne peut pas dépasser la remise maximale du caissier (`discount_exceeded`) ;
+- le plafond de remise du caissier n’est pas garanti par la base connectée ; le réglage est verrouillé en mode connecté ;
 - le montant encaissé ne peut pas dépasser le total (`overpayment`) ;
-- un encaissement en espèces exige une caisse ouverte, sauf si la règle a été désactivée pour la station (`cash_closed`). Le Mobile Money peut être enregistré à tout moment ;
+- en connecté, les espèces exigent une caisse ouverte ; le réglage local ne désactive pas cette règle serveur. Le moyen sélectionné doit aussi être accepté par la station ;
 - **les prix sont figés** sur la fiche au moment de sa création : modifier la grille tarifaire ne change jamais les lavages déjà enregistrés, donc l'historique et les rapports restent justes.
 
 Vérifications de caisse et de dépenses :
@@ -83,5 +83,5 @@ Vérifications de caisse et de dépenses :
 ## Notes d'implémentation frontend
 
 - L'état du parcours est recalculé à chaque changement de données (`computeOnboarding(state)`), jamais stocké comme « étape cochée ».
-- L'inscription, l'activation, les réinitialisations de mot de passe, les annulations et les changements de formule écrivent une ligne dans `auditLogs` (journal des opérations sensibles).
-- Le frontend conserve l'état dans `localStorage` (`washguard.state.v1`). *Paramètres → Réinitialiser la démonstration* permet de repartir à vide.
+- En démonstration, l’état et les empreintes d’accès sont deux clés locales, sans synchronisation ni chiffrement. Exporter et vérifier une copie avant toute réinitialisation ; celle-ci efface les deux clés uniquement après confirmation.
+- Les commandes connectées de `056` vérifient station et permissions, relisent le résultat et enregistrent un audit côté base. Après une réponse perdue, relire et vérifier avant de recommencer une création : ces réglages ne sont pas tous idempotents.

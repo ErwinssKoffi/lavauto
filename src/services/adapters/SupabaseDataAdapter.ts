@@ -1,6 +1,7 @@
 import { PaymentCommandError } from '../../lib/paymentAttempt';
-import { validateMoney } from '../../lib/validation';
-import type { AppUser, Client, Plan, ProfitabilityReport, Wash, WashPost } from '../../types';
+import { isDate, validateMoney } from '../../lib/validation';
+import type { AppUser, Client, DayHours, PayMethod, Plan, ProfitabilityReport, Wash, WashPost } from '../../types';
+import { isStationLogoPath } from '../../lib/image';
 import { dbRoleToUi } from '../auth/authTypes';
 import { PAY_METHOD_DB_KEY } from '../../types';
 import { WashCreationError } from '../../lib/washCreation';
@@ -18,10 +19,12 @@ import {
   type AnalyticsSnapshot, type PlatformSnapshot, type SubscriptionUsageSnapshot,
 } from '../../lib/analytics';
 import { SupabaseAnalyticsCommands } from './SupabaseAnalyticsCommands';
+import { SupabaseSubscriptionCommands } from './SupabaseSubscriptionCommands';
+import { FEATURE_KEYS, NO_ADVANCED } from '../../lib/subscription';
 import type {
   AnalyticsCommands, Bootstrap, CatalogPrice, CatalogSnapshot, DataAdapter, DataSource,
-  CrmCommands, ExpenseCreatePayload, FinanceCommands, StockCommands,
-  WashBoardSnapshot, WashCommands, WashCreatePayload,
+  CompanySetupPatch, CrmCommands, ExpenseCreatePayload, FinanceCommands, SetupCommands, StationSetupPatch,
+  StationSetupSnapshot, StockCommands, SubscriptionCommands, WashBoardSnapshot, WashCommands, WashCreatePayload,
 } from './DataAdapter';
 
 // ─── Adaptateur Supabase — lectures + RPC cœur lavages (Prompts 03 + 05) ─────
@@ -130,6 +133,18 @@ export function mapPlanRows(value: unknown): Plan[] {
     if (stations === undefined || employees === undefined || washesPerMonth === undefined) {
       throw new Error(`Limites manquantes pour la formule ${String(row.id ?? '?')}.`);
     }
+    if (!Array.isArray(row.plan_entitlements)) throw new Error(`Droits de formule indisponibles pour ${String(row.id ?? '?')}.`);
+    const entitlements = { ...NO_ADVANCED };
+    const seen = new Set<string>();
+    for (const item of row.plan_entitlements) {
+      const entitlement = asRecord(item, 'plan_entitlements');
+      const key = entitlement.feature_key;
+      if (typeof key !== 'string' || !FEATURE_KEYS.includes(key as typeof FEATURE_KEYS[number])
+        || typeof entitlement.enabled !== 'boolean' || seen.has(key)) throw new Error('Droit de formule invalide.');
+      seen.add(key);
+      entitlements[key as typeof FEATURE_KEYS[number]] = entitlement.enabled;
+    }
+    if (seen.size !== FEATURE_KEYS.length) throw new Error(`Droits de formule incomplets pour ${String(row.id ?? '?')}.`);
     return {
       id: text(row.id, 'plans.id'),
       name: text(row.name, 'plans.name'),
@@ -137,6 +152,7 @@ export function mapPlanRows(value: unknown): Plan[] {
       trial: number(row.trial_days, 'plans.trial_days') > 0,
       limits: { stations, employees, washesPerMonth },
       features: features(row.features),
+      entitlements,
     };
   });
 }
@@ -167,6 +183,109 @@ export function mapCatalogRows(
       currencyCode: typeof r.currency_code === 'string' ? r.currency_code.trim() : 'XOF',
     })),
   };
+}
+
+const SETUP_METHODS: PayMethod[] = ['especes', 'mobile_money', 'wave', 'orange_money', 'mtn_momo', 'carte', 'virement'];
+
+/** Rejette les réponses partielles : ne jamais fabriquer un catalogue serveur. */
+export function mapStationSetup(raw: unknown, expectedStation: string): StationSetupSnapshot {
+  const setup = asRecord(raw, 'my_station_setup');
+  const co = asRecord(setup.company, 'company');
+  const st = asRecord(setup.station, 'station');
+  const companyId = text(co.id, 'company.id');
+  const stationId = text(st.id, 'station.id');
+  if (stationId !== expectedStation || st.companyId !== companyId) throw new Error('Station ou entreprise incohérente dans la réponse serveur.');
+  if (typeof co.suspended !== 'boolean' || typeof st.activated !== 'boolean'
+    || !Array.isArray(st.hours) || !Array.isArray(st.paymentMethods)) throw new Error('Paramètres de station incomplets.');
+  const hours: DayHours[] = st.hours.map((value) => {
+    const h = asRecord(value, 'station.hours');
+    if (typeof h.day !== 'string' || typeof h.open !== 'string' || typeof h.close !== 'string' || typeof h.closed !== 'boolean') {
+      throw new Error('Horaires serveur illisibles.');
+    }
+    return { day: h.day, open: h.open, close: h.close, closed: h.closed };
+  });
+  if (st.paymentMethods.some((m: unknown) => typeof m !== 'string' || !SETUP_METHODS.includes(m as PayMethod))) {
+    throw new Error('Moyens de paiement serveur illisibles.');
+  }
+  const paymentMethods = st.paymentMethods as PayMethod[];
+  if (new Set(paymentMethods).size !== paymentMethods.length
+    || typeof st.commissionRate !== 'number' || typeof st.monthlyTarget !== 'number') {
+    throw new Error('Règles de station incomplètes.');
+  }
+  const commissionRate = number(st.commissionRate, 'station.commissionRate');
+  const monthlyTarget = number(st.monthlyTarget, 'station.monthlyTarget');
+  if (!Number.isSafeInteger(commissionRate) || commissionRate > 100 || !Number.isSafeInteger(monthlyTarget) || monthlyTarget > 1_000_000_000_000) {
+    throw new Error('Règles de station hors limites.');
+  }
+  const categoryRows = rows(setup.categories, 'categories', null);
+  const serviceRows = rows(setup.services, 'services', null);
+  const priceRows = rows(setup.prices, 'prices', null);
+  if (categoryRows.some((row) => typeof row.active !== 'boolean')
+    || serviceRows.some((row) => typeof row.active !== 'boolean' || typeof row.description !== 'string')
+    || priceRows.some((row) => typeof row.price_minor !== 'number' || !Number.isSafeInteger(row.price_minor)
+      || row.price_minor < 0 || row.price_minor > 1_000_000_000_000 || typeof row.currency_code !== 'string')) {
+    throw new Error('Catalogue serveur incomplet ou invalide.');
+  }
+  const catalog = mapCatalogRows(categoryRows, serviceRows, priceRows);
+  const categoryIds = new Set(catalog.categories.map((row) => row.id));
+  const serviceIds = new Set(catalog.services.map((row) => row.id));
+  const priceKeys = new Set(catalog.prices.map((row) => `${row.serviceId}:${row.vehicleCategoryId}`));
+  if ([...catalog.categories, ...catalog.services, ...catalog.prices].some((row) => row.stationId !== stationId)
+    || categoryIds.size !== catalog.categories.length || serviceIds.size !== catalog.services.length
+    || priceKeys.size !== catalog.prices.length || catalog.prices.some((row) => !categoryIds.has(row.vehicleCategoryId) || !serviceIds.has(row.serviceId))) {
+    throw new Error('Catalogue hors périmètre ou incohérent dans la réponse serveur.');
+  }
+  return {
+    company: { id: companyId, name: text(co.name, 'company.name'), city: optionalText(co.city), phone: optionalText(co.phone),
+      createdAt: text(co.createdAt, 'company.createdAt'), suspended: co.suspended },
+    station: { id: stationId, companyId, name: text(st.name, 'station.name'), address: optionalText(st.address),
+      city: optionalText(st.city), phone: optionalText(st.phone), currency: 'FCFA',
+      logoPath: isStationLogoPath(st.logoPath) && st.logoPath.startsWith(`${companyId}/`) ? st.logoPath : null,
+      hours, paymentMethods, cashRequiresOpen: true, maxCashierDiscount: 0, commissionRate, monthlyTarget,
+      activated: st.activated, activatedAt: typeof st.activatedAt === 'string' ? st.activatedAt : null },
+    catalog,
+  };
+}
+
+/** Aucun repli local et aucune reprise automatique d'une création incertaine. */
+export class SupabaseSetupCommands implements SetupCommands {
+  constructor(private readonly client: SupabaseReader) {}
+
+  private async write(name: string, args: Record<string, unknown>): Promise<unknown> {
+    let result: SupabaseResult<unknown>;
+    try { result = await this.client.rpc(name, args); }
+    catch { throw new Error('Résultat incertain : rechargez et vérifiez les données avant de réessayer.'); }
+    if (result.error) {
+      if (result.status === 0 || (result.status !== undefined && result.status >= 500)) {
+        throw new Error('Résultat incertain : rechargez et vérifiez les données avant de réessayer.');
+      }
+      throw new Error(result.error.message);
+    }
+    return result.data;
+  }
+
+  async read(stationId: string): Promise<StationSetupSnapshot> {
+    const result = await this.client.rpc('my_station_setup', { p_station_id: stationId });
+    return mapStationSetup(rpcData(result, 'my_station_setup'), stationId);
+  }
+  async saveCompany(stationId: string, patch: CompanySetupPatch): Promise<void> {
+    await this.write('save_company_setup', { p_station_id: stationId, p_patch: patch });
+  }
+  async saveStation(stationId: string, patch: StationSetupPatch): Promise<void> {
+    await this.write('save_station_setup', { p_station_id: stationId, p_patch: patch });
+  }
+  async saveCategory(stationId: string, id: string | null, name: string, active: boolean, remove = false): Promise<string> {
+    return text(await this.write('save_station_category', { p_station_id: stationId, p_id: id, p_name: name, p_active: active, p_remove: remove }), 'category.id');
+  }
+  async saveService(stationId: string, id: string | null, name: string, description: string, active: boolean, remove = false): Promise<string> {
+    return text(await this.write('save_station_service', { p_station_id: stationId, p_id: id, p_name: name, p_description: description, p_active: active, p_remove: remove }), 'service.id');
+  }
+  async savePrice(stationId: string, serviceId: string, categoryId: string, price: number): Promise<void> {
+    await this.write('save_station_price', { p_station_id: stationId, p_service_id: serviceId, p_category_id: categoryId, p_price_minor: price });
+  }
+  async activate(stationId: string): Promise<void> {
+    await this.write('activate_station_setup', { p_station_id: stationId });
+  }
 }
 
 function rpcData(result: SupabaseResult<unknown>, name: string): unknown {
@@ -298,6 +417,8 @@ export class SupabaseWashCommands implements WashCommands {
 
 export class SupabaseDataAdapter implements DataAdapter {
   readonly source: DataSource = 'supabase';
+  readonly setupCommands: SetupCommands;
+  readonly subscriptionCommands: SubscriptionCommands;
   readonly washCommands: WashCommands;
   readonly financeCommands: FinanceCommands;
   readonly stockCommands: StockCommands;
@@ -305,6 +426,8 @@ export class SupabaseDataAdapter implements DataAdapter {
   readonly analyticsCommands: AnalyticsCommands;
 
   constructor(private readonly client: SupabaseReader) {
+    this.setupCommands = new SupabaseSetupCommands(client);
+    this.subscriptionCommands = new SupabaseSubscriptionCommands(client);
     this.washCommands = new SupabaseWashCommands(client);
     this.financeCommands = new SupabaseFinanceCommands(client);
     this.stockCommands = new SupabaseStockCommands(client);
@@ -355,6 +478,25 @@ export class SupabaseDataAdapter implements DataAdapter {
     const { data, error } = await this.client.rpc(stationId ? 'my_station_finance_board' : 'my_finance_board',
       stationId ? { p_station_id: stationId } : undefined);
     if (error) throw new Error(error.message);
+    if (stationId) {
+      // Le mapping historique remplace certains champs absents par des valeurs
+      // par défaut. Ne jamais utiliser ces substitutions pour confirmer une
+      // dépense : valider les champs bruts avant toute projection.
+      const raw = asRecord(data, 'my_station_finance_board');
+      if (!Array.isArray(raw.expenses)) throw new Error('Liste des dépenses invalide.');
+      for (const value of raw.expenses) {
+        const e = asRecord(value, 'dépense');
+        if (typeof e.id !== 'string' || !e.id.trim() || e.stationId !== stationId
+          || typeof e.amount !== 'number' || !Number.isSafeInteger(e.amount) || e.amount <= 0
+          || typeof e.category !== 'string' || !e.category.trim() || typeof e.reason !== 'string' || !e.reason.trim()
+          || typeof e.supplier !== 'string' || typeof e.date !== 'string' || !isDate(e.date)
+          || typeof e.method !== 'string' || !Object.prototype.hasOwnProperty.call(PAY_METHOD_DB_KEY, e.method)
+          || (e.status !== 'enregistree' && e.status !== 'annulee')
+          || (e.idempotencyKey !== null && (typeof e.idempotencyKey !== 'string' || !e.idempotencyKey.trim()))) {
+          throw new Error('Dépense invalide reçue dans la lecture finance.');
+        }
+      }
+    }
     return mapFinanceBoard(data);
   }
 
@@ -413,7 +555,7 @@ export class SupabaseDataAdapter implements DataAdapter {
 
   async listPlans(): Promise<Plan[]> {
     const result = await this.client.from('plans')
-      .select('id,name,price_monthly_minor,currency_code,trial_days,features,sort_order,plan_limits(key,value_int)')
+      .select('id,name,price_monthly_minor,currency_code,trial_days,features,sort_order,plan_limits(key,value_int),plan_entitlements(feature_key,enabled)')
       .eq('active', true)
       .order('sort_order', { ascending: true });
     return mapPlanRows(rows(result.data, 'plans', result.error));

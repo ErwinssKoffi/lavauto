@@ -2,6 +2,9 @@ import type { AppState, AppUser, Role, Session } from '../../types';
 import { ApiError } from '../../types';
 import { uid } from '../../lib/format';
 import { permissionsForRole } from '../../lib/permissionCatalog';
+import { emptyStockCollections } from '../../lib/stock';
+import { emptyCrmCollections } from '../../lib/crm';
+import { DEMO_PASSWORDS_KEY, DEMO_STATE_KEY, readDemoState, serializeDemoState, withDemoStorageLock, writeDemoState } from '../../lib/demoStorage';
 import {
   clearDemoPasswords, hasDemoPassword, setDemoPassword, verifyDemoPassword,
 } from '../../lib/demoPasswords';
@@ -19,6 +22,8 @@ import {
 export interface LocalAuthHooks {
   getState(): AppState;
   setState(updater: (state: AppState) => AppState): void;
+  /** Aligne la version de l'onglet après l'inscription conservée sous verrou. */
+  onStateCommitted?(raw: string): void;
 }
 
 const INVITABLE_ROLES: Role[] = ['gerant', 'caissier', 'laveur'];
@@ -29,6 +34,17 @@ function asRole(role: Role): Role {
 
 function currencyCode(value: string | undefined): string {
   return value === 'FCFA' || !value ? 'XOF' : value;
+}
+
+function hasDemoContent(state: Partial<AppState>): boolean {
+  const defaults = { ...emptyStockCollections(), ...emptyCrmCollections() } as Record<string, unknown>;
+  return Object.entries(state).some(([key, value]) => {
+    if (key === 'demoMode' || value === null || value === undefined) return false;
+    if (key === 'washCounter') return value !== 0;
+    if (Array.isArray(value)) return value.length > 0;
+    if (['stockValuation', 'crmStats', 'crmRules'].includes(key)) return JSON.stringify(value) !== JSON.stringify(defaults[key]);
+    return true; // objets ou anciens champs inconnus : ne jamais les écraser
+  });
 }
 
 /** Projection pure AppState → contexte d'identité, pour la démo et les tests. */
@@ -95,8 +111,11 @@ function requirePermission(identity: AuthIdentity | null, permission: string): A
 export class LocalAuthAdapter implements AuthPort {
   readonly kind = 'local' as const;
   private identity: AuthIdentity | null;
+  private registrationPending = false;
   private handlers = new Set<(change: AuthChange) => void>();
   private invitations: Invitation[] = [];
+  // Les invitations de démonstration vivent en mémoire, comme cette liaison.
+  private invitationUsers = new Map<string, string>();
 
   constructor(private hooks: LocalAuthHooks, initialIdentity: AuthIdentity | null = null) {
     this.identity = initialIdentity;
@@ -139,21 +158,33 @@ export class LocalAuthAdapter implements AuthPort {
   }
 
   async signUp(payload: SignUpPayload): Promise<AuthResult> {
+    const stored = readDemoState();
+    if (stored.status === 'unreadable' || stored.status === 'unavailable') {
+      throw new ApiError('demo_storage_unavailable',
+        'Les données locales sont illisibles ou inaccessibles. Aucune inscription n’a été créée ; sauvegardez les données avant récupération.');
+    }
+    const existingError = () => new ApiError('demo_account_exists',
+      'Un espace de démonstration existe déjà dans ce navigateur. Connectez-vous avec son compte existant ; aucune donnée n’a été modifiée.');
+    if (this.registrationPending || hasDemoContent(this.hooks.getState())) throw existingError();
+    this.registrationPending = true;
+    try {
+      return await withDemoStorageLock(async () => {
+    // Une autre fenêtre a pu créer l'espace pendant l'attente du verrou : la
+    // version du disque, pas la copie React de cet onglet, fait autorité.
+    const current = readDemoState();
+    if (current.status === 'unreadable' || current.status === 'unavailable') {
+      throw new ApiError('demo_storage_unavailable', 'Les données locales sont illisibles ou inaccessibles. Aucune inscription n’a été créée ; sauvegardez les données avant récupération.');
+    }
     const state = this.hooks.getState();
-    const owner = state.users.find((u) => u.role === 'proprietaire');
-    if (state.company && state.station && owner) {
-      const existing = identityFromState(state, {
-        userId: owner.id, email: owner.email, name: owner.name, role: owner.role,
-        companyId: owner.companyId, stationId: owner.stationId ?? state.station.id,
-      });
-      if (existing) {
-        this.hooks.setState((s) => ({ ...s, session: {
-          userId: owner.id, email: owner.email, name: owner.name, role: owner.role,
-          companyId: owner.companyId, stationId: owner.stationId ?? state.station?.id ?? null,
-        } }));
-        this.emit('SIGNED_IN', existing);
-        return { identity: existing, message: 'Cet espace existe déjà.' };
+    if (hasDemoContent(state) || (current.status === 'ok' && hasDemoContent(current.value))) throw existingError();
+    const passwordsBefore = localStorage.getItem(DEMO_PASSWORDS_KEY);
+    if (passwordsBefore !== null) {
+      let parsed: unknown;
+      try { parsed = JSON.parse(passwordsBefore); } catch { throw new Error('Stockage des accès de démonstration illisible ou indisponible. Sauvegardez les données avant récupération.'); }
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || Object.values(parsed).some((v) => typeof v !== 'string')) {
+        throw new Error('Stockage des accès de démonstration illisible ou indisponible. Sauvegardez les données avant récupération.');
       }
+      if (Object.keys(parsed).length) throw new ApiError('demo_storage_unavailable', 'Des accès de démonstration existent déjà sans espace lisible. Sauvegardez-les avant récupération.');
     }
     const now = new Date().toISOString();
     const companyId = uid('co');
@@ -185,7 +216,7 @@ export class LocalAuthAdapter implements AuthPort {
       subscription: {
         id: uid('sub'), companyId, planId: 'essai', status: 'essai',
         startedAt: now, trialEndsAt: new Date(Date.now() + 14 * 86400000).toISOString(),
-        pendingPlanId: null,
+        pendingPlanId: payload.requestedPlanId && payload.requestedPlanId !== 'essai' ? payload.requestedPlanId : null,
       },
       platformCompanies: [{
         id: companyId, name: company.name, city: company.city, phone: company.phone,
@@ -196,11 +227,42 @@ export class LocalAuthAdapter implements AuthPort {
         detail: `Création de ${company.name} / ${station.name} et de l’abonnement d’essai`,
       }, ...state.auditLogs].slice(0, 200),
     };
-    setDemoPassword(email, payload.password);
+    const stateRaw = serializeDemoState(next);
+    try {
+      setDemoPassword(email, payload.password);
+      writeDemoState(stateRaw);
+    } catch {
+      // Deux clés localStorage ne constituent pas une transaction. Essayer de
+      // revenir aux octets d'origine ; si cela échoue, annoncer l'incertitude.
+      let restored = true;
+      try {
+        const observed = localStorage.getItem(DEMO_STATE_KEY);
+        if (observed === stateRaw) {
+          if (current.raw === null) localStorage.removeItem(DEMO_STATE_KEY);
+          else localStorage.setItem(DEMO_STATE_KEY, current.raw);
+        } else if (observed !== current.raw) {
+          // Valeur inattendue : ne pas écraser un tiers non coopérant.
+          restored = false;
+        }
+        if (passwordsBefore === null) localStorage.removeItem(DEMO_PASSWORDS_KEY);
+        else localStorage.setItem(DEMO_PASSWORDS_KEY, passwordsBefore);
+        if (localStorage.getItem(DEMO_STATE_KEY) !== current.raw
+          || localStorage.getItem(DEMO_PASSWORDS_KEY) !== passwordsBefore) restored = false;
+      } catch { restored = false; }
+      throw new ApiError('demo_storage_unavailable', restored
+        ? 'Impossible de conserver l’inscription dans ce navigateur. Aucune session n’a été ouverte.'
+        : 'Écriture locale incertaine. Aucune session n’a été ouverte : sauvegardez et vérifiez les données avant de réessayer.');
+    }
+    this.hooks.onStateCommitted?.(stateRaw);
     this.hooks.setState(() => next);
     const identity = identityFromState(next, session)!;
     this.emit('SIGNED_IN', identity);
     return { identity };
+      });
+    } catch (error) {
+      this.registrationPending = false;
+      throw error;
+    }
   }
 
   async signOut(): Promise<void> {
@@ -259,6 +321,7 @@ export class LocalAuthAdapter implements AuthPort {
       acceptedAt: null, revokedAt: null, createdAt: now,
     };
     this.invitations = [invitation, ...this.invitations];
+    this.invitationUsers.set(invitation.id, user.id);
     this.hooks.setState((s) => ({
       ...s,
       users: [...s.users, user],
@@ -271,14 +334,30 @@ export class LocalAuthAdapter implements AuthPort {
   }
 
   async revokeInvitation(id: string): Promise<void> {
-    requirePermission(this.identity, 'employees.invite');
+    const identity = requirePermission(this.identity, 'employees.invite');
+    requirePermission(this.identity, 'employees.disable');
     const target = this.invitations.find((i) => i.id === id);
-    if (!target || target.revokedAt || target.acceptedAt) {
-      throw new ApiError('not_found', 'Invitation introuvable ou déjà traitée.');
+    if (!target || target.acceptedAt) {
+      throw new ApiError('not_found', 'Invitation introuvable ou déjà acceptée.');
     }
-    this.invitations = this.invitations.map((i) =>
-      i.id === id ? { ...i, revokedAt: new Date().toISOString() } : i
-    );
+    const userId = this.invitationUsers.get(id);
+    const user = this.hooks.getState().users.find((u) => u.id === userId && u.companyId === identity.companyId);
+    if (!user) throw new ApiError('reconciliation_required', 'Compte associé introuvable : vérifiez les données avant révocation.');
+    if (user.id === identity.userId || user.role === 'proprietaire' || user.role === 'super_admin') {
+      throw new ApiError('forbidden', 'Ce compte protégé ne peut pas être désactivé par cette opération.');
+    }
+    if (target.revokedAt) {
+      if (!user.active) return;
+      throw new ApiError('reconciliation_required', 'Invitation déjà révoquée mais compte réactivé : relisez son état.');
+    }
+    const now = new Date().toISOString();
+    this.hooks.setState((s) => ({
+      ...s,
+      users: s.users.map((u) => u.id === user.id && u.companyId === identity.companyId ? { ...u, active: false } : u),
+      auditLogs: [{ id: uid('log'), at: now, actor: identity.fullName,
+        action: 'Invitation révoquée et compte désactivé', detail: user.email }, ...s.auditLogs].slice(0, 200),
+    }));
+    this.invitations = this.invitations.map((i) => i.id === id ? { ...i, revokedAt: now } : i);
   }
 
   async updateUser(payload: UpdateUserPayload): Promise<void> {
@@ -324,8 +403,10 @@ export class LocalAuthAdapter implements AuthPort {
   async refreshUsers(): Promise<AppUser[]> { return this.hooks.getState().users; }
 
   clearAll(): void {
+    this.registrationPending = false;
     clearDemoPasswords();
     this.invitations = [];
+    this.invitationUsers.clear();
     this.emit('SIGNED_OUT', null);
   }
 }

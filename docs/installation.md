@@ -1,6 +1,6 @@
 # LAVAUTO — Installation
 
-**Date :** 12/11/2026 · Les migrations `051` (logo) et `052` (création atomique) ont été appliquées sur `lavauto` via le connecteur Supabase ; la recette métier réelle et le déploiement du frontend de cette branche restent à effectuer.
+**Date :** 12/11/2026 · Les migrations `051` (logo) et `052` (création atomique) ont été appliquées sur `lavauto` via le connecteur Supabase ; `053`–`057`, le frontend et les nouvelles fonctions de cette branche restent locaux. La recette réelle et tout déploiement nécessitent une autorisation distincte.
 
 ## 1. Prérequis
 

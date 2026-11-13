@@ -1,16 +1,25 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { FiArrowRight, FiBriefcase, FiCheckCircle, FiInfo, FiLock, FiUser } from 'react-icons/fi';
 import AuthLayout from './AuthLayout';
 import { Alert, Badge } from '../../components/ui';
 import { useStore } from '../../lib/store';
+import { formatFCFA } from '../../lib/format';
+import { PlanDetails } from '../../components/PlanDetails';
 
 const fieldCls = 'w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm outline-none transition focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-100';
 const labelCls = 'mb-1.5 block text-xs font-bold text-slate-600';
 
 export default function SignUp() {
-  const { signUp } = useStore();
+  const { signUp, authKind, plans, plansError } = useStore();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const initialPlan = params.get('plan');
+  const [requestedPlanId, setRequestedPlanId] = useState<'essai' | 'standard' | 'premium'>(
+    initialPlan === 'standard' || initialPlan === 'premium' ? initialPlan : 'essai',
+  );
+  const availablePlans = plans.filter((plan) => ['essai', 'standard', 'premium'].includes(plan.id));
+  const selectedAvailable = availablePlans.some((plan) => plan.id === requestedPlanId);
   const [form, setForm] = useState({
     companyName: '', stationName: '', phone: '', city: '',
     ownerName: '', email: '', password: '', confirm: '',
@@ -24,13 +33,14 @@ export default function SignUp() {
     e.preventDefault();
     setError('');
     setNotice('');
+    if (!selectedAvailable) return setError('Choisissez une formule disponible avant de continuer.');
     if (form.password !== form.confirm) return setError('Les deux mots de passe ne correspondent pas.');
     if (form.password.length < 8) return setError('Le mot de passe doit contenir au moins 8 caractères.');
     setBusy(true);
     try {
-      const result = await signUp(form);
+      const result = await signUp({ ...form, requestedPlanId });
       if (result.confirmationRequired) {
-        setNotice(result.message ?? 'Confirmez votre adresse e-mail avant la première connexion.');
+        setNotice(`${result.message ?? 'Confirmez votre adresse e-mail avant la première connexion.'} Après connexion, ouvrez Abonnement pour vérifier la formule et toute demande en attente.`);
         return;
       }
       const activated = result.identity?.stations[0]?.activated ?? false;
@@ -44,11 +54,28 @@ export default function SignUp() {
 
   return (
     <AuthLayout>
-      <Badge tone="accent">14 jours d’essai · sans carte bancaire</Badge>
+      <Badge tone="accent">{authKind === 'local' ? 'Espace de démonstration local' : 'Inscription par e-mail'}</Badge>
       <h1 className="mt-4 text-3xl font-extrabold tracking-tight">Créer mon espace</h1>
-      <p className="mt-2 text-sm text-slate-500">Deux temps, quatre informations sur votre station, puis votre compte.</p>
+      <p className="mt-2 text-sm text-slate-500">Comparez les formules, puis créez votre entreprise et votre compte.</p>
 
       <form onSubmit={(e) => { void submit(e); }} className="mt-6 space-y-5">
+        <fieldset className="rounded-2xl border border-slate-200 p-4">
+          <legend className="px-1 text-sm font-bold">Votre formule souhaitée</legend>
+          <p className="mb-3 text-xs leading-relaxed text-slate-500">L’essai donne accès à tous les modules pendant 14 jours. Standard et Premium sont des demandes, activées seulement après validation administrateur. Aucun paiement automatique.</p>
+          {plansError && <Alert kind="danger">Formules indisponibles : {plansError}</Alert>}
+          {!plansError && availablePlans.length === 0 && <p role="status" className="text-xs text-slate-500">Chargement des formules…</p>}
+          <div className="space-y-3">
+            {availablePlans.map((plan) => <label key={plan.id} className={`block cursor-pointer rounded-xl border p-3 ${requestedPlanId === plan.id ? 'border-sky-500 bg-sky-50' : 'border-slate-200'}`}>
+              <span className="flex items-center justify-between gap-2 text-sm font-bold">
+                <span className="flex items-center gap-2"><input type="radio" name="plan" value={plan.id} checked={requestedPlanId === plan.id}
+                  onChange={() => setRequestedPlanId(plan.id as 'essai' | 'standard' | 'premium')} /> {plan.name}</span>
+                <span>{plan.id === 'essai' ? 'Gratuit · 14 jours' : `${formatFCFA(plan.priceMonthly)} / mois`}</span>
+              </span>
+              <div className="mt-2 text-slate-600"><PlanDetails plan={plan} compact /></div>
+            </label>)}
+          </div>
+          <p className="mt-3 text-[11px] leading-relaxed text-slate-500">Comptes actifs : propriétaire inclus. Tarifs indicatifs à valider commercialement. Une validation payante anticipée met fin immédiatement à l’essai. À son échéance sans validation, les données restent consultables et les écritures ordinaires sont bloquées.</p>
+        </fieldset>
         {/* Temps 1 */}
         <section className="rounded-2xl border border-slate-200 p-4">
           <div className="mb-4 flex items-center gap-2">
@@ -88,11 +115,15 @@ export default function SignUp() {
 
         <div className="rounded-xl bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-500">
           <div className="flex items-start gap-2"><FiInfo className="mt-0.5 shrink-0 text-sky-600" />
-            <p>Supabase Auth crée <strong>une seule fois</strong> l’entreprise, sa station, le profil propriétaire et l’abonnement d’essai. Un e-mail de confirmation est requis avant la première connexion. Aucune donnée d’exemple ni aucun tarif de lavage n’est prérempli.</p>
+            {authKind === 'local' ? (
+              <p>L’espace est créé uniquement dans ce navigateur. Aucun e-mail n’est envoyé ni vérifié ; aucun lien de récupération n’est disponible. Un espace existant ne sera pas remplacé.</p>
+            ) : (
+              <p>Supabase Auth crée l’entreprise, sa station, le profil propriétaire et l’abonnement d’essai. Une confirmation par e-mail peut être requise avant la première connexion. Aucun tarif de lavage n’est prérempli.</p>
+            )}
           </div>
         </div>
 
-        <button type="submit" disabled={busy} className="wg-btn wg-btn-primary w-full !py-3 disabled:opacity-60">
+        <button type="submit" disabled={busy || !selectedAvailable} className="wg-btn wg-btn-primary w-full !py-3 disabled:opacity-60">
           {busy ? 'Création…' : 'Créer mon espace'} <FiArrowRight />
         </button>
       </form>
@@ -100,7 +131,7 @@ export default function SignUp() {
       <p className="mt-5 text-center text-sm text-slate-500">
         Déjà inscrit ? <Link to="/connexion" className="font-bold text-sky-600 hover:underline">Se connecter</Link>
       </p>
-      <div className="mt-5 flex items-center justify-center gap-2 text-[11px] text-slate-400"><FiCheckCircle /> <FiLock /> JWT 1 h · refresh token renouvelé · aucune connexion Google / Facebook</div>
+      <div className="mt-5 flex items-center justify-center gap-2 text-[11px] text-slate-400"><FiCheckCircle /> <FiLock /> {authKind === 'local' ? 'Démonstration non sécurisée · session en mémoire' : 'Aucune connexion Google / Facebook'}</div>
     </AuthLayout>
   );
 }

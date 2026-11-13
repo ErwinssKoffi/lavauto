@@ -38,7 +38,7 @@ export function baseState(): Record<string, unknown> {
     washPosts: [{ id: 'p1', stationId: 'st1', name: 'Piste 1', capacity: 2, active: true }],
     cashSessions: [{ id: 'ca1', stationId: 'st1', openedBy: 'Erwin Koffi', openedAt: now, openingFloat: 10000, closedAt: null, countedAmount: null, closedBy: null, status: 'ouverte', reopenReason: null, reopenedAt: null }],
     expenses: [{ id: 'e1', stationId: 'st1', amount: 1500, category: 'Fournitures', reason: 'Shampoing', supplier: 'Fournisseur', date: now.slice(0, 10), method: 'especes', cashSessionId: 'ca1', status: 'enregistree', cancelReason: null, createdBy: 'Erwin Koffi', createdAt: now }],
-    subscription: { id: 'sub1', companyId: 'co1', planId: 'essai', status: 'essai', startedAt: now, trialEndsAt: now, pendingPlanId: null },
+    subscription: { id: 'sub1', companyId: 'co1', planId: 'essai', status: 'essai', startedAt: now, trialEndsAt: new Date(Date.now() + 14 * 86400000).toISOString(), pendingPlanId: null },
     auditLogs: [{ id: 'l1', at: now, actor: 'Erwin Koffi', action: 'Station activée', detail: 'Ouverture' }],
     platformCompanies: [{ id: 'co1', name: 'Clean Auto SARL', city: 'Abidjan', phone: '', planName: 'Essai', status: 'essai', stations: 1, monthlyRevenue: 0, createdAt: now }],
     session: { userId: 'u1', email: 'erwin@cleanauto.ci', name: 'Erwin Koffi', role: 'proprietaire', companyId: 'co1', stationId: 'st1' },

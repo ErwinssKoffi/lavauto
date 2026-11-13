@@ -1,5 +1,7 @@
 # LAVAUTO — Prompt 09 : analytics, quotas et administration SaaS
 
+> **Préparation locale ultérieure :** `057`, non déployée, ajoute les droits de formule, la lecture seule et les quotas UTC incluant les réservations. Les coûts avancés sont masqués en Standard, y compris dans les projections privilégiées. Le tableau plateforme signale l’échéance et les limites manquantes. Le reste de ce document décrit la livraison historique P09 ; voir [subscriptions.md](subscriptions.md) pour le contrat actuel de la branche.
+
 **Date :** 12/11/2026 · **Branche :** `arena/868cde36-lavauto` · **Projet :** `lavauto` (`cgxrqorwmmcyqescatzs`) · **Statut :** P09 livré ; P10 livré ensuite sur `p10_complet` + `levee_totale` (voir [deployment.md](deployment.md)).
 
 Ce document décrit la livraison réelle du **Prompt 09** (phase 8 de [`migration-roadmap.md`](migration-roadmap.md)). Les migrations `001`–`038` restent figées : aucune n'a été réécrite ni réappliquée. Les six migrations `039`–`044` sont strictement additives, sans nouvelle table métier, sans fixture persistante, sans compte Auth, sans e-mail, sans secret, sans bucket Storage, sans fournisseur ni envoi.

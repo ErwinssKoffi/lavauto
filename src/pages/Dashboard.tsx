@@ -6,6 +6,7 @@ import {
   FiDroplet, FiTrendingUp, FiTruck,
 } from 'react-icons/fi';
 import { useStore } from '../lib/store';
+import { usePermissions } from '../lib/usePermissions';
 import { buildReport, getLast7DaysChartData } from '../lib/metrics';
 import { analyticsBoardFromState, monthStartISO } from '../lib/analytics';
 import { formatDate, formatFCFA, todayISO } from '../lib/format';
@@ -15,7 +16,8 @@ import { washStatusTone, finishedWashes } from '../lib/washLifecycle';
 import Revenue7DaysLineChart from '../components/Revenue7DaysLineChart';
 
 export default function Dashboard() {
-  const { state, dataSource, stationMetrics, stationMetricsError, refreshStationMetrics } = useStore();
+  const { state, dataSource, stationMetrics, stationMetricsError, refreshStationMetrics, subscriptionAccess } = useStore();
+  const { can } = usePermissions();
   const today = todayISO();
   const start = new Date();
   start.setDate(start.getDate() - 6);
@@ -61,8 +63,8 @@ export default function Dashboard() {
   if (!openCash && state.station?.cashRequiresOpen) alerts.push({ tone: 'warn', text: 'Aucune caisse ouverte : les encaissements en espèces sont refusés.' });
   if (unpaid.length > 0) alerts.push({ tone: 'accent', text: `${unpaid.length} fiche(s) récente(s) avec un reste à payer.` });
   if (state.expenses.some((e) => e.status === 'annulee')) alerts.push({ tone: 'accent', text: 'Des dépenses annulées sont conservées dans le journal.' });
-  if (state.subscription?.pendingPlanId) alerts.push({ tone: 'accent', text: 'Une demande de changement de formule est en attente.' });
-  if (state.stockAlerts.length > 0) {
+  if (subscriptionAccess?.pendingPlanId) alerts.push({ tone: 'accent', text: 'Une demande de changement de formule est en attente.' });
+  if (can('inventory.view') && state.stockAlerts.length > 0) {
     alerts.push({
       tone: 'danger',
       text: `Stock critique : ${state.stockAlerts.length} consommable(s) sous le seuil (${state.stockAlerts.map((a) => `${a.name} : ${a.qtyOnHand}`).slice(0, 2).join(', ')}).`,
@@ -151,7 +153,7 @@ export default function Dashboard() {
             {target === 0 && <p className="wg-muted mt-2 text-[11px]">Fixez un objectif dans Paramètres ou pendant la mise en route.</p>}
           </Card>
 
-          <Card>
+          {can('inventory.view') && <Card>
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-bold flex items-center gap-1.5">
                 <FiBox className="text-amber-400" /> Consommables & Alertes
@@ -183,7 +185,7 @@ export default function Dashboard() {
               <Link to="/app/parametres#stock" className="wg-link text-[11px]">Seuils d’alerte</Link>
               <Link to="/app/stock" className="wg-link font-bold text-[11px]">Gérer les stocks →</Link>
             </div>
-          </Card>
+          </Card>}
         </div>
       </div>
 
@@ -214,7 +216,7 @@ export default function Dashboard() {
       <Card className="mt-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-bold">Tendance du mois — dashboard station</h2>
-          <Link to="/app/consolidation" className="wg-link text-xs"><FiTrendingUp className="inline" /> Consolidation multi-stations</Link>
+          {can('analytics.view') && <Link to="/app/consolidation" className="wg-link text-xs"><FiTrendingUp className="inline" /> Consolidation multi-stations</Link>}
         </div>
         {monthTrend.length === 0 ? (
           <EmptyState icon={<FiActivity />} title="Aucune tendance enregistrée" description="Les lavages réels alimenteront ce graphique Recharts, sans donnée d’exemple." />

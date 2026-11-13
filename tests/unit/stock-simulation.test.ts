@@ -4,6 +4,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { baseState } from '../../e2e/fixtures/state';
+import { fakeSubscriptionAccess } from '../../e2e-connected/fixtures/mock-supabase';
+import { mapSubscriptionAccess } from '../../src/lib/subscription';
 import type { AppState } from '../../src/types';
 import type { StockSnapshot } from '../../src/lib/stock';
 import type { StockCommands } from '../../src/services/adapters/DataAdapter';
@@ -26,6 +28,11 @@ vi.mock('../../src/services/adapters/DataAdapter', () => ({
   getDataSource: () => fake.source,
   getDataAdapter: (getState: () => AppState) => {
     const adapter = new LocalDataAdapter(getState);
+    if (fake.source === 'supabase' && fake.authKind === 'supabase') {
+      Object.defineProperty(adapter, 'subscriptionCommands', { value: {
+        read: async (companyId: string) => mapSubscriptionAccess(fakeSubscriptionAccess(companyId), companyId),
+      } });
+    }
     if (fake.commands) Object.defineProperty(adapter, 'stockCommands', { value: fake.commands });
     if (fake.board) Object.defineProperty(adapter, 'listStockBoard', { value: fake.readBoard });
     return adapter;
@@ -91,7 +98,7 @@ function Probe() {
 async function mount(state: Record<string, unknown> = fixture()) {
   localStorage.setItem('washguard.state.v1', JSON.stringify(state));
   const content = React.createElement(MemoryRouter,
-    { future: { v7_startTransition: true, v7_relativeSplatPath: true } },
+    null,
     React.createElement(Probe),
     React.createElement('div', { id: 'test-settings' }, React.createElement(Settings)),
     React.createElement('div', { id: 'test-banner' }, React.createElement(StockAlertBanner)),
@@ -126,7 +133,7 @@ beforeEach(() => {
   localStorage.clear();
   fake.source = 'local';
   fake.authKind = 'local';
-  fake.identity = null;
+  fake.identity = identity;
   fake.commands = null;
   fake.board = null;
   fake.readBoard.mockReset();
@@ -195,11 +202,19 @@ describe('commandes de stock réservées à la démonstration locale', () => {
     }
     await mount(fixture(true)); // Un ancien cache démo ne doit pas ouvrir les commandes.
     expect(store.isLocalStockDemo).toBe(false);
-    // La source connectée ne restaure plus les données métier du cache local.
-    expect(store.state.demoMode).toBe(source === 'local');
-    const settings = section('#test-settings #stock');
+    // Un contexte Auth serveur ne conserve pas le cache de démonstration ;
+    // une source connectée ne le restaure pas non plus.
+    expect(store.state.demoMode).toBe(false);
     expect(store.isServerStock).toBe(source === 'supabase' && authKind === 'supabase');
-    if (source !== authKind) expect(settings.textContent).toContain('les opérations sont bloquées');
+    if (source !== authKind) {
+      expect(container.querySelector('#test-settings #stock')).toBeNull();
+      expect(store.canWriteSubscription).toBe(false);
+      expect(() => store.adjustProductStock(product.id, 7)).toThrow(/Abonnement non confirmé/);
+      expect(() => store.updateStockThreshold(product.id, 12)).toThrow(/Abonnement non confirmé/);
+      expect(fake.rpc).not.toHaveBeenCalled();
+      return;
+    }
+    const settings = section('#test-settings #stock');
     expect(settings.querySelector('#stock-threshold-product-1')).toBeNull();
     expect(settings.querySelectorAll('button[aria-label^="Simuler"]')).toHaveLength(0);
     if (source === 'supabase' && authKind === 'local') {
@@ -236,7 +251,8 @@ describe('commandes de stock réservées à la démonstration locale', () => {
     expect(store.isLocalStockDemo).toBe(false);
     expect(store.state.products).toEqual([]);
     expect(store.state.stockAlerts).toEqual([]);
-    expect(section('#test-settings #stock').textContent).toContain('Aucun produit configuré');
+    expect(container.querySelector('#test-settings #stock')).toBeNull();
+    expect(store.canWriteSubscription).toBe(false);
   });
 
   it('refuse aussi les mutations locales lorsque l’adaptateur stock serveur est indisponible', async () => {
@@ -281,7 +297,7 @@ describe('commandes de stock réservées à la démonstration locale', () => {
       () => store.certifyCosts({ start: '2026-01-01', end: '2026-01-31', attestation: 'Je certifie les coûts.' }),
     ];
     await act(async () => {
-      for (const write of writes) expect(write).toThrow(/Stock serveur indisponible|station n’est pas encore activée/);
+      for (const write of writes) expect(write).toThrow(/Stock serveur indisponible|station n’est pas encore activée|Abonnement non confirmé/);
     });
     expect(JSON.stringify({ state: store.state, toasts: store.toasts })).toBe(before);
     expect(fake.rpc).not.toHaveBeenCalled();

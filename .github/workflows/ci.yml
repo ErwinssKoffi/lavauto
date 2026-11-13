@@ -19,7 +19,7 @@ jobs:
       - name: TypeScript
         run: npm run typecheck
       - name: Vérification des fonctions Edge avec Deno
-        run: npx --yes deno@2.9.6 check --no-config supabase/functions/whatsapp-dispatch/index.ts supabase/functions/whatsapp-webhook/index.ts
+        run: npx --yes deno@2.9.6 check --no-config supabase/functions/invite-user/index.ts supabase/functions/whatsapp-dispatch/index.ts supabase/functions/whatsapp-webhook/index.ts
       - name: Garde-fous statiques
         run: npm run lint
       - name: Tests unitaires Vitest

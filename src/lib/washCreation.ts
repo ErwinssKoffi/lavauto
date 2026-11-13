@@ -55,7 +55,7 @@ export function readPendingWash(userId: string, stationId: string): PendingWashC
   let raw: string | null;
   try { raw = storage().getItem(storageKey(userId, stationId)); }
   catch { throw new Error('La conservation de la tentative est indisponible dans ce navigateur : vérifiez les fiches avant toute nouvelle création.'); }
-  if (!raw) return null;
+  if (raw === null) return null;
   try {
     const value: unknown = JSON.parse(raw);
     if (!validPending(value, userId, stationId)) throw new Error('invalid');
